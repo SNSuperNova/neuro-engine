@@ -38,6 +38,15 @@ conductionVelocity  model distance unit / ms
 synapticDelay       ms
 ```
 
+Gate 1 将总延迟解析并四舍五入到整数微秒：
+
+```text
+travelTimeUs = round(pathLength / conductionVelocity × 1,000)
+totalDelayUs = travelTimeUs + synapticDelayUs
+```
+
+路径长度必须有限且非负，传导速度必须有限且大于零，总延迟必须严格大于零。
+
 ## 3. 两个事件之间的演化
 
 在没有输入事件时，膜电位解析衰减：

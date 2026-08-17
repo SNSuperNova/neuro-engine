@@ -8,16 +8,20 @@
 
 ## 当前阶段
 
-Gate 0 已实现：仓库包含一个无第三方依赖的 Rust 单神经元 LIF 内核、确定性事件批处理和边界测试。开发范围由 [MVP.md](MVP.md) 约束。
+Gate 0～2 已实现：仓库包含一个无第三方依赖的 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算和版本化对照实验。当前冻结基线是“起搏支持的稳定活动”，尚不是“撤除驱动后仍自维持”的网络。开发范围由 [MVP.md](MVP.md) 约束。
 
 运行验证：
 
 ```powershell
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
+cargo test --all-targets --release
 cargo run --example gate0
+cargo run --release --example gate2
+cargo run --release --example gate2_scan
 ```
+
+Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1.md](experiments/experiment-001-v1.md)。
 
 文档阅读顺序：
 

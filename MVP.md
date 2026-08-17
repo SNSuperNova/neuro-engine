@@ -53,7 +53,7 @@
 
 实现位于 [`src/lif.rs`](src/lif.rs)，验收测试位于 [`tests/gate0.rs`](tests/gate0.rs)。Gate 0 只承诺同一平台、同一工具链和同一配置下的逐事件确定性；跨 CPU 架构的浮点逐位一致仍是开放问题。
 
-### Gate 1：小网络
+### Gate 1：小网络（已实现）
 
 - 10～50 个神经元可以传播脉冲；
 - 多个在途脉冲和循环连接工作正确；
@@ -61,7 +61,9 @@
 - 不存在零延迟无限级联；
 - 相同实验的事件日志摘要一致。
 
-### Gate 2：网络动力学
+实现位于 [`src/network.rs`](src/network.rs)，验收测试位于 [`tests/gate1.rs`](tests/gate1.rs)。在途计数只包含已由神经元发出、尚未抵达的突触输入，不包含预先排定的外部事件。
+
+### Gate 2：网络动力学（已实现）
 
 - 扩展到 100～300 个神经元；
 - 分别运行无驱动、起搏驱动和关闭起搏后的对照实验；
@@ -70,6 +72,10 @@
 - 将经过试运行校准的验收区间冻结为实验版本的一部分。
 
 具体实验见 [EXPERIMENT_001.md](EXPERIMENT_001.md)。在验收区间冻结前，不以“动画看起来复杂”判定通过。
+
+指标与实验实现位于 [`src/metrics.rs`](src/metrics.rs) 和 [`src/experiment.rs`](src/experiment.rs)，验收测试位于 [`tests/gate2.rs`](tests/gate2.rs)。`experiment-001/v1` 的冻结配置与结果位于 [`experiments/experiment-001-v1.md`](experiments/experiment-001-v1.md)。
+
+Gate 2 的当前结论是：网络在起搏支持下满足冻结的稳定活动区间，局部刺激会改变后续轨迹；撤除起搏后网络沉默。因此“真正循环自维持”仍未达成，不能因 Gate 2 工具链完成而改写这一实验事实。
 
 ### Gate 3：只读回放
 

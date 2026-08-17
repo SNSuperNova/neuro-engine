@@ -17,7 +17,7 @@ impl SimTime {
         self.0
     }
 
-    fn checked_add(self, duration: SimDuration) -> Result<Self, ModelError> {
+    pub fn checked_add(self, duration: SimDuration) -> Result<Self, ModelError> {
         self.0
             .checked_add(duration.0)
             .map(Self)

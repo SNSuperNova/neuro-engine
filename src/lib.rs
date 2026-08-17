@@ -7,6 +7,7 @@ pub mod experiment;
 pub mod lif;
 pub mod metrics;
 pub mod network;
+pub mod playback;
 
 pub use experiment::{
     Gate2AcceptanceCriteria, Gate2AcceptanceReport, Gate2ExperimentConfig, Gate2ExperimentResult,
@@ -26,4 +27,9 @@ pub use network::{
     NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
     Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
     simulate_network, simulate_network_with_limits,
+};
+pub use playback::{
+    ArrivalOrigin, PlaybackArrival, PlaybackBundle, PlaybackChunk, PlaybackDataset, PlaybackError,
+    PlaybackInFlight, PlaybackMetricSample, PlaybackNeuron, PlaybackNeuronSample, PlaybackSpike,
+    PlaybackSynapse, build_playback_dataset,
 };

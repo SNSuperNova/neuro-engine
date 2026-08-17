@@ -26,7 +26,7 @@
 分析辅助        Python（可选，不进入正式模拟路径）
 ```
 
-下一阶段界面实现遵循 [VISUALIZATION.md](VISUALIZATION.md)，视觉优先级和持续起搏决策记录在 [ADR 0002](decisions/0002-visualization-first-and-continuous-pacemaker.md)。
+Gate 3 界面实现遵循 [VISUALIZATION.md](VISUALIZATION.md)，视觉优先级和持续起搏决策记录在 [ADR 0002](decisions/0002-visualization-first-and-continuous-pacemaker.md)。
 
 理由和约束记录在 [decisions/0001-initial-technical-direction.md](decisions/0001-initial-technical-direction.md)。
 
@@ -43,13 +43,16 @@ app-bridge      批量快照与前端命令，不包含模型逻辑
 
 模块名是职责说明，不要求第一天拆成六个独立包。只有边界稳定或需要独立测试时才拆包。
 
-当前 Gate 2 仍使用一个 Rust crate，并按源码模块分离：
+当前 Gate 3 使用一个无界面 Rust crate、一个只读播放桥和一个独立桌面界面：
 
 ```text
 src/lif.rs          单神经元解析演化
 src/network.rs      突触、空间传播、事件队列和日志
 src/metrics.rs      网络指标和轨迹差异
 src/experiment.rs   固定种子生成器与对照实验
+src/playback.rs     强类型 PlaybackChunk 与状态重建
+app/                TypeScript + Three.js 查看器
+src-tauri/          Windows/macOS 桌面容器
 ```
 
 ## 4. 时间与调度
@@ -88,7 +91,7 @@ SimulationBatch
 └── metricSamples[]
 ```
 
-密集数组采用紧凑二进制表示。JSON 只用于低频命令、配置和可读元数据。
+Rust 内部使用强类型 `PlaybackChunk`。当前冻结实验的发布包将拓扑只存一次，并把事件编码为紧凑数值数组；后续实时运行或更大数据集再替换为 typed array 二进制流。JSON 只用于低频命令、配置和可读元数据。
 
 界面以 30/60 FPS 绘制，但只读取模拟时间。播放速度和掉帧不得改变事件日志。
 

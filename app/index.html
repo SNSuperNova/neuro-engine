@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neuro Engine · Neural Microscope</title>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark"></span><strong>Neuro Engine</strong><span class="muted">Gate 3</span></div>
+    <label>运行分支 <select id="branch"></select></label>
+    <div class="search"><input id="search" type="search" inputmode="numeric" placeholder="神经元 ID"><button id="search-go">定位</button></div>
+    <button id="back" disabled>返回视角</button>
+    <div id="comparison" class="comparison" hidden></div>
+    <div id="perf" class="perf">-- FPS</div>
+  </header>
+
+  <main class="workspace">
+    <section id="viewport-wrap" class="viewport-wrap">
+      <canvas id="viewport" aria-label="三维神经元网络"></canvas>
+      <div class="legend">
+        <span><i class="dot excitatory"></i>兴奋</span>
+        <span><i class="dot inhibitory"></i>抑制</span>
+        <span><i class="ring"></i>起搏源</span>
+      </div>
+      <div class="camera-help"><kbd>WASD</kbd> 平移 · <kbd>Q/E</kbd> Z 轴 · 拖动鼠标旋转 · 滚轮前后</div>
+      <div class="axis"><span class="x">X</span><span class="y">Y</span><span class="z">Z</span></div>
+      <div id="loading" class="loading">正在载入实验数据…</div>
+    </section>
+
+    <aside class="inspector">
+      <div class="inspector-head"><span class="eyebrow">NEURON INSPECTOR</span><h1 id="neuron-title">未选择神经元</h1></div>
+      <dl id="details" class="details"><div><dt>提示</dt><dd>单击节点查看状态</dd></div></dl>
+      <div class="inspector-actions">
+        <button id="focus" disabled>聚焦</button>
+        <button id="upstream" disabled>跳到上游</button>
+        <button id="downstream" disabled>跳到下游</button>
+      </div>
+      <label class="toggle"><input id="isolate" type="checkbox" disabled> 只显示一阶邻域</label>
+      <section class="event-list"><h2>当前事件</h2><div id="events" class="events muted">播放后显示最近输入与放电</div></section>
+    </aside>
+  </main>
+
+  <footer class="playback">
+    <div class="transport">
+      <button id="prev" aria-label="上一个放电">◀|</button>
+      <button id="play" class="primary" aria-label="播放">▶</button>
+      <button id="next" aria-label="下一个放电">|▶</button>
+      <label>速度 <select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+      <strong id="time">0.000 ms</strong>
+      <span id="digest" class="muted"></span>
+    </div>
+    <input id="timeline" type="range" min="0" max="2500" step="0.1" value="0" aria-label="模拟时间">
+    <div class="charts">
+      <div><span>放电栅格</span><canvas id="raster" height="64"></canvas></div>
+      <div><span>10 ms 活动</span><canvas id="activity" height="64"></canvas></div>
+    </div>
+  </footer>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

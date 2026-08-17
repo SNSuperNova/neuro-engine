@@ -11,12 +11,12 @@
 - [MODEL_LIF.md](MODEL_LIF.md)：第一版神经元与突触模型；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：模拟、存储与界面边界；
 - [EXPERIMENT_001.md](EXPERIMENT_001.md)：首个可重复实验；
-- [VISUALIZATION.md](VISUALIZATION.md)：可视化优先的下一阶段规格；
+- [VISUALIZATION.md](VISUALIZATION.md)：Gate 3 可视化规格与当前实现边界；
 - [decisions/0001-initial-technical-direction.md](decisions/0001-initial-technical-direction.md)：首批技术决策。
 
 ## 当前推进策略
 
-Gate 0～2 已建立可运行、可测量的网络内核。下一阶段不继续叠加生物机制，而是优先完成 3D 游览、时间回放和局部检查工具。原因是网络动力学具有明显的空间和时间结构，仅凭汇总数字难以判断下一步应改善连接、延迟、抑制、起搏还是神经元模型。
+Gate 0～3 已建立可运行、可测量、可游览的网络内核与 3D 检查工具。下一阶段先使用持续起搏对照、局部刺激和撤除诊断的视觉结果提出小范围干预问题，再进入 Gate 4；不直接叠加新的生物机制。原因是网络动力学具有明显的空间和时间结构，仅凭汇总数字难以判断下一步应改善连接、延迟、抑制、起搏还是神经元模型。
 
 持续起搏是允许且预期的正常运行条件，类似系统内部持续存在的节律源。关闭起搏只是一种诊断和消融实验，不要求正常网络必须在撤除后继续运行。详细决定见 [decisions/0002-visualization-first-and-continuous-pacemaker.md](decisions/0002-visualization-first-and-continuous-pacemaker.md)。
 

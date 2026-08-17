@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Gate 0～2 已实现：仓库包含一个无第三方依赖的 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算和版本化对照实验。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。下一阶段优先实现可视化，以观察结果决定后续模型方向。开发范围由 [MVP.md](MVP.md) 约束。
+Gate 0～3 已实现：仓库包含 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算、版本化对照实验，以及 Tauri + Three.js 的 3D“神经显微镜”。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。下一阶段将使用可视化结果选择需要验证的干预方向。开发范围由 [MVP.md](MVP.md) 约束。
 
 运行验证：
 
@@ -19,6 +19,10 @@ cargo test --all-targets --release
 cargo run --example gate0
 cargo run --release --example gate2
 cargo run --release --example gate2_scan
+cargo run --release --example export_playback
+npm install
+npm run dev
+npm run tauri dev
 ```
 
 Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1.md](experiments/experiment-001-v1.md)。
@@ -29,7 +33,7 @@ Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1
 2. [MODEL_LIF.md](MODEL_LIF.md)：第一版计算模型；
 3. [ARCHITECTURE.md](ARCHITECTURE.md)：模块和数据边界；
 4. [EXPERIMENT_001.md](EXPERIMENT_001.md)：如何证明第一版有效；
-5. [VISUALIZATION.md](VISUALIZATION.md)：下一阶段的 3D 游览、时间回放和性能规格；
+5. [VISUALIZATION.md](VISUALIZATION.md)：已实现的 3D 游览、时间回放和性能规格；
 6. [DESIGN.md](DESIGN.md)：长期愿景和后续研究方向；
 7. [decisions](decisions/)：已经作出的重要工程决策。
 
@@ -40,7 +44,16 @@ Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1
 - 模拟内核不依赖图形界面，并能以无界面方式运行；
 - 显示帧率、播放速度和相机操作不能影响模拟结果；
 - 新机制必须能单独关闭，以便进行对照实验；
-- 完成 Gate 3 可视化观察工具前，不扩展到学习、生长、视觉输入和复杂神经元。
+- Gate 4 仍以可关闭、可比较的干预分支为边界，不直接扩展到学习、生长、视觉输入和复杂神经元。
+
+## Gate 3 操作
+
+- `WASD`：在 XY 平面移动；
+- `Q / E`：降低或升高 Z 轴位置；
+- 拖动鼠标：旋转视角；滚轮：沿视线前后移动；
+- 单击神经元或输入 ID：选择并检查；
+- 时间轴、播放按钮和倍速：查看同一份确定性实验结果；
+- 运行分支：切换持续起搏对照、局部刺激和撤除起搏诊断。
 
 ## 文档中的结论等级
 

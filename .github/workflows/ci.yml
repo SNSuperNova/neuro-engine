@@ -13,6 +13,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
       - name: Show Rust toolchain
         run: rustc --version && cargo --version
       - name: Check formatting
@@ -21,3 +25,9 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Test release behavior
         run: cargo test --all-targets --release
+      - name: Install visualizer dependencies
+        run: npm ci
+      - name: Build visualizer
+        run: npm run build
+      - name: Check Tauri desktop shell
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked

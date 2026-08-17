@@ -11,7 +11,14 @@
 - [MODEL_LIF.md](MODEL_LIF.md)：第一版神经元与突触模型；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：模拟、存储与界面边界；
 - [EXPERIMENT_001.md](EXPERIMENT_001.md)：首个可重复实验；
+- [VISUALIZATION.md](VISUALIZATION.md)：可视化优先的下一阶段规格；
 - [decisions/0001-initial-technical-direction.md](decisions/0001-initial-technical-direction.md)：首批技术决策。
+
+## 当前推进策略
+
+Gate 0～2 已建立可运行、可测量的网络内核。下一阶段不继续叠加生物机制，而是优先完成 3D 游览、时间回放和局部检查工具。原因是网络动力学具有明显的空间和时间结构，仅凭汇总数字难以判断下一步应改善连接、延迟、抑制、起搏还是神经元模型。
+
+持续起搏是允许且预期的正常运行条件，类似系统内部持续存在的节律源。关闭起搏只是一种诊断和消融实验，不要求正常网络必须在撤除后继续运行。详细决定见 [decisions/0002-visualization-first-and-continuous-pacemaker.md](decisions/0002-visualization-first-and-continuous-pacemaker.md)。
 
 ## 1. 项目愿景
 
@@ -403,6 +410,8 @@ Experiment
 不同模型版本产生的结果不能直接拼接为同一条时间线。若模型发生不兼容变化，应从兼容检查点或初始状态重新计算。
 
 ## 13. 推荐迭代阶段
+
+本节描述长期研究阶段，与 [MVP.md](MVP.md) 中用于工程验收的 Gate 编号不是同一套编号。当前工程下一步是 MVP Gate 3 可视化回放，不是本节的“阶段二：极简视觉输入”。
 
 ### 阶段一：自维持网络
 

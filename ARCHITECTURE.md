@@ -26,6 +26,8 @@
 分析辅助        Python（可选，不进入正式模拟路径）
 ```
 
+下一阶段界面实现遵循 [VISUALIZATION.md](VISUALIZATION.md)，视觉优先级和持续起搏决策记录在 [ADR 0002](decisions/0002-visualization-first-and-continuous-pacemaker.md)。
+
 理由和约束记录在 [decisions/0001-initial-technical-direction.md](decisions/0001-initial-technical-direction.md)。
 
 ## 3. Rust 模块

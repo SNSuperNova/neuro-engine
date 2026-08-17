@@ -8,7 +8,16 @@
 
 ## 当前阶段
 
-当前处于设计收敛阶段，尚未开始实现。开发范围由 [MVP.md](MVP.md) 约束。
+Gate 0 已实现：仓库包含一个无第三方依赖的 Rust 单神经元 LIF 内核、确定性事件批处理和边界测试。开发范围由 [MVP.md](MVP.md) 约束。
+
+运行验证：
+
+```powershell
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo run --example gate0
+```
 
 文档阅读顺序：
 

@@ -1,0 +1,12 @@
+[package]
+name = "neuro-engine"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic event-driven spiking network simulation core"
+license = "MIT"
+
+[lib]
+name = "neuro_engine"
+path = "src/lib.rs"
+
+[dependencies]

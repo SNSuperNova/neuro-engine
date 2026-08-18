@@ -8,7 +8,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate B</small></div></div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate C</small></div></div>
     <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
@@ -100,6 +100,31 @@
       <div class="section-head"><div><span class="eyebrow">PAIRED MODEL-SEED EVIDENCE</span><h2>状态必要性与训练曲线</h2></div><span>阴影为模型种子均值的 95% CI</span></div>
       <div id="gate-b-effects" class="gate-b-effects"></div>
       <canvas id="gate-b-curve" aria-label="Gate B 三种控制器的训练正确率"></canvas>
+    </section>
+
+    <section class="robustness card">
+      <div class="section-head"><div><span class="eyebrow">GATE B · CAPABILITY BOUNDARY</span><h2>状态机制的有效范围</h2></div><strong id="robustness-boundary"></strong></div>
+      <p class="audit-intro">固定 Gate B 机制后，只改变一个因素。绿色表示达到冻结的可靠标准；红色表示状态已经接近机会水平或受到持续输入覆盖。</p>
+      <div id="robustness-groups" class="robustness-groups"></div>
+    </section>
+
+    <section class="gate-c card">
+      <div class="section-head"><div><span class="eyebrow">GATE C · TEMPORAL CREDIT ASSIGNMENT</span><h2>资格迹 × 能量延迟</h2></div><span id="gate-c-protocol"></span></div>
+      <p class="audit-intro">线索在选择时可见，真实能量稍后才到账。每格显示未见序列正确率；行只改变能量延迟，列只改变资格迹衰减。</p>
+      <div id="gate-c-acceptance" class="acceptance-grid gate-c-acceptance"></div>
+      <div class="gate-c-layout">
+        <div>
+          <div id="gate-c-matrix" class="gate-c-matrix" role="table" aria-label="Gate C 正确率矩阵"></div>
+          <div id="gate-c-effects" class="gate-b-effects gate-c-effects"></div>
+        </div>
+        <aside class="credit-trace">
+          <label>代表轨迹 <select id="gate-c-trace-select"></select></label>
+          <div class="credit-readout"><span id="gate-c-phase">—</span><strong id="gate-c-reward">—</strong></div>
+          <div id="gate-c-events" class="credit-events"></div>
+          <input id="gate-c-range" type="range" min="0" max="1" value="0" aria-label="Gate C 时间轨迹">
+          <p id="gate-c-trace-note"></p>
+        </aside>
+      </div>
     </section>
   </main>
 </div>

@@ -54,6 +54,13 @@ interface GateBDataset {
   reports: GateBReport[]; pairedEffects: { id: string; leftLabel: string; rightLabel: string; effect: GateBMetricIntervals }[];
   traces: GateBTrace[]; conclusions: string[]; acceptance: Record<string, boolean> & { passed: boolean };
 }
+type RobustnessFactor = "delay-steps" | "cue-input-scale" | "persistent-input-scale";
+interface RobustnessPoint { id: string; factor: RobustnessFactor; value: number; delaySteps: number; cueInputScale: number; persistentInputScale: number; report: GateBReport }
+interface RobustnessDataset { version: string; config: { modelSeedCount: number; evaluationEpisodes: number }; baselineDelaySteps: number; baselineCueInputScale: number; baselinePersistentInputScale: number; reliableMemoryBoundarySteps: number | null; points: RobustnessPoint[] }
+interface GateCReport { rewardDelaySteps: number; eligibilityDecay: number; cueRandomized: boolean; metrics: { correctChoiceFraction: Interval; branchChoiceFraction: Interval; leftTargetAccuracy: Interval; rightTargetAccuracy: Interval }; sampleEfficiency: { reachedSeedCount: number; reachedSeedFraction: number; meanEpisodesWhenReached: Interval | null } }
+interface GateCFrame { step: number; phaseBefore: "junction" | "waiting" | "outcome"; waitingStepsRemainingBefore: number; visibleCue: ForkSide | null; action: Action; reward: number; energy: number; branchChoice: ForkSide | null; energyPaidOut: boolean; hiddenActivity: number[]; actionProbabilities: number[] }
+interface GateCTrace { label: string; rewardDelaySteps: number; eligibilityDecay: number; cueRandomized: boolean; target: ForkSide; presentedCue: ForkSide; frames: GateCFrame[]; summary: { correctChoice: boolean; energyPaidOut: boolean; finalEnergy: number; totalReward: number } }
+interface GateCDataset { version: string; config: { modelSeedCount: number; trainingEpisodes: number; evaluationEpisodes: number; rewardDelays: number[]; eligibilityDecays: number[] }; reports: GateCReport[]; pairedEffects: { id: string; effect: { correctChoiceFraction: Interval } }[]; traces: GateCTrace[]; acceptance: Record<string, boolean> & { passed: boolean } }
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -70,6 +77,8 @@ const gateBCurveCanvas = byId<HTMLCanvasElement>("gate-b-curve");
 const gateBTraceSelect = byId<HTMLSelectElement>("gate-b-trace-select");
 const gateBRange = byId<HTMLInputElement>("gate-b-range");
 const gateBPlay = byId<HTMLButtonElement>("gate-b-play");
+const gateCTraceSelect = byId<HTMLSelectElement>("gate-c-trace-select");
+const gateCRange = byId<HTMLInputElement>("gate-c-range");
 const traceSelect = byId<HTMLSelectElement>("trace-select");
 const timeline = byId<HTMLInputElement>("timeline");
 const play = byId<HTMLButtonElement>("play");
@@ -80,6 +89,10 @@ const speed = byId<HTMLSelectElement>("speed");
 let dataset: Dataset;
 let gateA: GateADataset;
 let gateB: GateBDataset;
+let robustness: RobustnessDataset;
+let gateC: GateCDataset;
+let gateCTrace: GateCTrace;
+let gateCFrameIndex = 0;
 let gateBTrace: GateBTrace;
 let gateBFrameIndex = 0;
 let gateBPlaying = false;
@@ -291,6 +304,74 @@ const renderGateB = () => {
   selectGateBTrace();drawGateBCurve();
 };
 
+const renderRobustness = () => {
+  byId("robustness-boundary").textContent = robustness.reliableMemoryBoundarySteps === null ? "未找到可靠边界" : `可靠记忆边界 ${robustness.reliableMemoryBoundarySteps} 步`;
+  const definitions: { factor: RobustnessFactor; title: string; unit: string }[] = [
+    { factor: "delay-steps", title: "无信息延迟", unit: "步" },
+    { factor: "cue-input-scale", title: "线索投影", unit: "×" },
+    { factor: "persistent-input-scale", title: "持续输入干扰", unit: "×" },
+  ];
+  const groups = byId("robustness-groups");
+  groups.replaceChildren(...definitions.map(definition => {
+    const article = document.createElement("article");
+    const points = robustness.points.filter(point => point.factor === definition.factor).sort((a,b) => a.value-b.value);
+    article.innerHTML = `<h3>${definition.title}</h3><div class="boundary-bars">${points.map(point => {
+      const metric = point.report.metrics.correctChoiceFraction;
+      const reliable = metric.mean >= .7 && metric.lower95 > .5;
+      const baseline = point.delaySteps === robustness.baselineDelaySteps && point.cueInputScale === robustness.baselineCueInputScale && point.persistentInputScale === robustness.baselinePersistentInputScale;
+      return `<div class="boundary-row ${reliable ? "reliable" : "limited"} ${baseline ? "baseline" : ""}"><span>${point.value.toFixed(definition.factor === "delay-steps" ? 0 : 2)} ${definition.unit}</span><div><i style="width:${Math.max(0,Math.min(100,metric.mean*100))}%"></i><b style="left:${Math.max(0,Math.min(100,metric.lower95*100))}%;width:${Math.max(0,(Math.min(1,metric.upper95)-Math.max(0,metric.lower95))*100)}%"></b></div><strong>${(metric.mean*100).toFixed(1)}%</strong></div>`;
+    }).join("")}</div>`;
+    return article;
+  }));
+};
+
+const renderGateCFrame = () => {
+  const frame = gateCTrace.frames[gateCFrameIndex];
+  gateCRange.value = String(gateCFrameIndex);
+  const phase = frame.phaseBefore === "junction" ? "选择分支" : frame.energyPaidOut ? "真实能量到账" : `强制等待 · 还剩 ${frame.waitingStepsRemainingBefore} 步`;
+  byId("gate-c-phase").textContent = phase;
+  byId("gate-c-reward").textContent = frame.reward > 0 ? `+${frame.reward.toFixed(3)} reward` : "无能量后果";
+  byId("gate-c-reward").className = frame.reward > 0 ? "positive" : "";
+  [...byId("gate-c-events").children].forEach((item,index) => item.classList.toggle("active", index === gateCFrameIndex));
+  byId("gate-c-trace-note").textContent = `目标 ${labels[gateCTrace.target]} · 线索 ${frame.visibleCue ? labels[frame.visibleCue] : "已关闭"} · 动作 ${labels[frame.action]} · 能量 ${frame.energy.toFixed(3)}`;
+};
+
+const selectGateCTrace = () => {
+  gateCTrace = gateC.traces.find(item => item.label === gateCTraceSelect.value) ?? gateC.traces[0];
+  gateCFrameIndex = 0; gateCRange.max = String(gateCTrace.frames.length - 1);
+  const events = byId("gate-c-events");
+  events.replaceChildren(...gateCTrace.frames.map((frame,index) => {
+    const button = document.createElement("button");
+    button.className = frame.phaseBefore === "junction" ? "choice" : frame.energyPaidOut ? "payout" : "wait";
+    button.innerHTML = `<i>${frame.step}</i><span>${frame.phaseBefore === "junction" ? "选择" : frame.energyPaidOut ? "到账" : "等待"}</span>`;
+    button.addEventListener("click", () => { gateCFrameIndex=index; renderGateCFrame(); });
+    return button;
+  }));
+  renderGateCFrame();
+};
+
+const renderGateC = () => {
+  byId("gate-c-protocol").textContent = `${gateC.config.modelSeedCount} 模型种子 × ${gateC.config.evaluationEpisodes} 均衡测试`;
+  const acceptanceLabels: Record<string,string> = { immediateRewardLearnable:"即时奖励可学习",currentTraceBeatsZeroAtDelayEight:"8 步资格迹显著胜出",currentTraceReachesSeventyPercent:"8 步正确率 ≥ 70%",zeroTraceDegradesWithDelay:"无轨迹随延迟退化",randomizedControlAtChance:"随机线索为机会水平",leftRightAndBranchConsistent:"左右与提交一致",deterministic:"完全确定性" };
+  const acceptance = byId("gate-c-acceptance"); acceptance.replaceChildren();
+  for (const [key,label] of Object.entries(acceptanceLabels)) { const pass=gateC.acceptance[key]; const item=document.createElement("div"); item.className=pass?"pass":"fail"; item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`; acceptance.append(item); }
+  const matrix = byId("gate-c-matrix");
+  const cells = [`<div class="matrix-head">延迟 \ trace</div>`, ...gateC.config.eligibilityDecays.map(value=>`<div class="matrix-head">${value.toFixed(2)}</div>`)];
+  for (const delay of gateC.config.rewardDelays) {
+    cells.push(`<div class="matrix-head">${delay} 步</div>`);
+    for (const decay of gateC.config.eligibilityDecays) {
+      const report=gateC.reports.find(item=>!item.cueRandomized&&item.rewardDelaySteps===delay&&Math.abs(item.eligibilityDecay-decay)<1e-9);
+      if (!report) { cells.push("<div>—</div>"); continue; }
+      const value=report.metrics.correctChoiceFraction; const strength=Math.max(0,Math.min(1,(value.mean-.5)/.5));
+      cells.push(`<div class="matrix-cell" style="--strength:${strength}"><strong>${(value.mean*100).toFixed(1)}%</strong><small>${(value.lower95*100).toFixed(1)}–${(value.upper95*100).toFixed(1)}</small></div>`);
+    }
+  }
+  matrix.innerHTML=cells.join("");
+  const effects=byId("gate-c-effects"); effects.replaceChildren(...gateC.pairedEffects.map(effect=>{const card=document.createElement("article");const value=effect.effect.correctChoiceFraction;const title=effect.id==="delay-8-current-vs-zero"?"延迟 8：trace 0.88 − 0":"trace 0：即时 − 延迟 8";card.innerHTML=`<span>${title}</span><strong>${(value.mean*100).toFixed(1)} pp</strong><small>配对 95% CI ${(value.lower95*100).toFixed(1)}–${(value.upper95*100).toFixed(1)} pp</small>`;return card;}));
+  gateCTraceSelect.replaceChildren(...gateC.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=`延迟 ${trace.rewardDelaySteps} · trace ${trace.eligibilityDecay.toFixed(2)}${trace.cueRandomized?" · 随机线索":""}`;if(trace.rewardDelaySteps===8&&Math.abs(trace.eligibilityDecay-.88)<1e-9)option.selected=true;return option;}));
+  selectGateCTrace();
+};
+
 const renderEvidence = () => {
   const cards=byId("evaluation-cards");cards.replaceChildren();
   for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
@@ -307,6 +388,8 @@ prev.addEventListener("click",()=>setFrame(frameIndex-1)); next.addEventListener
 timeline.addEventListener("input",()=>setFrame(Number(timeline.value))); traceSelect.addEventListener("change",selectTrace);
 gateASelect.addEventListener("change", drawGateACurve);
 gateBTraceSelect.addEventListener("change",selectGateBTrace);
+gateCTraceSelect.addEventListener("change",selectGateCTrace);
+gateCRange.addEventListener("input",()=>{gateCFrameIndex=Number(gateCRange.value);renderGateCFrame();});
 gateBPlay.addEventListener("click",()=>{gateBPlaying=!gateBPlaying;gateBPlay.textContent=gateBPlaying?"Ⅱ":"▶";gateBLastTick=performance.now();});
 byId("gate-b-prev").addEventListener("click",()=>setGateBFrame(gateBFrameIndex-1));byId("gate-b-next").addEventListener("click",()=>setGateBFrame(gateBFrameIndex+1));gateBRange.addEventListener("input",()=>setGateBFrame(Number(gateBRange.value)));
 window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();}});
@@ -314,13 +397,13 @@ window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGate
 const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}if(gateBPlaying&&now-gateBLastTick>=650){gateBLastTick=now;if(gateBFrameIndex>=gateBTrace.frames.length-1){gateBPlaying=false;gateBPlay.textContent="▶";}else setGateBFrame(gateBFrameIndex+1);}requestAnimationFrame(animate); };
 
 const start = async () => {
-  const [behaviorResponse, gateAResponse,gateBResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json")]);
-  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);
-  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;
+  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json")]);
+  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);
+  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;
   ready=true;
-  byId("version").textContent=gateB.version;byId("acceptance-label").textContent=gateB.acceptance.passed?"Gate B 验收通过":"Gate B 验收失败";byId("acceptance-dot").className=gateB.acceptance.passed?"pass":"fail";
+  byId("version").textContent=gateC.version;byId("acceptance-label").textContent=gateC.acceptance.passed?"Gate C 验收通过":"Gate C 验收失败";byId("acceptance-dot").className=gateC.acceptance.passed?"pass":"fail";
   traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
-  renderEvidence();renderGateA();renderGateB();drawCurve();selectTrace();requestAnimationFrame(animate);
+  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
 start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

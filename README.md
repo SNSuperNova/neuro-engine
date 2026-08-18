@@ -24,6 +24,10 @@ Gate A 又使用 9 个辅助条件、每项 12 个独立模型种子进行了审
 
 Gate B 使用早期线索消失后的 T 型岔路证明了连续状态的功能贡献：`leaky-state` 在 12 个未参与机制选择的模型种子上达到 `81.8% [73.6%, 90.0%]`，相同预算的 `state-reset` 为 `51.2%`；配对增益是 `30.6 [22.6, 38.6]` 个百分点，历史置乱后降至 `48.8%`。这证明短期状态有用，但不代表形成了概念或类脑记忆。
 
+随后的独立鲁棒性扫描把当前固定状态机制的可靠记忆边界定在 **4 个无信息步骤**：4 步为 `86.2% [83.3%, 89.2%]`，6 步为 `60.0% [54.1%, 65.9%]`，8 步接近机会水平。持续感觉投影增大也会覆盖早期状态，说明这是一种边界明确的短期机制。
+
+Gate C 隔离了延迟信用分配：当前线索在岔路可见，分支动作之后等待 8 步才获得真实能量。无状态控制器使用资格迹 0.88 时达到 `99.3% [98.7%, 99.9%]`，关闭资格迹时为 `47.0% [41.3%, 52.6%]`，配对增益 `52.3 [46.5, 58.1]` 个百分点；随机线索对照保持机会水平。该结果证明资格迹在受控任务中有用，不代表一般长期学习已经解决。
+
 ## 运行
 
 ```powershell
@@ -31,6 +35,8 @@ cargo test --all-targets --release
 cargo run --release --example embodied_lab
 cargo run --release --example gate_a_lab
 cargo run --release --example gate_b_lab
+cargo run --release --example gate_b_robustness_lab
+cargo run --release --example gate_c_lab
 npm install
 npm run dev
 ```
@@ -48,6 +54,7 @@ npm run tauri dev
 ```text
 src/embodied.rs             二维世界、主体、控制器、可塑性与实验
 src/gate_b.rs               延迟线索环境、等预算控制器和配对统计
+src/gate_c.rs               延迟能量环境、资格迹矩阵和因果对照
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -64,9 +71,13 @@ experiments/                版本化结果与失败记录
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；
 - [ROADMAP.md](ROADMAP.md)：从奖励审计、状态必要性到脉冲对照的递进实验路线；
 - [GATE_B.md](GATE_B.md)：已完成的延迟线索任务和防泄漏验收冻结规格；
+- [GATE_B_ROBUSTNESS.md](GATE_B_ROBUSTNESS.md)：已完成的状态延迟、线索带宽与持续干扰边界扫描；
+- [GATE_C.md](GATE_C.md)：已完成的资格迹 × 延迟能量冻结规格；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
 - [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)：奖励塑形与方向感觉的多种子审计；
 - [experiments/gate-b-v1.2.md](experiments/gate-b-v1.2.md)：连续状态必要性的多种子配对实验；
+- [experiments/gate-b-robustness-v1.2b.md](experiments/gate-b-robustness-v1.2b.md)：固定状态机制的能力边界；
+- [experiments/gate-c-v1.3.md](experiments/gate-c-v1.3.md)：资格迹解决受控延迟信用分配的 4×4 实验；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

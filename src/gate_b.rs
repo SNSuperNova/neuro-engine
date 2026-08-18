@@ -5,7 +5,6 @@ use crate::{AgentAction, ControllerConfig, EmbodiedError, GridPosition, Heading}
 pub const GATE_B_SENSOR_COUNT: usize = 12;
 const HIDDEN_COUNT: usize = crate::HIDDEN_COUNT;
 const ACTION_COUNT: usize = crate::ACTION_COUNT;
-const START: GridPosition = GridPosition { x: 4, y: 8 };
 const JUNCTION: GridPosition = GridPosition { x: 4, y: 2 };
 const LEFT_TERMINAL: GridPosition = GridPosition { x: 3, y: 2 };
 const RIGHT_TERMINAL: GridPosition = GridPosition { x: 5, y: 2 };
@@ -77,6 +76,9 @@ pub struct GateBExperimentConfig {
     pub curve_window: usize,
     pub maximum_steps: usize,
     pub cue_steps: usize,
+    pub delay_steps: usize,
+    pub cue_input_scale: f64,
+    pub persistent_input_scale: f64,
     pub initial_energy: f64,
     pub maximum_energy: f64,
     pub passive_cost: f64,
@@ -100,6 +102,9 @@ impl Default for GateBExperimentConfig {
             curve_window: 40,
             maximum_steps: 40,
             cue_steps: 2,
+            delay_steps: 4,
+            cue_input_scale: 1.20,
+            persistent_input_scale: 0.20,
             initial_energy: 1.0,
             maximum_energy: 2.0,
             passive_cost: 0.004,
@@ -282,6 +287,61 @@ pub struct GateBExperimentResult {
     pub acceptance: GateBAcceptanceReport,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GateBRobustnessFactor {
+    DelaySteps,
+    CueInputScale,
+    PersistentInputScale,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GateBRobustnessConfig {
+    pub seed: u64,
+    pub model_seed_count: usize,
+    pub training_episodes: usize,
+    pub evaluation_episodes: usize,
+    pub curve_window: usize,
+}
+
+impl Default for GateBRobustnessConfig {
+    fn default() -> Self {
+        Self {
+            seed: 0x4741_5445_5f42_0301,
+            model_seed_count: 12,
+            training_episodes: 1_200,
+            evaluation_episodes: 200,
+            curve_window: 40,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GateBRobustnessPoint {
+    pub id: String,
+    pub factor: GateBRobustnessFactor,
+    pub value: f64,
+    pub delay_steps: usize,
+    pub cue_input_scale: f64,
+    pub persistent_input_scale: f64,
+    pub report: GateBControllerReport,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GateBRobustnessResult {
+    pub version: String,
+    pub config: GateBRobustnessConfig,
+    pub baseline_delay_steps: usize,
+    pub baseline_cue_input_scale: f64,
+    pub baseline_persistent_input_scale: f64,
+    pub reliable_memory_boundary_steps: Option<usize>,
+    pub points: Vec<GateBRobustnessPoint>,
+    pub conclusions: Vec<String>,
+}
+
 #[derive(Clone, Copy)]
 struct TrialPlan {
     target: ForkSide,
@@ -334,12 +394,21 @@ struct GateBController {
 }
 
 impl GateBController {
-    fn new(config: ControllerConfig, seed: u64) -> Self {
+    fn new(
+        config: ControllerConfig,
+        cue_input_scale: f64,
+        persistent_input_scale: f64,
+        seed: u64,
+    ) -> Self {
         let mut rng = GateBRng::new(seed);
         let mut input_weights = [[0.0; GATE_B_SENSOR_COUNT]; HIDDEN_COUNT];
         for row in &mut input_weights {
             for (sensor, weight) in row.iter_mut().enumerate() {
-                let scale = if matches!(sensor, 2 | 3) { 1.20 } else { 0.20 };
+                let scale = if matches!(sensor, 2 | 3) {
+                    cue_input_scale
+                } else {
+                    persistent_input_scale
+                };
                 *weight = rng.signed(scale);
             }
         }
@@ -477,11 +546,15 @@ struct ForkArena {
 
 impl ForkArena {
     fn new(config: GateBExperimentConfig, condition: GateBCondition, plan: TrialPlan) -> Self {
+        let start = GridPosition {
+            x: JUNCTION.x,
+            y: JUNCTION.y + (config.cue_steps + config.delay_steps) as i32,
+        };
         Self {
             config,
             condition,
             plan,
-            position: START,
+            position: start,
             heading: Heading::North,
             energy: config.initial_energy,
             step: 0,
@@ -509,9 +582,9 @@ impl ForkArena {
             self.energy / self.config.maximum_energy,
             f64::from(cue == Some(ForkSide::Left)),
             f64::from(cue == Some(ForkSide::Right)),
-            f64::from(!is_open(forward)),
-            f64::from(!is_open(left)),
-            f64::from(!is_open(right)),
+            f64::from(!self.is_open(forward)),
+            f64::from(!self.is_open(left)),
+            f64::from(!self.is_open(right)),
             f64::from(self.position == terminal_for(self.plan.target) && !self.food_eaten),
             f64::from(self.position == JUNCTION),
             self.previous_reward.tanh(),
@@ -526,6 +599,13 @@ impl ForkArena {
             x: self.position.x + delta.x,
             y: self.position.y + delta.y,
         }
+    }
+
+    fn is_open(&self, position: GridPosition) -> bool {
+        let start_y = JUNCTION.y + (self.config.cue_steps + self.config.delay_steps) as i32;
+        (position.x == JUNCTION.x && (JUNCTION.y..=start_y).contains(&position.y))
+            || position == LEFT_TERMINAL
+            || position == RIGHT_TERMINAL
     }
 
     fn step(&mut self, action: AgentAction) -> f64 {
@@ -687,6 +767,176 @@ pub fn run_gate_b_experiment(
     })
 }
 
+pub fn run_gate_b_robustness_experiment(
+    robustness: GateBRobustnessConfig,
+) -> Result<GateBRobustnessResult, EmbodiedError> {
+    if robustness.model_seed_count < 2
+        || robustness.training_episodes == 0
+        || robustness.evaluation_episodes < 4
+        || !robustness.training_episodes.is_multiple_of(4)
+        || !robustness.evaluation_episodes.is_multiple_of(4)
+        || robustness.curve_window == 0
+    {
+        return Err(EmbodiedError::InvalidExperiment);
+    }
+
+    let baseline = GateBExperimentConfig {
+        seed: robustness.seed,
+        model_seed_count: robustness.model_seed_count,
+        training_episodes: robustness.training_episodes,
+        evaluation_episodes: robustness.evaluation_episodes,
+        curve_window: robustness.curve_window,
+        ..GateBExperimentConfig::default()
+    };
+    let variants = [
+        (GateBRobustnessFactor::DelaySteps, 2.0),
+        (GateBRobustnessFactor::DelaySteps, 4.0),
+        (GateBRobustnessFactor::DelaySteps, 6.0),
+        (GateBRobustnessFactor::DelaySteps, 8.0),
+        (GateBRobustnessFactor::DelaySteps, 12.0),
+        (GateBRobustnessFactor::CueInputScale, 0.60),
+        (GateBRobustnessFactor::CueInputScale, 0.90),
+        (GateBRobustnessFactor::CueInputScale, 1.50),
+        (GateBRobustnessFactor::PersistentInputScale, 0.10),
+        (GateBRobustnessFactor::PersistentInputScale, 0.40),
+        (GateBRobustnessFactor::PersistentInputScale, 0.65),
+    ];
+    let mut points = Vec::with_capacity(variants.len());
+    for (factor, value) in variants {
+        let mut point_config = baseline;
+        match factor {
+            GateBRobustnessFactor::DelaySteps => point_config.delay_steps = value as usize,
+            GateBRobustnessFactor::CueInputScale => point_config.cue_input_scale = value,
+            GateBRobustnessFactor::PersistentInputScale => {
+                point_config.persistent_input_scale = value;
+            }
+        }
+        validate_config(point_config)?;
+        let seed_outputs = (0..robustness.model_seed_count)
+            .map(|index| {
+                let seed = robustness
+                    .seed
+                    .wrapping_add((index as u64).wrapping_mul(SEED_STRIDE));
+                vec![run_delayed_leaky_seed(point_config, seed)]
+            })
+            .collect::<Vec<_>>();
+        let report = aggregate_report(
+            point_config,
+            GateBCondition::DelayedCue,
+            GateBControllerKind::LeakyState,
+            &seed_outputs,
+        );
+        let id = match factor {
+            GateBRobustnessFactor::DelaySteps => format!("delay-{}", value as usize),
+            GateBRobustnessFactor::CueInputScale => format!("cue-scale-{value:.2}"),
+            GateBRobustnessFactor::PersistentInputScale => {
+                format!("persistent-scale-{value:.2}")
+            }
+        };
+        points.push(GateBRobustnessPoint {
+            id,
+            factor,
+            value,
+            delay_steps: point_config.delay_steps,
+            cue_input_scale: point_config.cue_input_scale,
+            persistent_input_scale: point_config.persistent_input_scale,
+            report,
+        });
+    }
+    let reliable_memory_boundary_steps = points
+        .iter()
+        .filter(|point| point.factor == GateBRobustnessFactor::DelaySteps)
+        .filter(|point| {
+            let accuracy = point.report.metrics.correct_choice_fraction;
+            accuracy.mean >= 0.70 && accuracy.lower95 > 0.50
+        })
+        .map(|point| point.delay_steps)
+        .max();
+    let baseline_point = points
+        .iter()
+        .find(|point| point.id == "delay-4")
+        .expect("frozen baseline point");
+    let conclusions = vec![
+        format!(
+            "独立边界种子上的 4 步基线正确率为 {:.3} [95% CI {:.3}, {:.3}]。",
+            baseline_point.report.metrics.correct_choice_fraction.mean,
+            baseline_point
+                .report
+                .metrics
+                .correct_choice_fraction
+                .lower95,
+            baseline_point
+                .report
+                .metrics
+                .correct_choice_fraction
+                .upper95,
+        ),
+        reliable_memory_boundary_steps.map_or_else(
+            || "冻结扫描内没有延迟同时达到均值 70% 且区间下界高于机会水平。".to_owned(),
+            |delay| format!("冻结定义下的可靠记忆边界为 {delay} 个无信息步骤。"),
+        ),
+        "该扫描描述已冻结状态机制的边界，不重新决定 Gate B 是否通过。".to_owned(),
+    ];
+    Ok(GateBRobustnessResult {
+        version: "embodied-learning/v1.2b-state-robustness".to_owned(),
+        config: robustness,
+        baseline_delay_steps: baseline.delay_steps,
+        baseline_cue_input_scale: baseline.cue_input_scale,
+        baseline_persistent_input_scale: baseline.persistent_input_scale,
+        reliable_memory_boundary_steps,
+        points,
+        conclusions,
+    })
+}
+
+fn run_delayed_leaky_seed(config: GateBExperimentConfig, seed: u64) -> SeedRun {
+    let condition = GateBCondition::DelayedCue;
+    let controller_kind = GateBControllerKind::LeakyState;
+    let controller_seed = seed ^ 0x434f_4e54_524f_4c01;
+    let mut controller = GateBController::new(
+        config.controller,
+        config.cue_input_scale,
+        config.persistent_input_scale,
+        controller_seed,
+    );
+    let training_plans = make_plans(
+        config.training_episodes,
+        seed ^ condition_tag(condition) ^ 0x5452_4149_4e01,
+        false,
+    );
+    let (curve, episodes_to_threshold) = train(
+        &mut controller,
+        controller_kind,
+        condition,
+        &training_plans,
+        config,
+        seed,
+    );
+    let evaluation_plans = make_plans(
+        config.evaluation_episodes,
+        seed ^ condition_tag(condition) ^ 0x4556_414c_0101,
+        false,
+    );
+    let metrics = evaluate(
+        &controller,
+        controller_kind,
+        condition,
+        &evaluation_plans,
+        config,
+        seed,
+        None,
+    )
+    .0;
+    SeedRun {
+        seed,
+        condition,
+        controller: controller_kind,
+        metrics,
+        curve,
+        episodes_to_threshold,
+    }
+}
+
 #[derive(Clone)]
 struct SeedRun {
     seed: u64,
@@ -722,7 +972,12 @@ fn run_model_seed(
     ] {
         for controller_kind in GateBControllerKind::ALL {
             let controller_seed = seed ^ 0x434f_4e54_524f_4c01;
-            let mut controller = GateBController::new(config.controller, controller_seed);
+            let mut controller = GateBController::new(
+                config.controller,
+                config.cue_input_scale,
+                config.persistent_input_scale,
+                controller_seed,
+            );
             let training_plans = make_plans(
                 config.training_episodes,
                 seed ^ condition_tag(condition) ^ 0x5452_4149_4e01,
@@ -1285,6 +1540,8 @@ fn validate_config(config: GateBExperimentConfig) -> Result<(), EmbodiedError> {
         config.movement_cost,
         config.collision_cost,
         config.food_energy,
+        config.cue_input_scale,
+        config.persistent_input_scale,
     ]
     .iter()
     .all(|value| value.is_finite());
@@ -1307,6 +1564,7 @@ fn validate_config(config: GateBExperimentConfig) -> Result<(), EmbodiedError> {
         || !config.evaluation_episodes.is_multiple_of(4)
         || config.curve_window == 0
         || config.cue_steps != 2
+        || config.delay_steps == 0
         || config.maximum_steps < 12
         || !finite
         || config.initial_energy <= 0.0
@@ -1315,6 +1573,8 @@ fn validate_config(config: GateBExperimentConfig) -> Result<(), EmbodiedError> {
         || config.movement_cost < 0.0
         || config.collision_cost < 0.0
         || config.food_energy <= 0.0
+        || config.cue_input_scale <= 0.0
+        || config.persistent_input_scale <= 0.0
         || !controller_finite
         || !(0.0..1.0).contains(&config.controller.hidden_leak)
         || !(0.0..1.0).contains(&config.controller.adaptation_decay)
@@ -1335,12 +1595,6 @@ fn terminal_for(side: ForkSide) -> GridPosition {
         ForkSide::Left => LEFT_TERMINAL,
         ForkSide::Right => RIGHT_TERMINAL,
     }
-}
-
-fn is_open(position: GridPosition) -> bool {
-    (position.x == 4 && (2..=8).contains(&position.y))
-        || position == LEFT_TERMINAL
-        || position == RIGHT_TERMINAL
 }
 
 fn heading_delta(heading: Heading) -> GridPosition {

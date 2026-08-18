@@ -74,6 +74,21 @@ JSON 只包含数个代表行为轨迹和聚合指标，不保存每个训练回
 
 Gate B 的走廊是确定性的强制延迟段，不让稀疏奖励导航掩盖状态实验。控制器在岔路才通过左转或右转提交分支，在正确终点通过进食取得能量。正式 JSON 保存逐种子指标、配对置信区间、训练曲线、等预算元数据和代表轨迹，但不保存墙钟时间。
 
+同一模块还提供 Gate B 单因素鲁棒性扫描。它只运行 `leaky-state`，改变无信息延迟、线索投影尺度或持续输入尺度，并输出 `app/public/gate-b-robustness-v1.2b.json`。扫描使用独立种子，不修改 Gate B 的机制或结论。
+
+`gate_c.rs` 实现 `delayed-energy-fork/v1`。控制器在当前线索可见时提交左右分支，环境随后关闭线索并强制等待；只有等待结束时才根据先前选择交付真实能量。控制器在所有条件中无状态，只改变 96 条动作连接的资格迹衰减，因此延迟表现差异不会由状态记忆解释。
+
+```text
+current cue ──► fixed random features ──► stochastic branch action
+                                              │
+                                              ▼
+                                   decaying action eligibility
+                                              │
+real energy after forced delay ───────────────┘──► policy update
+```
+
+`examples/gate_c_lab.rs` 输出完整 4×4 因子矩阵、逐种子结果、配对效应、训练曲线、代表时间轨迹与验收项到 `app/public/gate-c-v1.3.json`。随机线索对照使用相同预算和时间结构，只破坏线索与目标的关系。
+
 ## 5. Web 与桌面
 
 `app/` 使用原生 TypeScript、DOM 和 Canvas 2D，不再依赖 Three.js。主界面展示：
@@ -84,6 +99,8 @@ Gate B 的走廊是确定性的强制延迟段，不让稀疏奖励导航掩盖�
 - 未训练、关闭学习、学习后、置乱和消融对照；
 - 训练曲线和验收项。
 - Gate B 的线索写入、无信息延迟、岔路选择、内部状态和配对证据。
+- Gate B 的延迟、线索带宽和持续干扰边界曲线；
+- Gate C 的资格迹 × 能量延迟矩阵、因果效应与能量到账时间轨迹。
 
 Tauri 只是同一 Web 应用的桌面壳。核心 crate 不依赖浏览器、Tauri 或 UI 类型。
 

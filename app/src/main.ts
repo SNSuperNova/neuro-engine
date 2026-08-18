@@ -154,12 +154,10 @@ class NeuralScene {
   private readonly inhibitory = new THREE.Color(0x087fb5);
   private excitatoryNeurons?: THREE.InstancedMesh;
   private inhibitoryNeurons?: THREE.InstancedMesh;
-  private neuronHighlights?: THREE.InstancedMesh;
   private excitatoryNeuronIds: number[] = [];
   private inhibitoryNeuronIds: number[] = [];
   private pacemakerRings?: THREE.InstancedMesh;
   private pulses?: THREE.InstancedMesh;
-  private pulseGlows?: THREE.InstancedMesh;
   private signalTrails?: THREE.LineSegments;
   private trailPositionAttribute?: THREE.BufferAttribute;
   private trailColorAttribute?: THREE.BufferAttribute;
@@ -187,14 +185,14 @@ class NeuralScene {
 
   constructor() {
     this.camera.up.set(0, 0, 1);
-    this.camera.position.set(18, 18, 13);
+    this.camera.position.set(22, 22, 16);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c7ce, 2.4));
     const light = new THREE.DirectionalLight(0xffffff, 2.2);
     light.position.set(8, -5, 13);
     this.scene.add(light);
-    const grid = new THREE.GridHelper(36, 18, 0x8fa5b2, 0xd4dde2);
+    const grid = new THREE.GridHelper(54, 27, 0x8fa5b2, 0xd4dde2);
     grid.rotation.x = Math.PI / 2;
-    grid.position.z = -8;
+    grid.position.z = -12;
     this.scene.add(grid);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0xf4f7f8, 1);
@@ -332,7 +330,7 @@ class NeuralScene {
   }
 
   private buildNeurons(): void {
-    for (const mesh of [this.excitatoryNeurons, this.inhibitoryNeurons, this.neuronHighlights]) {
+    for (const mesh of [this.excitatoryNeurons, this.inhibitoryNeurons]) {
       if (!mesh) continue;
       this.scene.remove(mesh);
       mesh.geometry.dispose();
@@ -342,25 +340,17 @@ class NeuralScene {
     this.inhibitoryNeuronIds = this.dataset!.neurons.filter((neuron) => neuron.polarity === "inhibitory").map((neuron) => neuron.id);
     this.excitatoryNeurons = new THREE.InstancedMesh(
       new THREE.IcosahedronGeometry(0.34, 2),
-      new THREE.MeshBasicMaterial({ color: this.excitatory }),
+      new THREE.MeshStandardMaterial({ color: this.excitatory, roughness: 0.72, metalness: 0 }),
       this.excitatoryNeuronIds.length,
     );
     this.inhibitoryNeurons = new THREE.InstancedMesh(
       new THREE.IcosahedronGeometry(0.34, 2),
-      new THREE.MeshBasicMaterial({ color: this.inhibitory }),
+      new THREE.MeshStandardMaterial({ color: this.inhibitory, roughness: 0.72, metalness: 0 }),
       this.inhibitoryNeuronIds.length,
-    );
-    this.neuronHighlights = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.48, 10, 10),
-      new THREE.MeshBasicMaterial({ color: 0xffc400, transparent: true, opacity: 0.32, depthWrite: false }),
-      this.dataset!.neurons.length,
     );
     this.excitatoryNeurons.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.inhibitoryNeurons.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.neuronHighlights.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.neuronHighlights.count = 0;
-    this.neuronHighlights.renderOrder = 2;
-    this.scene.add(this.excitatoryNeurons, this.inhibitoryNeurons, this.neuronHighlights);
+    this.scene.add(this.excitatoryNeurons, this.inhibitoryNeurons);
   }
 
   private buildPacemakerRings(): void {
@@ -389,11 +379,6 @@ class NeuralScene {
       this.pulses.geometry.dispose();
       (this.pulses.material as THREE.Material).dispose();
     }
-    if (this.pulseGlows) {
-      this.scene.remove(this.pulseGlows);
-      this.pulseGlows.geometry.dispose();
-      (this.pulseGlows.material as THREE.Material).dispose();
-    }
     if (this.signalTrails) {
       this.scene.remove(this.signalTrails);
       this.signalTrails.geometry.dispose();
@@ -401,7 +386,7 @@ class NeuralScene {
     }
     const capacity = Math.min(Math.max(this.flat!.flights.length, 1), 1024);
     this.pulses = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.19, 10, 10),
+      new THREE.SphereGeometry(0.15, 10, 10),
       new THREE.MeshBasicMaterial({ color: 0x9c27b0 }),
       capacity,
     );
@@ -409,15 +394,6 @@ class NeuralScene {
     this.pulses.count = 0;
     this.pulses.renderOrder = 4;
     this.scene.add(this.pulses);
-    this.pulseGlows = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.34, 10, 10),
-      new THREE.MeshBasicMaterial({ color: 0xd34bdf, transparent: true, opacity: 0.24, depthWrite: false }),
-      capacity,
-    );
-    this.pulseGlows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.pulseGlows.count = 0;
-    this.pulseGlows.renderOrder = 3;
-    this.scene.add(this.pulseGlows);
 
     const trailGeometry = new THREE.BufferGeometry();
     this.trailPositionAttribute = new THREE.BufferAttribute(new Float32Array(capacity * 2 * 3), 3);
@@ -429,7 +405,7 @@ class NeuralScene {
     trailGeometry.setDrawRange(0, 0);
     this.signalTrails = new THREE.LineSegments(
       trailGeometry,
-      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false }),
+      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false }),
     );
     this.signalTrails.renderOrder = 3;
     this.scene.add(this.signalTrails);
@@ -495,52 +471,34 @@ class NeuralScene {
   }
 
   private updateNeuronInstances(timeMs: number): void {
-    if (!this.excitatoryNeurons || !this.inhibitoryNeurons || !this.neuronHighlights || !this.dataset) return;
+    if (!this.excitatoryNeurons || !this.inhibitoryNeurons || !this.dataset) return;
     const visible = this.visibleNeuronIds();
-    let highlightIndex = 0;
     const updateBatch = (mesh: THREE.InstancedMesh, ids: number[]): void => {
       ids.forEach((id, index) => {
         const neuron = this.dataset!.neurons[this.indexById.get(id)!];
-        const sample = this.lastAtOrBefore(this.samplesByNeuron.get(neuron.id) ?? [], timeMs, (item) => item.timeMs);
-        const potential = potentialAt(neuron, sample, timeMs);
-        const activation = THREE.MathUtils.clamp((potential - neuron.restPotentialMv) / (neuron.thresholdMv - neuron.restPotentialMv), 0, 1);
         const latestSpike = this.lastAtOrBefore(this.spikesByNeuron.get(neuron.id) ?? [], timeMs, (item) => item.timeMs);
         const flash = latestSpike ? Math.max(0, 1 - (timeMs - latestSpike.timeMs) / 36) : 0;
         const selectedScale = this.selectedId === neuron.id ? 1.65 : 1;
-        const spikeScale = flash > 0 ? 1 + flash * 0.25 : 1;
-        const scale = visible.has(neuron.id) ? selectedScale * spikeScale : 0;
+        const comparisonScale = timeMs >= this.comparisonStartMs && this.comparisonIds.has(neuron.id) ? 1.14 : 1;
+        const spikeScale = flash > 0 ? 1 + flash * 0.32 : 1;
+        const scale = visible.has(neuron.id) ? selectedScale * comparisonScale * spikeScale : 0;
         this.workMatrix.compose(
           this.worldPosition(neuron.position),
           new THREE.Quaternion(),
           new THREE.Vector3(scale, scale, scale),
         );
         mesh.setMatrixAt(index, this.workMatrix);
-
-        const comparison = timeMs >= this.comparisonStartMs && this.comparisonIds.has(neuron.id);
-        const haloStrength = Math.max(flash, activation > 0.72 ? (activation - 0.72) / 0.28 * 0.55 : 0, comparison ? 0.28 : 0);
-        if (visible.has(neuron.id) && haloStrength > 0.04 && highlightIndex < this.dataset!.neurons.length) {
-          const haloScale = 0.7 + haloStrength * 0.85;
-          this.workMatrix.compose(
-            this.worldPosition(neuron.position),
-            new THREE.Quaternion(),
-            new THREE.Vector3(haloScale, haloScale, haloScale),
-          );
-          this.neuronHighlights!.setMatrixAt(highlightIndex, this.workMatrix);
-          highlightIndex++;
-        }
       });
       mesh.instanceMatrix.needsUpdate = true;
     };
     updateBatch(this.excitatoryNeurons, this.excitatoryNeuronIds);
     updateBatch(this.inhibitoryNeurons, this.inhibitoryNeuronIds);
-    this.neuronHighlights.count = highlightIndex;
-    this.neuronHighlights.instanceMatrix.needsUpdate = true;
   }
 
   private updatePulseInstances(timeMs: number): void {
-    if (!this.pulses || !this.pulseGlows || !this.signalTrails || !this.trailPositionAttribute || !this.trailColorAttribute || !this.flat || !this.dataset) return;
+    if (!this.pulses || !this.signalTrails || !this.trailPositionAttribute || !this.trailColorAttribute || !this.flat || !this.dataset) return;
     let index = 0;
-    const afterglowMs = 70;
+    const afterglowMs = 24;
     for (const flight of this.flat.flights) {
       if (index >= 1024) break;
       if (timeMs < flight.sendTimeMs || timeMs > flight.arrivalTimeMs + afterglowMs) continue;
@@ -552,15 +510,12 @@ class NeuralScene {
       const progress = THREE.MathUtils.clamp(inFlightProgress, 0, 1);
       const afterglow = timeMs <= flight.arrivalTimeMs ? 1 : 1 - (timeMs - flight.arrivalTimeMs) / afterglowMs;
       const position = sourcePosition.clone().lerp(targetPosition, progress);
-      const coreScale = 0.72 + Math.max(0, afterglow) * 0.45;
+      const coreScale = 0.78 + Math.max(0, afterglow) * 0.22;
       this.workMatrix.compose(position, new THREE.Quaternion(), new THREE.Vector3(coreScale, coreScale, coreScale));
       this.pulses.setMatrixAt(index, this.workMatrix);
-      const glowScale = 0.6 + Math.max(0, afterglow) * 0.8;
-      this.workMatrix.compose(position, new THREE.Quaternion(), new THREE.Vector3(glowScale, glowScale, glowScale));
-      this.pulseGlows.setMatrixAt(index, this.workMatrix);
 
       const trailHead = progress;
-      const trailLength = timeMs <= flight.arrivalTimeMs ? 0.24 : 0.24 * Math.max(0, afterglow);
+      const trailLength = timeMs <= flight.arrivalTimeMs ? 0.075 : 0.075 * Math.max(0, afterglow);
       const trailStart = Math.max(0, trailHead - trailLength);
       const trailStartPosition = sourcePosition.clone().lerp(targetPosition, trailStart);
       this.trailPositionAttribute.setXYZ(index * 2, trailStartPosition.x, trailStartPosition.y, trailStartPosition.z);
@@ -570,10 +525,8 @@ class NeuralScene {
       index++;
     }
     this.pulses.count = index;
-    this.pulseGlows.count = index;
     this.signalTrails.geometry.setDrawRange(0, index * 2);
     this.pulses.instanceMatrix.needsUpdate = true;
-    this.pulseGlows.instanceMatrix.needsUpdate = true;
     this.trailPositionAttribute.needsUpdate = true;
     this.trailColorAttribute.needsUpdate = true;
   }
@@ -626,7 +579,7 @@ class NeuralScene {
   }
 
   private worldPosition(position: [number, number, number]): THREE.Vector3 {
-    return new THREE.Vector3((position[0] - 0.5) * 22, (position[1] - 0.5) * 22, (position[2] - 0.5) * 16);
+    return new THREE.Vector3((position[0] - 0.5) * 32, (position[1] - 0.5) * 32, (position[2] - 0.5) * 24);
   }
 
   private lastAtOrBefore<T>(items: T[], time: number, getTime: (item: T) => number): T | undefined {

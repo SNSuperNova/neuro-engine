@@ -53,8 +53,9 @@ experiments/                版本化结果与失败记录
 ## 文档
 
 - [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
+- [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；
-- [ROADMAP.md](ROADMAP.md)：下一阶段只允许逐项加入的机制；
+- [ROADMAP.md](ROADMAP.md)：从奖励审计、状态必要性到脉冲对照的递进实验路线；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 

@@ -11,6 +11,10 @@ interface CompactBundle {
 }
 interface CompactBranch {
   label: string;
+  comparisonBaseIndex: number | null;
+  patternCells: boolean[] | null;
+  inputNeuronIds: number[];
+  stimulusWindowMs: number[] | null;
   startMs: number;
   endMs: number;
   eventDigest: string;
@@ -119,6 +123,9 @@ const activity = element<HTMLCanvasElement>("activity");
 const statePlane = element<HTMLCanvasElement>("state-plane");
 const planeChannel = element<HTMLSelectElement>("plane-channel");
 const planeInfo = element<HTMLElement>("plane-info");
+const patternPanel = element<HTMLElement>("pattern-panel");
+const patternGrid = element<HTMLElement>("pattern-grid");
+const patternMeta = element<HTMLElement>("pattern-meta");
 
 const flatten = (dataset: PlaybackDataset): FlatPlayback => {
   const flights = new Map<string, PlaybackInFlight>();
@@ -680,7 +687,8 @@ const setSelection = (id: number): void => {
 neuralScene.onSelect = setSelection;
 
 const setDataset = (index: number): void => {
-  dataset = decodeDataset(compactBundle, compactBundle.branches[index]);
+  const branchValue = compactBundle.branches[index];
+  dataset = decodeDataset(compactBundle, branchValue);
   flat = flatten(dataset);
   prepareStatePlane();
   displayTime = dataset.startMs;
@@ -692,19 +700,34 @@ const setDataset = (index: number): void => {
   timeline.value = String(displayTime);
   digest.textContent = `digest ${dataset.eventDigest}`;
   neuralScene.setDataset(dataset, flat);
+  updatePatternPanel(branchValue);
   updateComparison(index);
   if (selectedId !== null) neuralScene.setSelected(selectedId);
   drawCharts();
   updateUi();
 };
 
+const updatePatternPanel = (value: CompactBranch): void => {
+  if (!value.patternCells || !value.stimulusWindowMs) {
+    patternPanel.hidden = true;
+    return;
+  }
+  patternPanel.hidden = false;
+  patternGrid.innerHTML = value.patternCells
+    .map((active, index) => `<i class="${active ? "active" : ""}" title="通道 ${index} · 神经元 ${value.inputNeuronIds[index]}"></i>`)
+    .join("");
+  const activeCount = value.patternCells.filter(Boolean).length;
+  patternMeta.textContent = `${activeCount}/9 通道 · 神经元 ${value.inputNeuronIds[0]}–${value.inputNeuronIds.at(-1)} · ${value.stimulusWindowMs[0].toFixed(0)}–${value.stimulusWindowMs[1].toFixed(0)} ms`;
+};
+
 const updateComparison = (index: number): void => {
-  if (index !== 1) {
+  const controlIndex = compactBundle.branches[index].comparisonBaseIndex;
+  if (controlIndex === null) {
     comparison.hidden = true;
     neuralScene.setComparison(new Set(), Number.POSITIVE_INFINITY);
     return;
   }
-  const control = flatten(decodeDataset(compactBundle, compactBundle.branches[0]));
+  const control = flatten(decodeDataset(compactBundle, compactBundle.branches[controlIndex]));
   const counts = (spikes: PlaybackSpike[]): Map<string, number> => {
     const result = new Map<string, number>();
     for (const spike of spikes) {

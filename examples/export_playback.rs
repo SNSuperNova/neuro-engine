@@ -5,8 +5,8 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 use neuro_engine::{
-    ArrivalOrigin, Gate2ExperimentConfig, PlaybackDataset, SimDuration, build_playback_dataset,
-    run_gate2_experiment,
+    ArrivalOrigin, Gate2ExperimentConfig, Pattern3x3, Phase2ExperimentConfig, PlaybackDataset,
+    SimDuration, build_playback_dataset, run_gate2_experiment, run_phase2_experiment,
 };
 use serde::Serialize;
 
@@ -28,6 +28,10 @@ struct CompactTopology {
 #[serde(rename_all = "camelCase")]
 struct CompactBranch {
     label: String,
+    comparison_base_index: Option<usize>,
+    pattern_cells: Option<[bool; 9]>,
+    input_neuron_ids: Vec<u32>,
+    stimulus_window_ms: Option<[f64; 2]>,
     start_ms: f64,
     end_ms: f64,
     event_digest: String,
@@ -78,7 +82,13 @@ impl CompactTopology {
 }
 
 impl CompactBranch {
-    fn from_dataset(dataset: PlaybackDataset) -> Self {
+    fn from_dataset(
+        dataset: PlaybackDataset,
+        comparison_base_index: Option<usize>,
+        pattern_cells: Option<[bool; 9]>,
+        input_neuron_ids: Vec<u32>,
+        stimulus_window_ms: Option<[f64; 2]>,
+    ) -> Self {
         let spikes = dataset
             .chunks
             .iter()
@@ -184,6 +194,10 @@ impl CompactBranch {
 
         Self {
             label: dataset.label,
+            comparison_base_index,
+            pattern_cells,
+            input_neuron_ids,
+            stimulus_window_ms,
             start_ms: dataset.start_ms,
             end_ms: dataset.end_ms,
             event_digest: dataset.event_digest,
@@ -203,6 +217,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("app/public/experiment-001-v1.json"));
     let experiment = run_gate2_experiment(Gate2ExperimentConfig::default())?;
+    let phase2 = run_phase2_experiment(Phase2ExperimentConfig::default())?;
+    if experiment.definition != phase2.definition {
+        return Err("phase 2 playback must share the frozen baseline topology".into());
+    }
     let chunk_duration = SimDuration::from_micros(250_000);
     let datasets = vec![
         build_playback_dataset(
@@ -223,14 +241,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &experiment.driven_withdrawal_run,
             chunk_duration,
         )?,
+        build_playback_dataset(
+            "phase 2 · 3×3 blank control",
+            &phase2.definition,
+            &phase2.control_run,
+            chunk_duration,
+        )?,
+        build_playback_dataset(
+            "phase 2 · 3×3 center cross",
+            &phase2.definition,
+            &phase2.pattern_run,
+            chunk_duration,
+        )?,
     ];
+    let phase2_input_ids = phase2
+        .input_neuron_ids
+        .iter()
+        .map(|id| id.0)
+        .collect::<Vec<_>>();
+    let phase2_window = Some([
+        phase2.pattern_start.as_micros() as f64 / 1_000.0,
+        phase2.pattern_end.as_micros() as f64 / 1_000.0,
+    ]);
+    let topology = CompactTopology::from_dataset(&datasets[0]);
+    let branches = datasets
+        .into_iter()
+        .enumerate()
+        .map(|(index, dataset)| match index {
+            0 => CompactBranch::from_dataset(dataset, None, None, Vec::new(), None),
+            1 => CompactBranch::from_dataset(dataset, Some(0), None, Vec::new(), None),
+            2 => CompactBranch::from_dataset(dataset, None, None, Vec::new(), None),
+            3 => CompactBranch::from_dataset(
+                dataset,
+                None,
+                Some(Pattern3x3::BLANK.cells),
+                phase2_input_ids.clone(),
+                phase2_window,
+            ),
+            4 => CompactBranch::from_dataset(
+                dataset,
+                Some(3),
+                Some(phase2.pattern.cells),
+                phase2_input_ids.clone(),
+                phase2_window,
+            ),
+            _ => unreachable!("all playback branches have explicit metadata"),
+        })
+        .collect();
     let bundle = CompactBundle {
         version: 1,
-        topology: CompactTopology::from_dataset(&datasets[0]),
-        branches: datasets
-            .into_iter()
-            .map(CompactBranch::from_dataset)
-            .collect(),
+        topology,
+        branches,
     };
     if let Some(parent) = output.parent() {
         std::fs::create_dir_all(parent)?;

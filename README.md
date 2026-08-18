@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Gate 0～3 已实现：仓库包含 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算、版本化对照实验，以及同时显示 3D 网络与二维神经状态平面的 Tauri + Three.js“神经显微镜”。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。工程下一步先完成 Gate 4 的检查点干预分支；通过后再进入独立的 [第二阶段模式刺激实验](PHASE_2.md)，验证稳定响应、简单读出和候选功能群的因果性。第一阶段开发范围仍由 [MVP.md](MVP.md) 约束。
+Gate 0～3 已实现：仓库包含 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算、版本化对照实验，以及同时显示 3D 网络与二维神经状态平面的 Tauri + Three.js“神经显微镜”。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。工程现在直接进入 [第二阶段模式刺激实验](PHASE_2.md)，先跑通最小输入—响应切片，再按真实实验需要逐步补齐 Gate 4 的刺激、比较和消融分支能力。第一阶段边界仍由 [MVP.md](MVP.md) 约束。
 
 运行验证：
 
@@ -19,6 +19,8 @@ cargo test --all-targets --release
 cargo run --example gate0
 cargo run --release --example gate2
 cargo run --release --example gate2_scan
+cargo run --release --example phase2
+cargo run --release --example phase2_scan
 cargo run --release --example export_playback
 npm install
 npm run dev
@@ -26,6 +28,7 @@ npm run tauri dev
 ```
 
 Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1.md](experiments/experiment-001-v1.md)。
+Phase 2 最小 `3×3` 成对试验及首次输入扫描见 [experiments/phase2-p2-0.md](experiments/phase2-p2-0.md)。
 
 文档阅读顺序：
 

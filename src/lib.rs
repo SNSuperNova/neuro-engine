@@ -11,8 +11,10 @@ pub mod playback;
 
 pub use experiment::{
     Gate2AcceptanceCriteria, Gate2AcceptanceReport, Gate2ExperimentConfig, Gate2ExperimentResult,
-    Gate2Summary, GeneratedNetworkConfig, generate_network, local_stimulus_inputs,
-    pacemaker_inputs, run_gate2_experiment,
+    Gate2Summary, GeneratedNetworkConfig, Pattern3x3, PatternStimulusSchedule,
+    Phase2ExperimentConfig, Phase2ExperimentResult, Phase2Summary, generate_network,
+    local_stimulus_inputs, pacemaker_inputs, pattern_stimulus_inputs, run_gate2_experiment,
+    run_phase2_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,

@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Gate 0～3 已实现：仓库包含 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算、版本化对照实验，以及同时显示 3D 网络与二维神经状态平面的 Tauri + Three.js“神经显微镜”。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。下一阶段将使用可视化结果选择需要验证的干预方向。开发范围由 [MVP.md](MVP.md) 约束。
+Gate 0～3 已实现：仓库包含 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算、版本化对照实验，以及同时显示 3D 网络与二维神经状态平面的 Tauri + Three.js“神经显微镜”。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。工程下一步先完成 Gate 4 的检查点干预分支；通过后再进入独立的 [第二阶段模式刺激实验](PHASE_2.md)，验证稳定响应、简单读出和候选功能群的因果性。第一阶段开发范围仍由 [MVP.md](MVP.md) 约束。
 
 运行验证：
 
@@ -35,8 +35,9 @@ Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1
 4. [EXPERIMENT_001.md](EXPERIMENT_001.md)：如何证明第一版有效；
 5. [VISUALIZATION.md](VISUALIZATION.md)：已实现的 3D 游览、时间回放和性能规格；
 6. [POPULATION_VIEW.md](POPULATION_VIEW.md)：群体统计、区域信息流与功能证据门槛；
-7. [DESIGN.md](DESIGN.md)：长期愿景和后续研究方向；
-8. [decisions](decisions/)：已经作出的重要工程决策。
+7. [PHASE_2.md](PHASE_2.md)：`3×3` 模式刺激、自然功能群、简单读出和因果验证；
+8. [DESIGN.md](DESIGN.md)：长期愿景和后续研究方向；
+9. [decisions](decisions/)：已经作出的重要工程决策。
 
 ## 项目原则
 

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import "./style.css";
 
 type Polarity = "excitatory" | "inhibitory";
+type PlaneChannel = "voltage" | "spike" | "refractory";
 
 interface CompactBundle {
   version: number;
@@ -115,6 +116,9 @@ const details = element<HTMLElement>("details");
 const events = element<HTMLElement>("events");
 const raster = element<HTMLCanvasElement>("raster");
 const activity = element<HTMLCanvasElement>("activity");
+const statePlane = element<HTMLCanvasElement>("state-plane");
+const planeChannel = element<HTMLSelectElement>("plane-channel");
+const planeInfo = element<HTMLElement>("plane-info");
 
 const flatten = (dataset: PlaybackDataset): FlatPlayback => {
   const flights = new Map<string, PlaybackInFlight>();
@@ -139,6 +143,34 @@ const potentialAt = (neuron: PlaybackNeuron, sample: PlaybackNeuronSample | unde
   const elapsed = Math.max(0, timeMs - decayStart);
   const decay = Math.exp(-elapsed / neuron.membraneTimeConstantMs);
   return neuron.restPotentialMv + (sample.membranePotentialMv - neuron.restPotentialMv) * decay;
+};
+
+const lastAtOrBefore = <T>(items: T[], time: number, getTime: (item: T) => number): T | undefined => {
+  let low = 0;
+  let high = items.length - 1;
+  let found: T | undefined;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    if (getTime(items[middle]) <= time) {
+      found = items[middle];
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return found;
+};
+
+const spatialMortonKey = (position: [number, number, number]): number => {
+  const quantize = (value: number): number => THREE.MathUtils.clamp(Math.floor(value * 32), 0, 31);
+  const [x, y, z] = position.map(quantize);
+  let key = 0;
+  for (let bit = 0; bit < 5; bit++) {
+    key |= ((x >> bit) & 1) << (bit * 3);
+    key |= ((y >> bit) & 1) << (bit * 3 + 1);
+    key |= ((z >> bit) & 1) << (bit * 3 + 2);
+  }
+  return key;
 };
 
 class NeuralScene {
@@ -609,7 +641,30 @@ let nudgeRemainingSeconds = 0;
 let selectedId: number | null = null;
 let lastFrame = performance.now();
 let lastUiUpdate = 0;
+let planeOrder: PlaybackNeuron[] = [];
+let planeSamplesByNeuron = new Map<number, PlaybackNeuronSample[]>();
+let planeSpikesByNeuron = new Map<number, PlaybackSpike[]>();
+let planeCells: Array<{ neuronId: number; x: number; y: number; size: number }> = [];
 const neuralScene = new NeuralScene();
+
+const prepareStatePlane = (): void => {
+  planeOrder = [...dataset.neurons].sort((left, right) => {
+    const spatial = spatialMortonKey(left.position) - spatialMortonKey(right.position);
+    return spatial || left.id - right.id;
+  });
+  planeSamplesByNeuron = new Map();
+  planeSpikesByNeuron = new Map();
+  for (const sample of flat.samples) {
+    const samples = planeSamplesByNeuron.get(sample.neuronId) ?? [];
+    samples.push(sample);
+    planeSamplesByNeuron.set(sample.neuronId, samples);
+  }
+  for (const spike of flat.spikes) {
+    const spikes = planeSpikesByNeuron.get(spike.neuronId) ?? [];
+    spikes.push(spike);
+    planeSpikesByNeuron.set(spike.neuronId, spikes);
+  }
+};
 
 const setSelection = (id: number): void => {
   if (!dataset.neurons.some((neuron) => neuron.id === id)) return;
@@ -620,12 +675,14 @@ const setSelection = (id: number): void => {
   upstreamButton.disabled = !dataset.synapses.some((synapse) => synapse.target === id);
   downstreamButton.disabled = !dataset.synapses.some((synapse) => synapse.source === id);
   updateInspector();
+  drawStatePlane();
 };
 neuralScene.onSelect = setSelection;
 
 const setDataset = (index: number): void => {
   dataset = decodeDataset(compactBundle, compactBundle.branches[index]);
   flat = flatten(dataset);
+  prepareStatePlane();
   displayTime = dataset.startMs;
   playing = false;
   nudgeRemainingSeconds = 0;
@@ -722,6 +779,7 @@ const updateUi = (): void => {
   timeLabel.textContent = `${displayTime.toFixed(3)} ms`;
   perf.textContent = neuralScene.performanceText();
   updateInspector();
+  drawStatePlane();
   drawTimeMarkers();
 };
 
@@ -734,6 +792,111 @@ const canvasContext = (target: HTMLCanvasElement): CanvasRenderingContext2D => {
     target.height = height;
   }
   return target.getContext("2d")!;
+};
+
+const mixRgb = (from: [number, number, number], to: [number, number, number], amount: number): string => {
+  const t = THREE.MathUtils.clamp(amount, 0, 1);
+  const values = from.map((value, index) => Math.round(value + (to[index] - value) * t));
+  return `rgb(${values[0]}, ${values[1]}, ${values[2]})`;
+};
+
+const drawStatePlane = (): void => {
+  if (!dataset || planeOrder.length === 0) return;
+  const context = canvasContext(statePlane);
+  const width = statePlane.width;
+  const height = statePlane.height;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#eef3f5";
+  context.fillRect(0, 0, width, height);
+
+  const columns = Math.ceil(Math.sqrt(planeOrder.length));
+  const rows = Math.ceil(planeOrder.length / columns);
+  const padding = Math.max(8, Math.min(width, height) * 0.035);
+  const gap = Math.max(2, Math.min(width, height) * 0.009);
+  const cellSize = Math.max(4, Math.min(
+    (width - padding * 2 - gap * (columns - 1)) / columns,
+    (height - padding * 2 - gap * (rows - 1)) / rows,
+  ));
+  const gridWidth = columns * cellSize + (columns - 1) * gap;
+  const gridHeight = rows * cellSize + (rows - 1) * gap;
+  const originX = (width - gridWidth) / 2;
+  const originY = (height - gridHeight) / 2;
+  const channel = planeChannel.value as PlaneChannel;
+  planeCells = [];
+
+  for (let index = 0; index < planeOrder.length; index++) {
+    const neuron = planeOrder[index];
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = originX + column * (cellSize + gap);
+    const y = originY + row * (cellSize + gap);
+    const sample = lastAtOrBefore(planeSamplesByNeuron.get(neuron.id) ?? [], displayTime, (item) => item.timeMs);
+    const spike = lastAtOrBefore(planeSpikesByNeuron.get(neuron.id) ?? [], displayTime, (item) => item.timeMs);
+    const potential = potentialAt(neuron, sample, displayTime);
+    const activation = THREE.MathUtils.clamp(
+      (potential - neuron.restPotentialMv) / (neuron.thresholdMv - neuron.restPotentialMv),
+      0,
+      1,
+    );
+    const spikeAge = spike ? displayTime - spike.timeMs : Number.POSITIVE_INFINITY;
+    const spikeStrength = THREE.MathUtils.clamp(1 - spikeAge / 5, 0, 1);
+    const refractoryRemaining = sample?.refractoryUntilMs === null || sample?.refractoryUntilMs === undefined
+      ? 0
+      : Math.max(0, sample.refractoryUntilMs - displayTime);
+    const refractoryStrength = THREE.MathUtils.clamp(refractoryRemaining / neuron.refractoryPeriodMs, 0, 1);
+
+    if (channel === "voltage") {
+      const target: [number, number, number] = neuron.polarity === "excitatory" ? [240, 106, 36] : [8, 127, 181];
+      context.fillStyle = mixRgb([236, 242, 244], target, 0.16 + activation * 0.84);
+    } else if (channel === "spike") {
+      context.fillStyle = mixRgb([232, 238, 241], [156, 39, 176], spikeStrength);
+    } else {
+      context.fillStyle = mixRgb([235, 241, 243], [58, 73, 82], refractoryStrength);
+    }
+    context.fillRect(x, y, cellSize, cellSize);
+
+    context.lineWidth = Math.max(1, cellSize * 0.045);
+    context.strokeStyle = "rgba(87, 112, 123, .34)";
+    context.strokeRect(x, y, cellSize, cellSize);
+    if (dataset.pacemakerNeuronIds.includes(neuron.id)) {
+      context.lineWidth = Math.max(1.5, cellSize * 0.07);
+      context.strokeStyle = "#a47b00";
+      context.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+    }
+    if (spikeStrength > 0) {
+      context.lineWidth = Math.max(1.5, cellSize * 0.08);
+      context.strokeStyle = `rgba(156, 39, 176, ${0.3 + spikeStrength * 0.7})`;
+      context.strokeRect(x + cellSize * 0.1, y + cellSize * 0.1, cellSize * 0.8, cellSize * 0.8);
+    }
+    if (selectedId === neuron.id) {
+      context.lineWidth = Math.max(2, cellSize * 0.1);
+      context.strokeStyle = "#152f3b";
+      context.strokeRect(x - 1, y - 1, cellSize + 2, cellSize + 2);
+    }
+
+    if (cellSize >= 22) {
+      const darkBackground = (channel === "voltage" && activation > 0.58)
+        || (channel === "spike" && spikeStrength > 0.5)
+        || (channel === "refractory" && refractoryStrength > 0.45);
+      context.fillStyle = darkBackground ? "rgba(255,255,255,.92)" : "rgba(26,51,62,.8)";
+      context.font = `${Math.max(8, Math.floor(cellSize * 0.23))}px ui-monospace, monospace`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(String(neuron.id), x + cellSize / 2, y + cellSize / 2);
+    }
+    planeCells.push({ neuronId: neuron.id, x, y, size: cellSize });
+  }
+
+  const labels: Record<PlaneChannel, string> = { voltage: "膜电位", spike: "5 ms 放电痕迹", refractory: "剩余不应期" };
+  let selectionText = "未选择神经元";
+  if (selectedId !== null) {
+    const neuron = dataset.neurons.find((item) => item.id === selectedId);
+    if (neuron) {
+      const sample = lastAtOrBefore(planeSamplesByNeuron.get(neuron.id) ?? [], displayTime, (item) => item.timeMs);
+      selectionText = `N${neuron.id} ${(potentialAt(neuron, sample, displayTime)).toFixed(2)} mV`;
+    }
+  }
+  planeInfo.textContent = `固定空间展开 ${columns}×${rows} · ${labels[channel]} · ${selectionText}`;
 };
 
 const drawCharts = (): void => {
@@ -825,7 +988,15 @@ downstreamButton.addEventListener("click", () => {
   const synapse = dataset.synapses.find((item) => item.source === selectedId);
   if (synapse) { setSelection(synapse.target); neuralScene.focusNeuron(synapse.target); backButton.disabled = false; }
 });
-window.addEventListener("resize", drawCharts);
+planeChannel.addEventListener("change", drawStatePlane);
+statePlane.addEventListener("click", (event) => {
+  const bounds = statePlane.getBoundingClientRect();
+  const x = (event.clientX - bounds.left) * statePlane.width / bounds.width;
+  const y = (event.clientY - bounds.top) * statePlane.height / bounds.height;
+  const cell = planeCells.find((item) => x >= item.x && x <= item.x + item.size && y >= item.y && y <= item.y + item.size);
+  if (cell) setSelection(cell.neuronId);
+});
+window.addEventListener("resize", () => { drawCharts(); drawStatePlane(); });
 
 const animate = (now: number): void => {
   const delta = Math.min((now - lastFrame) / 1000, 0.05);

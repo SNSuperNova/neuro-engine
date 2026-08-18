@@ -27,7 +27,7 @@ label { display: flex; align-items: center; gap: 7px; color: #58717d; font-size:
 .perf { margin-left: auto; color: #15704a; font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; }
 .comparison { color: #7837a9; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; }
 
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 270px; min-height: 0; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(370px, .85fr); min-height: 0; }
 .viewport-wrap { position: relative; min-width: 0; overflow: hidden; background: #f4f7f8; }
 #viewport { display: block; width: 100%; height: 100%; cursor: grab; outline: none; }
 #viewport.dragging { cursor: grabbing; }
@@ -48,7 +48,15 @@ kbd { color: #294653; font: 10px ui-monospace, monospace; border: 1px solid #9eb
 .loading { inset: 0; display: grid; place-items: center; background: #f4f7f8; color: #617985; }
 .loading.hidden { display: none; }
 
-.inspector { min-width: 0; border-left: 1px solid #cbd7dc; background: rgba(255, 255, 255, .97); padding: 16px; overflow-y: auto; }
+.analysis-column { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(280px, 1.15fr) minmax(190px, .85fr); border-left: 1px solid #cbd7dc; background: #fff; }
+.atlas-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 13px 14px 9px; border-bottom: 1px solid #cbd7dc; background: #f8fbfc; }
+.atlas-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.atlas-head h1 { margin: 3px 0 0; font-size: 17px; font-weight: 560; color: #18313d; }
+.atlas-head select { padding: 4px 6px; }
+.atlas-canvas-wrap { flex: 1; min-height: 0; margin-top: 8px; border: 1px solid #cbd7dc; border-radius: 7px; overflow: hidden; background: #eef3f5; }
+#state-plane { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.plane-info { min-height: 18px; padding-top: 6px; color: #647d88; font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inspector { min-width: 0; min-height: 0; background: rgba(255, 255, 255, .97); padding: 13px 14px; overflow-y: auto; }
 .eyebrow { color: #688490; font: 10px ui-monospace, monospace; letter-spacing: .12em; }
 .inspector h1 { margin: 6px 0 14px; font-size: 20px; font-weight: 500; color: #18313d; }
 .details { margin: 0; }
@@ -79,7 +87,8 @@ kbd { color: #294653; font: 10px ui-monospace, monospace; border: 1px solid #9eb
 
 @media (max-width: 760px) {
   #app { grid-template-rows: 48px minmax(0, 1fr) 145px; }
-  .workspace { grid-template-columns: minmax(0, 1fr) 220px; }
+  .workspace { grid-template-columns: minmax(0, 1fr) 300px; }
+  .analysis-column { grid-template-rows: minmax(250px, 1fr) minmax(170px, .75fr); }
   .brand .muted, .camera-help, #digest, .comparison { display: none; }
   .topbar { gap: 7px; }
   .topbar > label { display: none; }

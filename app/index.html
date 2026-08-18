@@ -30,17 +30,34 @@
       <div id="loading" class="loading">正在载入实验数据…</div>
     </section>
 
-    <aside class="inspector">
-      <div class="inspector-head"><span class="eyebrow">NEURON INSPECTOR</span><h1 id="neuron-title">未选择神经元</h1></div>
-      <dl id="details" class="details"><div><dt>提示</dt><dd>单击节点查看状态</dd></div></dl>
-      <div class="inspector-actions">
-        <button id="focus" disabled>聚焦</button>
-        <button id="upstream" disabled>跳到上游</button>
-        <button id="downstream" disabled>跳到下游</button>
-      </div>
-      <label class="toggle"><input id="isolate" type="checkbox" disabled> 只显示一阶邻域</label>
-      <section class="event-list"><h2>当前事件</h2><div id="events" class="events muted">播放后显示最近输入与放电</div></section>
-    </aside>
+    <div class="analysis-column">
+      <section class="atlas-panel">
+        <div class="atlas-head">
+          <div><span class="eyebrow">NEURAL STATE PLANE</span><h1>神经状态展开</h1></div>
+          <label>通道
+            <select id="plane-channel">
+              <option value="voltage">膜电位</option>
+              <option value="spike">放电事件</option>
+              <option value="refractory">不应期</option>
+            </select>
+          </label>
+        </div>
+        <div class="atlas-canvas-wrap"><canvas id="state-plane" aria-label="二维神经状态平面"></canvas></div>
+        <div id="plane-info" class="plane-info">固定空间展开 · 等待数据</div>
+      </section>
+
+      <aside class="inspector">
+        <div class="inspector-head"><span class="eyebrow">NEURON INSPECTOR</span><h1 id="neuron-title">未选择神经元</h1></div>
+        <dl id="details" class="details"><div><dt>提示</dt><dd>单击 3D 节点或二维格子</dd></div></dl>
+        <div class="inspector-actions">
+          <button id="focus" disabled>聚焦</button>
+          <button id="upstream" disabled>跳到上游</button>
+          <button id="downstream" disabled>跳到下游</button>
+        </div>
+        <label class="toggle"><input id="isolate" type="checkbox" disabled> 只显示一阶邻域</label>
+        <section class="event-list"><h2>当前事件</h2><div id="events" class="events muted">播放后显示最近输入与放电</div></section>
+      </aside>
+    </div>
   </main>
 
   <footer class="playback">

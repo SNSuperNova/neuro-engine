@@ -12,6 +12,7 @@
 - [ARCHITECTURE.md](ARCHITECTURE.md)：模拟、存储与界面边界；
 - [EXPERIMENT_001.md](EXPERIMENT_001.md)：首个可重复实验；
 - [VISUALIZATION.md](VISUALIZATION.md)：Gate 3 可视化规格与当前实现边界；
+- [POPULATION_VIEW.md](POPULATION_VIEW.md)：群体统计、区域信息流与功能证据；
 - [decisions/0001-initial-technical-direction.md](decisions/0001-initial-technical-direction.md)：首批技术决策。
 
 ## 当前推进策略

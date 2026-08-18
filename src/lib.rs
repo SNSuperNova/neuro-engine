@@ -7,6 +7,7 @@ pub mod experiment;
 pub mod lif;
 pub mod metrics;
 pub mod network;
+pub mod phase2;
 pub mod playback;
 
 pub use experiment::{
@@ -25,10 +26,19 @@ pub use metrics::{
     compute_network_metrics,
 };
 pub use network::{
-    EventLog, ExternalInput, ExternalInputKind, InputOrigin, InputRecord, LogEvent,
-    NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
-    Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
-    simulate_network, simulate_network_with_limits,
+    ActivityRegulatorConfig, EventLog, ExternalInput, ExternalInputKind, InputOrigin, InputRecord,
+    LogEvent, NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity,
+    NeuronSpec, Position3, PropagationSpec, RegulationRecord, SimulationLimits, SpikeId, SynapseId,
+    SynapseSpec, simulate_network, simulate_network_with_limits, simulate_network_with_regulator,
+};
+pub use phase2::{
+    AblationComparison, AccuracyReport, ActivityRegulatorReport, FunctionalGroupReport,
+    FunctionalNeuronScore, InputStabilityEvaluation, Phase2AnalysisError, Phase2HypothesisReport,
+    Phase2PatternId, Phase2ProtocolConfig, Phase2ProtocolReport, Phase2ProtocolResult,
+    Phase2RawEvent, Phase2StabilityCriteria, Phase2TrialArtifact, ReadoutReport,
+    SeedExperimentReport, StructureSeedScreen, TrialMetadata, TrialResponse, TrialSplit,
+    degree_preserving_connection_shuffle, evaluate_phase2_input_stability, run_phase2_protocol,
+    run_phase2_trial_artifact, screen_phase2_structure_seeds, silence_neurons,
 };
 pub use playback::{
     ArrivalOrigin, PlaybackArrival, PlaybackBundle, PlaybackChunk, PlaybackDataset, PlaybackError,

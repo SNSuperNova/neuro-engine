@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use serde::Serialize;
+
 use crate::lif::{InputPolarity, NeuronId, SimDuration, SimTime};
 use crate::network::{NetworkDefinition, NetworkRun};
 
@@ -14,7 +16,8 @@ pub struct MetricsConfig {
     pub maximum_period_lag: SimDuration,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NetworkMetrics {
     pub duration_ms: f64,
     pub total_spikes: usize,
@@ -33,7 +36,8 @@ pub struct NetworkMetrics {
     pub peak_autocorrelation_lag_ms: Option<f64>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrajectoryDifference {
     pub bin_count: usize,
     pub mean_rms_spike_difference: f64,

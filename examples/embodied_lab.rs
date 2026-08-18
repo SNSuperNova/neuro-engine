@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)?;
     }
-    serde_json::to_writer_pretty(BufWriter::new(File::create(&output)?), &result)?;
+    serde_json::to_writer(BufWriter::new(File::create(&output)?), &result)?;
     for evaluation in &result.evaluations {
         println!(
             "{} food={:.3} energy={:.3} survival={:.1} completion={:.3}",

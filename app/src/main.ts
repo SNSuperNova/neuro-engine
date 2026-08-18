@@ -1,1119 +1,147 @@
-import * as THREE from "three";
 import "./style.css";
 
-type Polarity = "excitatory" | "inhibitory";
-type PlaneChannel = "voltage" | "spike" | "refractory";
-
-interface CompactBundle {
-  version: number;
-  topology: { neurons: number[][]; synapses: number[][] };
-  branches: CompactBranch[];
+type Heading = "north" | "east" | "south" | "west";
+type Action = "forward" | "turn-left" | "turn-right" | "eat";
+interface Position { x: number; y: number }
+interface Frame {
+  step: number; position: Position; heading: Heading; energy: number; foodsEaten: number;
+  action: Action; reward: number; actionProbabilities: number[]; sensors: number[];
+  hiddenActivity: number[]; remainingFood: Position[];
 }
-interface CompactBranch {
-  label: string;
-  comparisonBaseIndex: number | null;
-  patternCells: boolean[] | null;
-  inputNeuronIds: number[];
-  stimulusWindowMs: number[] | null;
-  startMs: number;
-  endMs: number;
-  eventDigest: string;
-  pacemakerNeuronIds: number[];
-  spikes: number[][];
-  arrivals: number[][];
-  samples: number[][];
-  metrics: number[][];
-  flights: number[][];
-}
-interface PlaybackDataset {
-  version: number;
-  label: string;
-  startMs: number;
-  endMs: number;
-  eventDigest: string;
-  neurons: PlaybackNeuron[];
-  synapses: PlaybackSynapse[];
-  pacemakerNeuronIds: number[];
-  chunks: PlaybackChunk[];
-}
-interface PlaybackNeuron {
-  id: number;
-  polarity: Polarity;
-  position: [number, number, number];
-  restPotentialMv: number;
-  resetPotentialMv: number;
-  thresholdMv: number;
-  membraneTimeConstantMs: number;
-  refractoryPeriodMs: number;
-}
-interface PlaybackSynapse { id: number; source: number; target: number; magnitudeMv: number; delayMs: number }
-interface PlaybackSpike { id: number; neuronId: number; timeMs: number }
-type ArrivalOrigin =
-  | { kind: "initialization"; eventId: number }
-  | { kind: "pacemaker"; eventId: number }
-  | { kind: "stimulus"; eventId: number }
-  | { kind: "synaptic"; spikeId: number; synapseId: number; source: number };
-interface PlaybackArrival {
-  sequence: number;
-  target: number;
-  timeMs: number;
-  polarity: Polarity;
-  magnitudeMv: number;
-  origin: ArrivalOrigin;
-  ignoredDuringRefractory: boolean;
-}
-interface PlaybackNeuronSample { neuronId: number; timeMs: number; membranePotentialMv: number; refractoryUntilMs: number | null }
-interface PlaybackMetricSample { timeMs: number; spikeCount: number; activeNeuronCount: number }
-interface PlaybackInFlight {
-  spikeId: number;
-  synapseId: number;
-  source: number;
-  target: number;
-  sendTimeMs: number;
-  arrivalTimeMs: number;
-  polarity: Polarity;
-}
-interface PlaybackChunk {
-  startMs: number;
-  endMs: number;
-  spikeEvents: PlaybackSpike[];
-  arrivalEvents: PlaybackArrival[];
-  neuronSamples: PlaybackNeuronSample[];
-  metricSamples: PlaybackMetricSample[];
-  inFlightIntervals: PlaybackInFlight[];
-}
-interface FlatPlayback {
-  spikes: PlaybackSpike[];
-  arrivals: PlaybackArrival[];
-  samples: PlaybackNeuronSample[];
-  metrics: PlaybackMetricSample[];
-  flights: PlaybackInFlight[];
+interface Summary { stepsSurvived: number; foodsEaten: number; finalEnergy: number; collisions: number; hazardContacts: number; completed: boolean; totalReward: number }
+interface Trace { label: string; mapSeed: number; hazards: Position[]; initialFood: Position[]; frames: Frame[]; summary: Summary }
+interface Evaluation { label: string; episodeCount: number; meanStepsSurvived: number; meanFoodsEaten: number; meanFinalEnergy: number; meanCollisions: number; meanHazardContacts: number; completionFraction: number }
+interface CurvePoint { episode: number; meanFoodsEaten: number; meanStepsSurvived: number; meanFinalEnergy: number; meanReward: number }
+interface Dataset {
+  version: string;
+  config: { arena: { width: number; height: number; foodCount: number; maximumEnergy: number }; trainingEpisodes: number; evaluationEpisodes: number };
+  sensorLabels: string[]; actionLabels: string[]; trainingCurve: CurvePoint[]; evaluations: Evaluation[];
+  plasticity: { changedWeightCount: number; totalWeightCount: number; rootMeanSquareChange: number; maximumAbsoluteChange: number; lesionedHiddenUnits: number[] };
+  traces: Trace[];
+  acceptance: Record<string, boolean> & { passed: boolean };
 }
 
-const element = <T extends HTMLElement>(id: string): T => {
-  const value = document.getElementById(id);
-  if (!value) throw new Error(`missing element #${id}`);
-  return value as T;
+const byId = <T extends HTMLElement>(id: string): T => {
+  const found = document.getElementById(id);
+  if (!found) throw new Error(`missing #${id}`);
+  return found as T;
 };
 
-const canvas = element<HTMLCanvasElement>("viewport");
-const branch = element<HTMLSelectElement>("branch");
-const timeline = element<HTMLInputElement>("timeline");
-const playButton = element<HTMLButtonElement>("play");
-const prevButton = element<HTMLButtonElement>("prev");
-const nextButton = element<HTMLButtonElement>("next");
-const speedSelect = element<HTMLSelectElement>("speed");
-const timeLabel = element<HTMLElement>("time");
-const digest = element<HTMLElement>("digest");
-const perf = element<HTMLElement>("perf");
-const comparison = element<HTMLElement>("comparison");
-const loading = element<HTMLElement>("loading");
-const search = element<HTMLInputElement>("search");
-const searchGo = element<HTMLButtonElement>("search-go");
-const backButton = element<HTMLButtonElement>("back");
-const focusButton = element<HTMLButtonElement>("focus");
-const upstreamButton = element<HTMLButtonElement>("upstream");
-const downstreamButton = element<HTMLButtonElement>("downstream");
-const isolate = element<HTMLInputElement>("isolate");
-const neuronTitle = element<HTMLElement>("neuron-title");
-const details = element<HTMLElement>("details");
-const events = element<HTMLElement>("events");
-const raster = element<HTMLCanvasElement>("raster");
-const activity = element<HTMLCanvasElement>("activity");
-const statePlane = element<HTMLCanvasElement>("state-plane");
-const planeChannel = element<HTMLSelectElement>("plane-channel");
-const planeInfo = element<HTMLElement>("plane-info");
-const patternPanel = element<HTMLElement>("pattern-panel");
-const patternGrid = element<HTMLElement>("pattern-grid");
-const patternMeta = element<HTMLElement>("pattern-meta");
+const worldCanvas = byId<HTMLCanvasElement>("world");
+const curveCanvas = byId<HTMLCanvasElement>("learning-curve");
+const traceSelect = byId<HTMLSelectElement>("trace-select");
+const timeline = byId<HTMLInputElement>("timeline");
+const play = byId<HTMLButtonElement>("play");
+const prev = byId<HTMLButtonElement>("prev");
+const next = byId<HTMLButtonElement>("next");
+const speed = byId<HTMLSelectElement>("speed");
 
-const flatten = (dataset: PlaybackDataset): FlatPlayback => {
-  const flights = new Map<string, PlaybackInFlight>();
-  for (const flight of dataset.chunks.flatMap((chunk) => chunk.inFlightIntervals)) {
-    flights.set(`${flight.spikeId}:${flight.synapseId}`, flight);
-  }
-  return {
-    spikes: dataset.chunks.flatMap((chunk) => chunk.spikeEvents).sort((a, b) => a.timeMs - b.timeMs),
-    arrivals: dataset.chunks.flatMap((chunk) => chunk.arrivalEvents).sort((a, b) => a.timeMs - b.timeMs),
-    samples: dataset.chunks.flatMap((chunk) => chunk.neuronSamples).sort((a, b) => a.timeMs - b.timeMs),
-    metrics: dataset.chunks.flatMap((chunk) => chunk.metricSamples).sort((a, b) => a.timeMs - b.timeMs),
-    flights: [...flights.values()].sort((a, b) => a.sendTimeMs - b.sendTimeMs),
-  };
-};
-
-const potentialAt = (neuron: PlaybackNeuron, sample: PlaybackNeuronSample | undefined, timeMs: number): number => {
-  if (!sample) return neuron.restPotentialMv;
-  if (sample.refractoryUntilMs !== null && timeMs < sample.refractoryUntilMs) {
-    return sample.membranePotentialMv;
-  }
-  const decayStart = Math.max(sample.timeMs, sample.refractoryUntilMs ?? sample.timeMs);
-  const elapsed = Math.max(0, timeMs - decayStart);
-  const decay = Math.exp(-elapsed / neuron.membraneTimeConstantMs);
-  return neuron.restPotentialMv + (sample.membranePotentialMv - neuron.restPotentialMv) * decay;
-};
-
-const lastAtOrBefore = <T>(items: T[], time: number, getTime: (item: T) => number): T | undefined => {
-  let low = 0;
-  let high = items.length - 1;
-  let found: T | undefined;
-  while (low <= high) {
-    const middle = (low + high) >> 1;
-    if (getTime(items[middle]) <= time) {
-      found = items[middle];
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
-  }
-  return found;
-};
-
-const spatialMortonKey = (position: [number, number, number]): number => {
-  const quantize = (value: number): number => THREE.MathUtils.clamp(Math.floor(value * 32), 0, 31);
-  const [x, y, z] = position.map(quantize);
-  let key = 0;
-  for (let bit = 0; bit < 5; bit++) {
-    key |= ((x >> bit) & 1) << (bit * 3);
-    key |= ((y >> bit) & 1) << (bit * 3 + 1);
-    key |= ((z >> bit) & 1) << (bit * 3 + 2);
-  }
-  return key;
-};
-
-class NeuralScene {
-  private readonly renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-  private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
-  private readonly raycaster = new THREE.Raycaster();
-  private readonly pointer = new THREE.Vector2();
-  private readonly keys = new Set<string>();
-  private readonly baseMatrix = new THREE.Matrix4();
-  private readonly workMatrix = new THREE.Matrix4();
-  private readonly excitatory = new THREE.Color(0xf06a24);
-  private readonly inhibitory = new THREE.Color(0x087fb5);
-  private excitatoryNeurons?: THREE.InstancedMesh;
-  private inhibitoryNeurons?: THREE.InstancedMesh;
-  private excitatoryNeuronIds: number[] = [];
-  private inhibitoryNeuronIds: number[] = [];
-  private pacemakerRings?: THREE.InstancedMesh;
-  private pulses?: THREE.InstancedMesh;
-  private signalTrails?: THREE.LineSegments;
-  private trailPositionAttribute?: THREE.BufferAttribute;
-  private trailColorAttribute?: THREE.BufferAttribute;
-  private allConnectionLines?: THREE.LineSegments;
-  private connectionLines?: THREE.LineSegments;
-  private dataset?: PlaybackDataset;
-  private flat?: FlatPlayback;
-  private samplesByNeuron = new Map<number, PlaybackNeuronSample[]>();
-  private spikesByNeuron = new Map<number, PlaybackSpike[]>();
-  private indexById = new Map<number, number>();
-  private selectedId: number | null = null;
-  private isolated = false;
-  private comparisonIds = new Set<number>();
-  private comparisonStartMs = Number.POSITIVE_INFINITY;
-  private yaw = -Math.PI * 0.72;
-  private pitch = -0.34;
-  private dragging = false;
-  private dragged = false;
-  private lastPointer = { x: 0, y: 0 };
-  private frameCounter = 0;
-  private frameTime = 0;
-  private currentFps = 0;
-  readonly cameraHistory: Array<{ position: THREE.Vector3; yaw: number; pitch: number }> = [];
-  onSelect: (id: number) => void = () => undefined;
-
-  constructor() {
-    this.camera.up.set(0, 0, 1);
-    this.camera.position.set(22, 22, 16);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c7ce, 2.4));
-    const light = new THREE.DirectionalLight(0xffffff, 2.2);
-    light.position.set(8, -5, 13);
-    this.scene.add(light);
-    const grid = new THREE.GridHelper(54, 27, 0x8fa5b2, 0xd4dde2);
-    grid.rotation.x = Math.PI / 2;
-    grid.position.z = -12;
-    this.scene.add(grid);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0xf4f7f8, 1);
-    new ResizeObserver(() => this.resize()).observe(canvas.parentElement!);
-    this.resize();
-    this.bindControls();
-  }
-
-  setDataset(dataset: PlaybackDataset, flat: FlatPlayback): void {
-    this.dataset = dataset;
-    this.flat = flat;
-    this.samplesByNeuron.clear();
-    this.spikesByNeuron.clear();
-    this.indexById.clear();
-    dataset.neurons.forEach((neuron, index) => this.indexById.set(neuron.id, index));
-    for (const sample of flat.samples) {
-      const list = this.samplesByNeuron.get(sample.neuronId) ?? [];
-      list.push(sample);
-      this.samplesByNeuron.set(sample.neuronId, list);
-    }
-    for (const spike of flat.spikes) {
-      const list = this.spikesByNeuron.get(spike.neuronId) ?? [];
-      list.push(spike);
-      this.spikesByNeuron.set(spike.neuronId, list);
-    }
-    this.buildNeurons();
-    this.buildPacemakerRings();
-    this.buildPulses();
-    this.rebuildAllConnections();
-    this.rebuildConnections();
-  }
-
-  setSelected(id: number | null): void {
-    this.selectedId = id;
-    if (this.isolated) this.rebuildAllConnections();
-    this.rebuildConnections();
-  }
-
-  setIsolated(value: boolean): void {
-    this.isolated = value;
-    this.rebuildAllConnections();
-  }
-
-  setComparison(ids: Set<number>, startMs: number): void {
-    this.comparisonIds = ids;
-    this.comparisonStartMs = startMs;
-  }
-
-  focusNeuron(id: number, remember = true): void {
-    if (!this.dataset) return;
-    const neuron = this.dataset.neurons.find((item) => item.id === id);
-    if (!neuron) return;
-    if (remember) {
-      this.cameraHistory.push({ position: this.camera.position.clone(), yaw: this.yaw, pitch: this.pitch });
-    }
-    const target = this.worldPosition(neuron.position);
-    const forward = this.forwardVector();
-    this.camera.position.copy(target).addScaledVector(forward, -6);
-    this.updateCameraRotation();
-  }
-
-  restoreCamera(): boolean {
-    const state = this.cameraHistory.pop();
-    if (!state) return false;
-    this.camera.position.copy(state.position);
-    this.yaw = state.yaw;
-    this.pitch = state.pitch;
-    this.updateCameraRotation();
-    return true;
-  }
-
-  update(timeMs: number, deltaSeconds: number): void {
-    this.updateMovement(deltaSeconds);
-    this.updateNeuronInstances(timeMs);
-    this.updatePulseInstances(timeMs);
-    this.renderer.render(this.scene, this.camera);
-    this.frameCounter++;
-    this.frameTime += deltaSeconds;
-    if (this.frameTime >= 0.5) {
-      this.currentFps = this.frameCounter / this.frameTime;
-      this.frameCounter = 0;
-      this.frameTime = 0;
-    }
-  }
-
-  performanceText(): string {
-    const positionAttribute = this.allConnectionLines?.geometry.getAttribute("position");
-    const visibleConnections = positionAttribute ? positionAttribute.count / 2 : 0;
-    const activeFlights = this.pulses?.count ?? 0;
-    return `${this.currentFps.toFixed(0)} FPS · ${this.dataset?.neurons.length ?? 0} nodes · ${visibleConnections} links · ${activeFlights} pulses`;
-  }
-
-  private bindControls(): void {
-    window.addEventListener("keydown", (event) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
-      this.keys.add(event.key.toLowerCase());
-    });
-    window.addEventListener("keyup", (event) => this.keys.delete(event.key.toLowerCase()));
-    window.addEventListener("blur", () => this.keys.clear());
-    canvas.addEventListener("pointerdown", (event) => {
-      this.dragging = true;
-      this.dragged = false;
-      this.lastPointer = { x: event.clientX, y: event.clientY };
-      canvas.setPointerCapture(event.pointerId);
-      canvas.classList.add("dragging");
-    });
-    canvas.addEventListener("pointermove", (event) => {
-      if (!this.dragging) return;
-      const dx = event.clientX - this.lastPointer.x;
-      const dy = event.clientY - this.lastPointer.y;
-      if (Math.abs(dx) + Math.abs(dy) > 1) this.dragged = true;
-      this.yaw -= dx * 0.004;
-      this.pitch = THREE.MathUtils.clamp(this.pitch - dy * 0.004, -1.45, 1.45);
-      this.lastPointer = { x: event.clientX, y: event.clientY };
-      this.updateCameraRotation();
-    });
-    canvas.addEventListener("pointerup", (event) => {
-      this.dragging = false;
-      canvas.classList.remove("dragging");
-      if (!this.dragged) this.pick(event);
-    });
-    canvas.addEventListener("wheel", (event) => {
-      event.preventDefault();
-      this.camera.position.addScaledVector(this.forwardVector(), event.deltaY * 0.008);
-    }, { passive: false });
-  }
-
-  private resize(): void {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    if (!width || !height) return;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height, false);
-  }
-
-  private buildNeurons(): void {
-    for (const mesh of [this.excitatoryNeurons, this.inhibitoryNeurons]) {
-      if (!mesh) continue;
-      this.scene.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-    }
-    this.excitatoryNeuronIds = this.dataset!.neurons.filter((neuron) => neuron.polarity === "excitatory").map((neuron) => neuron.id);
-    this.inhibitoryNeuronIds = this.dataset!.neurons.filter((neuron) => neuron.polarity === "inhibitory").map((neuron) => neuron.id);
-    this.excitatoryNeurons = new THREE.InstancedMesh(
-      new THREE.IcosahedronGeometry(0.34, 2),
-      new THREE.MeshStandardMaterial({ color: this.excitatory, roughness: 0.72, metalness: 0 }),
-      this.excitatoryNeuronIds.length,
-    );
-    this.inhibitoryNeurons = new THREE.InstancedMesh(
-      new THREE.IcosahedronGeometry(0.34, 2),
-      new THREE.MeshStandardMaterial({ color: this.inhibitory, roughness: 0.72, metalness: 0 }),
-      this.inhibitoryNeuronIds.length,
-    );
-    this.excitatoryNeurons.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.inhibitoryNeurons.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.scene.add(this.excitatoryNeurons, this.inhibitoryNeurons);
-  }
-
-  private buildPacemakerRings(): void {
-    if (this.pacemakerRings) {
-      this.scene.remove(this.pacemakerRings);
-      this.pacemakerRings.geometry.dispose();
-      (this.pacemakerRings.material as THREE.Material).dispose();
-    }
-    const ids = this.dataset!.pacemakerNeuronIds;
-    this.pacemakerRings = new THREE.InstancedMesh(
-      new THREE.TorusGeometry(0.52, 0.035, 8, 28),
-      new THREE.MeshBasicMaterial({ color: 0xb78b00, transparent: true, opacity: 0.95 }),
-      ids.length,
-    );
-    ids.forEach((id, index) => {
-      const neuron = this.dataset!.neurons[this.indexById.get(id)!];
-      this.baseMatrix.makeTranslation(...this.worldPosition(neuron.position).toArray());
-      this.pacemakerRings!.setMatrixAt(index, this.baseMatrix);
-    });
-    this.scene.add(this.pacemakerRings);
-  }
-
-  private buildPulses(): void {
-    if (this.pulses) {
-      this.scene.remove(this.pulses);
-      this.pulses.geometry.dispose();
-      (this.pulses.material as THREE.Material).dispose();
-    }
-    if (this.signalTrails) {
-      this.scene.remove(this.signalTrails);
-      this.signalTrails.geometry.dispose();
-      (this.signalTrails.material as THREE.Material).dispose();
-    }
-    const capacity = Math.min(Math.max(this.flat!.flights.length, 1), 1024);
-    this.pulses = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.15, 10, 10),
-      new THREE.MeshBasicMaterial({ color: 0x9c27b0 }),
-      capacity,
-    );
-    this.pulses.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.pulses.count = 0;
-    this.pulses.renderOrder = 4;
-    this.scene.add(this.pulses);
-
-    const trailGeometry = new THREE.BufferGeometry();
-    this.trailPositionAttribute = new THREE.BufferAttribute(new Float32Array(capacity * 2 * 3), 3);
-    this.trailColorAttribute = new THREE.BufferAttribute(new Float32Array(capacity * 2 * 3), 3);
-    this.trailPositionAttribute.setUsage(THREE.DynamicDrawUsage);
-    this.trailColorAttribute.setUsage(THREE.DynamicDrawUsage);
-    trailGeometry.setAttribute("position", this.trailPositionAttribute);
-    trailGeometry.setAttribute("color", this.trailColorAttribute);
-    trailGeometry.setDrawRange(0, 0);
-    this.signalTrails = new THREE.LineSegments(
-      trailGeometry,
-      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false }),
-    );
-    this.signalTrails.renderOrder = 3;
-    this.scene.add(this.signalTrails);
-  }
-
-  private rebuildAllConnections(): void {
-    if (this.allConnectionLines) {
-      this.scene.remove(this.allConnectionLines);
-      this.allConnectionLines.geometry.dispose();
-      (this.allConnectionLines.material as THREE.Material).dispose();
-      this.allConnectionLines = undefined;
-    }
-    if (!this.dataset) return;
-    const visible = this.visibleNeuronIds();
-    const positions: number[] = [];
-    const colors: number[] = [];
-    for (const synapse of this.dataset.synapses) {
-      if (!visible.has(synapse.source) || !visible.has(synapse.target)) continue;
-      const source = this.dataset.neurons[this.indexById.get(synapse.source)!];
-      const target = this.dataset.neurons[this.indexById.get(synapse.target)!];
-      positions.push(...this.worldPosition(source.position).toArray(), ...this.worldPosition(target.position).toArray());
-      const color = source.polarity === "excitatory" ? this.excitatory : this.inhibitory;
-      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-    this.allConnectionLines = new THREE.LineSegments(
-      geometry,
-      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.075, depthWrite: false }),
-    );
-    this.allConnectionLines.renderOrder = 0;
-    this.scene.add(this.allConnectionLines);
-  }
-
-  private rebuildConnections(): void {
-    if (this.connectionLines) {
-      this.scene.remove(this.connectionLines);
-      this.connectionLines.geometry.dispose();
-      (this.connectionLines.material as THREE.Material).dispose();
-      this.connectionLines = undefined;
-    }
-    if (!this.dataset || this.selectedId === null) return;
-    const related = this.dataset.synapses.filter((synapse) => synapse.source === this.selectedId || synapse.target === this.selectedId);
-    const positions: number[] = [];
-    const colors: number[] = [];
-    for (const synapse of related) {
-      const source = this.dataset.neurons[this.indexById.get(synapse.source)!];
-      const target = this.dataset.neurons[this.indexById.get(synapse.target)!];
-      positions.push(...this.worldPosition(source.position).toArray(), ...this.worldPosition(target.position).toArray());
-      const color = source.polarity === "excitatory" ? this.excitatory : this.inhibitory;
-      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-    this.connectionLines = new THREE.LineSegments(
-      geometry,
-      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.82, depthWrite: false }),
-    );
-    this.connectionLines.renderOrder = 2;
-    this.scene.add(this.connectionLines);
-  }
-
-  private updateNeuronInstances(timeMs: number): void {
-    if (!this.excitatoryNeurons || !this.inhibitoryNeurons || !this.dataset) return;
-    const visible = this.visibleNeuronIds();
-    const updateBatch = (mesh: THREE.InstancedMesh, ids: number[]): void => {
-      ids.forEach((id, index) => {
-        const neuron = this.dataset!.neurons[this.indexById.get(id)!];
-        const latestSpike = this.lastAtOrBefore(this.spikesByNeuron.get(neuron.id) ?? [], timeMs, (item) => item.timeMs);
-        const flash = latestSpike ? Math.max(0, 1 - (timeMs - latestSpike.timeMs) / 36) : 0;
-        const selectedScale = this.selectedId === neuron.id ? 1.65 : 1;
-        const comparisonScale = timeMs >= this.comparisonStartMs && this.comparisonIds.has(neuron.id) ? 1.14 : 1;
-        const spikeScale = flash > 0 ? 1 + flash * 0.32 : 1;
-        const scale = visible.has(neuron.id) ? selectedScale * comparisonScale * spikeScale : 0;
-        this.workMatrix.compose(
-          this.worldPosition(neuron.position),
-          new THREE.Quaternion(),
-          new THREE.Vector3(scale, scale, scale),
-        );
-        mesh.setMatrixAt(index, this.workMatrix);
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-    };
-    updateBatch(this.excitatoryNeurons, this.excitatoryNeuronIds);
-    updateBatch(this.inhibitoryNeurons, this.inhibitoryNeuronIds);
-  }
-
-  private updatePulseInstances(timeMs: number): void {
-    if (!this.pulses || !this.signalTrails || !this.trailPositionAttribute || !this.trailColorAttribute || !this.flat || !this.dataset) return;
-    let index = 0;
-    const afterglowMs = 24;
-    for (const flight of this.flat.flights) {
-      if (index >= 1024) break;
-      if (timeMs < flight.sendTimeMs || timeMs > flight.arrivalTimeMs + afterglowMs) continue;
-      const source = this.dataset.neurons[this.indexById.get(flight.source)!];
-      const target = this.dataset.neurons[this.indexById.get(flight.target)!];
-      const sourcePosition = this.worldPosition(source.position);
-      const targetPosition = this.worldPosition(target.position);
-      const inFlightProgress = (timeMs - flight.sendTimeMs) / (flight.arrivalTimeMs - flight.sendTimeMs);
-      const progress = THREE.MathUtils.clamp(inFlightProgress, 0, 1);
-      const afterglow = timeMs <= flight.arrivalTimeMs ? 1 : 1 - (timeMs - flight.arrivalTimeMs) / afterglowMs;
-      const position = sourcePosition.clone().lerp(targetPosition, progress);
-      const coreScale = 0.78 + Math.max(0, afterglow) * 0.22;
-      this.workMatrix.compose(position, new THREE.Quaternion(), new THREE.Vector3(coreScale, coreScale, coreScale));
-      this.pulses.setMatrixAt(index, this.workMatrix);
-
-      const trailHead = progress;
-      const trailLength = timeMs <= flight.arrivalTimeMs ? 0.075 : 0.075 * Math.max(0, afterglow);
-      const trailStart = Math.max(0, trailHead - trailLength);
-      const trailStartPosition = sourcePosition.clone().lerp(targetPosition, trailStart);
-      this.trailPositionAttribute.setXYZ(index * 2, trailStartPosition.x, trailStartPosition.y, trailStartPosition.z);
-      this.trailPositionAttribute.setXYZ(index * 2 + 1, position.x, position.y, position.z);
-      this.trailColorAttribute.setXYZ(index * 2, 0.39, 0.04, 0.48);
-      this.trailColorAttribute.setXYZ(index * 2 + 1, 0.82, 0.16, 0.89);
-      index++;
-    }
-    this.pulses.count = index;
-    this.signalTrails.geometry.setDrawRange(0, index * 2);
-    this.pulses.instanceMatrix.needsUpdate = true;
-    this.trailPositionAttribute.needsUpdate = true;
-    this.trailColorAttribute.needsUpdate = true;
-  }
-
-  private visibleNeuronIds(): Set<number> {
-    if (!this.dataset || !this.isolated || this.selectedId === null) {
-      return new Set(this.dataset?.neurons.map((neuron) => neuron.id) ?? []);
-    }
-    const ids = new Set<number>([this.selectedId]);
-    for (const synapse of this.dataset.synapses) {
-      if (synapse.source === this.selectedId) ids.add(synapse.target);
-      if (synapse.target === this.selectedId) ids.add(synapse.source);
-    }
-    return ids;
-  }
-
-  private pick(event: PointerEvent): void {
-    if (!this.excitatoryNeurons || !this.inhibitoryNeurons || !this.dataset) return;
-    const rect = canvas.getBoundingClientRect();
-    this.pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hit = this.raycaster.intersectObjects([this.excitatoryNeurons, this.inhibitoryNeurons], false)[0];
-    if (hit?.instanceId === undefined) return;
-    const ids = hit.object === this.excitatoryNeurons ? this.excitatoryNeuronIds : this.inhibitoryNeuronIds;
-    const id = ids[hit.instanceId];
-    this.onSelect(id);
-  }
-
-  private updateMovement(deltaSeconds: number): void {
-    const speed = (this.keys.has("shift") ? 14 : 7) * deltaSeconds;
-    const horizontalForward = new THREE.Vector3(Math.cos(this.yaw), Math.sin(this.yaw), 0);
-    const right = new THREE.Vector3(-Math.sin(this.yaw), Math.cos(this.yaw), 0);
-    if (this.keys.has("w")) this.camera.position.addScaledVector(horizontalForward, speed);
-    if (this.keys.has("s")) this.camera.position.addScaledVector(horizontalForward, -speed);
-    if (this.keys.has("a")) this.camera.position.addScaledVector(right, -speed);
-    if (this.keys.has("d")) this.camera.position.addScaledVector(right, speed);
-    if (this.keys.has("q")) this.camera.position.z -= speed;
-    if (this.keys.has("e")) this.camera.position.z += speed;
-    this.updateCameraRotation();
-  }
-
-  private updateCameraRotation(): void {
-    const forward = this.forwardVector();
-    this.camera.lookAt(this.camera.position.clone().add(forward));
-  }
-
-  private forwardVector(): THREE.Vector3 {
-    const cosPitch = Math.cos(this.pitch);
-    return new THREE.Vector3(cosPitch * Math.cos(this.yaw), cosPitch * Math.sin(this.yaw), Math.sin(this.pitch)).normalize();
-  }
-
-  private worldPosition(position: [number, number, number]): THREE.Vector3 {
-    return new THREE.Vector3((position[0] - 0.5) * 32, (position[1] - 0.5) * 32, (position[2] - 0.5) * 24);
-  }
-
-  private lastAtOrBefore<T>(items: T[], time: number, getTime: (item: T) => number): T | undefined {
-    let low = 0;
-    let high = items.length - 1;
-    let found: T | undefined;
-    while (low <= high) {
-      const middle = (low + high) >> 1;
-      if (getTime(items[middle]) <= time) {
-        found = items[middle];
-        low = middle + 1;
-      } else {
-        high = middle - 1;
-      }
-    }
-    return found;
-  }
-}
-
-let compactBundle: CompactBundle;
-let dataset: PlaybackDataset;
-let flat: FlatPlayback;
-let displayTime = 0;
+let dataset: Dataset;
+let trace: Trace;
+let frameIndex = 0;
 let playing = false;
-let nudgeDirection: -1 | 1 = 1;
-let nudgeRemainingSeconds = 0;
-let selectedId: number | null = null;
-let lastFrame = performance.now();
-let lastUiUpdate = 0;
-let planeOrder: PlaybackNeuron[] = [];
-let planeSamplesByNeuron = new Map<number, PlaybackNeuronSample[]>();
-let planeSpikesByNeuron = new Map<number, PlaybackSpike[]>();
-let planeCells: Array<{ neuronId: number; x: number; y: number; size: number }> = [];
-const neuralScene = new NeuralScene();
+let lastTick = performance.now();
 
-const prepareStatePlane = (): void => {
-  planeOrder = [...dataset.neurons].sort((left, right) => {
-    const spatial = spatialMortonKey(left.position) - spatialMortonKey(right.position);
-    return spatial || left.id - right.id;
-  });
-  planeSamplesByNeuron = new Map();
-  planeSpikesByNeuron = new Map();
-  for (const sample of flat.samples) {
-    const samples = planeSamplesByNeuron.get(sample.neuronId) ?? [];
-    samples.push(sample);
-    planeSamplesByNeuron.set(sample.neuronId, samples);
+const labels: Record<string, string> = {
+  untrained: "未经训练", learned: "学习后", shuffled: "打乱突触", lesioned: "内部单元消融",
+  "learning-disabled": "关闭学习", forward: "前进", "turn-left": "左转", "turn-right": "右转", eat: "进食",
+  north: "北", east: "东", south: "南", west: "西",
+};
+
+const fitCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContext2D => {
+  const ratio = Math.min(devicePixelRatio, 2);
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width * ratio));
+  const height = Math.max(1, Math.floor(rect.height * ratio));
+  if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("2D canvas unavailable");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return context;
+};
+
+const drawWorld = () => {
+  const ctx = fitCanvas(worldCanvas);
+  const { width, height } = dataset.config.arena;
+  const rect = worldCanvas.getBoundingClientRect();
+  const padding = 22;
+  const cell = Math.min((rect.width - padding * 2) / width, (rect.height - padding * 2) / height);
+  const ox = (rect.width - cell * width) / 2;
+  const oy = (rect.height - cell * height) / 2;
+  ctx.clearRect(0, 0, rect.width, rect.height);
+  ctx.fillStyle = "#f7faf7"; ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.strokeStyle = "#dce6dc"; ctx.lineWidth = 1;
+  for (let x = 0; x <= width; x++) { ctx.beginPath(); ctx.moveTo(ox + x * cell, oy); ctx.lineTo(ox + x * cell, oy + height * cell); ctx.stroke(); }
+  for (let y = 0; y <= height; y++) { ctx.beginPath(); ctx.moveTo(ox, oy + y * cell); ctx.lineTo(ox + width * cell, oy + y * cell); ctx.stroke(); }
+  const center = (point: Position): [number, number] => [ox + (point.x + .5) * cell, oy + (point.y + .5) * cell];
+  for (const hazard of trace.hazards) { const [x,y] = center(hazard); ctx.fillStyle = "#ec6a5e"; ctx.beginPath(); ctx.arc(x,y,cell*.28,0,Math.PI*2); ctx.fill(); }
+  const current = trace.frames[Math.min(frameIndex, trace.frames.length - 1)];
+  for (const food of current.remainingFood) { const [x,y] = center(food); ctx.fillStyle = "#4db878"; ctx.beginPath(); ctx.arc(x,y,cell*.25,0,Math.PI*2); ctx.fill(); ctx.strokeStyle="#207447";ctx.stroke(); }
+  if (frameIndex > 0) {
+    ctx.strokeStyle = "rgba(47, 125, 98, .32)"; ctx.lineWidth = Math.max(2, cell*.12); ctx.lineCap="round"; ctx.beginPath();
+    trace.frames.slice(0, frameIndex + 1).forEach((f,i) => { const [x,y]=center(f.position); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }); ctx.stroke();
   }
-  for (const spike of flat.spikes) {
-    const spikes = planeSpikesByNeuron.get(spike.neuronId) ?? [];
-    spikes.push(spike);
-    planeSpikesByNeuron.set(spike.neuronId, spikes);
-  }
+  const [ax,ay] = center(current.position); const angle = {north:-Math.PI/2,east:0,south:Math.PI/2,west:Math.PI}[current.heading];
+  ctx.save(); ctx.translate(ax,ay); ctx.rotate(angle); ctx.fillStyle="#174f45"; ctx.beginPath(); ctx.moveTo(cell*.38,0); ctx.lineTo(-cell*.28,-cell*.27); ctx.lineTo(-cell*.28,cell*.27); ctx.closePath(); ctx.fill(); ctx.restore();
 };
 
-const setSelection = (id: number): void => {
-  if (!dataset.neurons.some((neuron) => neuron.id === id)) return;
-  selectedId = id;
-  neuralScene.setSelected(id);
-  isolate.disabled = false;
-  focusButton.disabled = false;
-  upstreamButton.disabled = !dataset.synapses.some((synapse) => synapse.target === id);
-  downstreamButton.disabled = !dataset.synapses.some((synapse) => synapse.source === id);
-  updateInspector();
-  drawStatePlane();
-};
-neuralScene.onSelect = setSelection;
-
-const setDataset = (index: number): void => {
-  const branchValue = compactBundle.branches[index];
-  dataset = decodeDataset(compactBundle, branchValue);
-  flat = flatten(dataset);
-  prepareStatePlane();
-  displayTime = dataset.startMs;
-  playing = false;
-  nudgeRemainingSeconds = 0;
-  playButton.textContent = "▶";
-  timeline.min = String(dataset.startMs);
-  timeline.max = String(dataset.endMs);
-  timeline.value = String(displayTime);
-  digest.textContent = `digest ${dataset.eventDigest}`;
-  neuralScene.setDataset(dataset, flat);
-  updatePatternPanel(branchValue);
-  updateComparison(index);
-  if (selectedId !== null) neuralScene.setSelected(selectedId);
-  drawCharts();
-  updateUi();
+const makeBar = (label: string, value: number, signed = false) => {
+  const row = document.createElement("div"); row.className = "bar-row";
+  const normalized = signed ? (value + 1) / 2 : Math.max(0, Math.min(1, value));
+  row.innerHTML = `<span>${label}</span><div><i style="width:${normalized*100}%"></i></div><strong>${value.toFixed(2)}</strong>`;
+  return row;
 };
 
-const updatePatternPanel = (value: CompactBranch): void => {
-  if (!value.patternCells || !value.stimulusWindowMs) {
-    patternPanel.hidden = true;
-    return;
-  }
-  patternPanel.hidden = false;
-  patternGrid.innerHTML = value.patternCells
-    .map((active, index) => `<i class="${active ? "active" : ""}" title="通道 ${index} · 神经元 ${value.inputNeuronIds[index]}"></i>`)
-    .join("");
-  const activeCount = value.patternCells.filter(Boolean).length;
-  patternMeta.textContent = `${activeCount}/9 通道 · 神经元 ${value.inputNeuronIds[0]}–${value.inputNeuronIds.at(-1)} · ${value.stimulusWindowMs[0].toFixed(0)}–${value.stimulusWindowMs[1].toFixed(0)} ms`;
+const renderFrame = () => {
+  timeline.value = String(frameIndex);
+  const frame = trace.frames[frameIndex];
+  byId("step-label").textContent = `step ${frame.step} / ${trace.frames.length}`;
+  byId("action-name").textContent = labels[frame.action] ?? frame.action;
+  byId("energy-value").textContent = frame.energy.toFixed(1);
+  byId<HTMLElement>("energy-bar").style.width = `${frame.energy / dataset.config.arena.maximumEnergy * 100}%`;
+  byId("food-value").textContent = `${frame.foodsEaten} / ${dataset.config.arena.foodCount}`;
+  byId("reward-value").textContent = `${frame.reward >= 0 ? "+" : ""}${frame.reward.toFixed(3)}`;
+  byId("reward-value").className = frame.reward >= 0 ? "positive" : "negative";
+  byId("position-value").textContent = `${frame.position.x}, ${frame.position.y}`;
+  byId("heading-value").textContent = labels[frame.heading];
+  const actionBars = byId("action-bars"); actionBars.replaceChildren(); frame.actionProbabilities.forEach((value,i) => actionBars.append(makeBar(labels[dataset.actionLabels[i]] ?? dataset.actionLabels[i], value)));
+  const sensorBars = byId("sensor-bars"); sensorBars.replaceChildren(); frame.sensors.forEach((value,i) => sensorBars.append(makeBar(dataset.sensorLabels[i], value, i === 11)));
+  const hidden = byId("hidden-grid"); hidden.replaceChildren(); frame.hiddenActivity.forEach((value,i) => { const cell=document.createElement("i"); cell.title=`H${i}: ${value.toFixed(3)}`; cell.style.setProperty("--activity", String(Math.abs(value))); cell.className=value>=0?"excited":"suppressed"; hidden.append(cell); });
+  drawWorld();
 };
 
-const updateComparison = (index: number): void => {
-  const controlIndex = compactBundle.branches[index].comparisonBaseIndex;
-  if (controlIndex === null) {
-    comparison.hidden = true;
-    neuralScene.setComparison(new Set(), Number.POSITIVE_INFINITY);
-    return;
-  }
-  const control = flatten(decodeDataset(compactBundle, compactBundle.branches[controlIndex]));
-  const counts = (spikes: PlaybackSpike[]): Map<string, number> => {
-    const result = new Map<string, number>();
-    for (const spike of spikes) {
-      const key = `${Math.floor(spike.timeMs / 10)}:${spike.neuronId}`;
-      result.set(key, (result.get(key) ?? 0) + 1);
-    }
-    return result;
-  };
-  const left = counts(control.spikes);
-  const right = counts(flat.spikes);
-  const keys = new Set([...left.keys(), ...right.keys()]);
-  let firstBin = Number.POSITIVE_INFINITY;
-  const affected = new Set<number>();
-  for (const key of keys) {
-    if ((left.get(key) ?? 0) === (right.get(key) ?? 0)) continue;
-    const [bin, neuron] = key.split(":").map(Number);
-    firstBin = Math.min(firstBin, bin);
-    affected.add(neuron);
-  }
-  const firstMs = firstBin * 10;
-  comparison.textContent = `对照首次分歧 ${firstMs.toFixed(0)} ms · ${affected.size} 个受影响神经元`;
-  comparison.hidden = false;
-  neuralScene.setComparison(affected, firstMs);
+const drawCurve = () => {
+  const ctx = fitCanvas(curveCanvas); const rect=curveCanvas.getBoundingClientRect(); ctx.clearRect(0,0,rect.width,rect.height);
+  const pad={l:44,r:18,t:16,b:30}; const w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b; const maxFood=dataset.config.arena.foodCount;
+  ctx.strokeStyle="#d8e3db";ctx.fillStyle="#718078";ctx.font="11px system-ui";ctx.textAlign="right";
+  for(let i=0;i<=maxFood;i++){const y=pad.t+h-i/maxFood*h;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();if(i%2===0)ctx.fillText(String(i),pad.l-8,y+4);}
+  ctx.strokeStyle="#23845d";ctx.lineWidth=3;ctx.beginPath();dataset.trainingCurve.forEach((p,i)=>{const x=pad.l+p.episode/dataset.config.trainingEpisodes*w;const y=pad.t+h-p.meanFoodsEaten/maxFood*h;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+  ctx.fillStyle="#718078";ctx.textAlign="center";ctx.fillText("训练回合",pad.l+w/2,rect.height-6);ctx.textAlign="left";ctx.fillStyle="#23845d";ctx.fillText("平均获取食物",pad.l+8,pad.t+14);
 };
 
-const updateInspector = (): void => {
-  if (selectedId === null) return;
-  const neuron = dataset.neurons.find((item) => item.id === selectedId)!;
-  const samples = flat.samples.filter((sample) => sample.neuronId === selectedId && sample.timeMs <= displayTime);
-  const sample = samples.at(-1);
-  const neuronSpikes = flat.spikes.filter((spike) => spike.neuronId === selectedId && spike.timeMs <= displayTime);
-  const recentArrivals = flat.arrivals.filter((arrival) => arrival.target === selectedId && arrival.timeMs <= displayTime).slice(-4).reverse();
-  const recentFlights = flat.flights.filter((flight) => flight.target === selectedId && flight.arrivalTimeMs <= displayTime).slice(-4).reverse();
-  const inputs = dataset.synapses.filter((synapse) => synapse.target === selectedId).length;
-  const outputs = dataset.synapses.filter((synapse) => synapse.source === selectedId).length;
-  const pacemaker = dataset.pacemakerNeuronIds.includes(selectedId);
-  neuronTitle.textContent = `神经元 ${selectedId}${pacemaker ? " · 起搏源" : ""}`;
-  details.innerHTML = [
-    ["类型", neuron.polarity === "excitatory" ? "兴奋性" : "抑制性"],
-    ["膜电位", `${potentialAt(neuron, sample, displayTime).toFixed(2)} mV`],
-    ["阈值", `${neuron.thresholdMv.toFixed(2)} mV`],
-    ["状态", sample?.refractoryUntilMs && sample.refractoryUntilMs > displayTime ? "绝对不应期" : "可响应"],
-    ["最近放电", neuronSpikes.at(-1) ? `${neuronSpikes.at(-1)!.timeMs.toFixed(3)} ms` : "—"],
-    ["连接", `${inputs} 入 / ${outputs} 出`],
-    ["坐标", neuron.position.map((value) => value.toFixed(3)).join(", ")],
-  ].map(([key, value]) => `<div><dt>${key}</dt><dd>${value}</dd></div>`).join("");
-  const latestSpike = neuronSpikes.at(-1);
-  const eventRows = [
-    ...(latestSpike ? [`<div class="event"><b>放电</b> · ${latestSpike.timeMs.toFixed(3)} ms</div>`] : []),
-    ...recentArrivals.map((arrival) => {
-      const source = arrival.origin.kind === "synaptic" ? `神经元 ${arrival.origin.source}` : originLabel(arrival.origin.kind);
-      const ignored = arrival.ignoredDuringRefractory ? " · 不应期忽略" : "";
-      return `<div class="event"><b>${source}</b> · ${arrival.magnitudeMv.toFixed(2)} mV<br>${arrival.timeMs.toFixed(3)} ms${ignored}</div>`;
-    }),
-    ...recentFlights.map((flight) => {
-      const magnitude = dataset.synapses.find((synapse) => synapse.id === flight.synapseId)?.magnitudeMv ?? 0;
-      return `<div class="event"><b>神经元 ${flight.source}</b> · ${magnitude.toFixed(2)} mV<br>${flight.arrivalTimeMs.toFixed(3)} ms</div>`;
-    }),
-  ];
-  events.innerHTML = eventRows.join("") || '<span class="muted">当前时间之前没有事件</span>';
+const renderEvidence = () => {
+  const cards=byId("evaluation-cards");cards.replaceChildren();
+  for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
+  byId("evaluation-count").textContent=`${dataset.config.evaluationEpisodes} 张未见地图`;
+  const acceptanceLabels:Record<string,string>={weightsChanged:"突触产生持久变化",learnedBeatsLearningDisabled:"胜过关闭学习",shuffleHurtsPerformance:"打乱连接后退化",lesionHurtsPerformance:"内部单元消融后退化",deterministic:"完全确定性"};
+  const grid=byId("acceptance-grid");grid.replaceChildren();for(const [key,label] of Object.entries(acceptanceLabels)){const pass=dataset.acceptance[key];const item=document.createElement("div");item.className=pass?"pass":"fail";item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`;grid.append(item);}
+  byId("plasticity-summary").textContent=`${dataset.plasticity.changedWeightCount}/${dataset.plasticity.totalWeightCount} 动作突触改变 · RMS ${dataset.plasticity.rootMeanSquareChange.toFixed(3)}`;
 };
 
-const originLabel = (kind: ArrivalOrigin["kind"]): string => ({
-  initialization: "初始化",
-  pacemaker: "起搏器",
-  stimulus: "局部刺激",
-  synaptic: "突触输入",
-}[kind]);
+const selectTrace = () => { trace=dataset.traces.find(item=>item.label===traceSelect.value)??dataset.traces[0];frameIndex=0;timeline.max=String(trace.frames.length-1);playing=false;play.textContent="▶";renderFrame(); };
+const setFrame = (value:number) => { frameIndex=Math.max(0,Math.min(trace.frames.length-1,value));renderFrame(); };
+play.addEventListener("click",()=>{playing=!playing;play.textContent=playing?"Ⅱ":"▶";lastTick=performance.now();});
+prev.addEventListener("click",()=>setFrame(frameIndex-1)); next.addEventListener("click",()=>setFrame(frameIndex+1));
+timeline.addEventListener("input",()=>setFrame(Number(timeline.value))); traceSelect.addEventListener("change",selectTrace);
+window.addEventListener("resize",()=>{drawWorld();drawCurve();});
 
-const updateUi = (): void => {
-  timeline.value = String(displayTime);
-  timeLabel.textContent = `${displayTime.toFixed(3)} ms`;
-  perf.textContent = neuralScene.performanceText();
-  updateInspector();
-  drawStatePlane();
-  drawTimeMarkers();
+const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}requestAnimationFrame(animate); };
+
+const start = async () => {
+  const response=await fetch("/embodied-v1.json");if(!response.ok)throw new Error(`dataset ${response.status}`);dataset=await response.json() as Dataset;
+  byId("version").textContent=dataset.version;byId("acceptance-label").textContent=dataset.acceptance.passed?"行为验收通过":"行为验收失败";byId("acceptance-dot").className=dataset.acceptance.passed?"pass":"fail";
+  traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
+  renderEvidence();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
-const canvasContext = (target: HTMLCanvasElement): CanvasRenderingContext2D => {
-  const dpr = Math.min(window.devicePixelRatio, 2);
-  const width = Math.max(1, Math.floor(target.clientWidth * dpr));
-  const height = Math.max(1, Math.floor(target.clientHeight * dpr));
-  if (target.width !== width || target.height !== height) {
-    target.width = width;
-    target.height = height;
-  }
-  return target.getContext("2d")!;
-};
-
-const mixRgb = (from: [number, number, number], to: [number, number, number], amount: number): string => {
-  const t = THREE.MathUtils.clamp(amount, 0, 1);
-  const values = from.map((value, index) => Math.round(value + (to[index] - value) * t));
-  return `rgb(${values[0]}, ${values[1]}, ${values[2]})`;
-};
-
-const drawStatePlane = (): void => {
-  if (!dataset || planeOrder.length === 0) return;
-  const context = canvasContext(statePlane);
-  const width = statePlane.width;
-  const height = statePlane.height;
-  context.clearRect(0, 0, width, height);
-  context.fillStyle = "#eef3f5";
-  context.fillRect(0, 0, width, height);
-
-  const columns = Math.ceil(Math.sqrt(planeOrder.length));
-  const rows = Math.ceil(planeOrder.length / columns);
-  const padding = Math.max(8, Math.min(width, height) * 0.035);
-  const gap = Math.max(2, Math.min(width, height) * 0.009);
-  const cellSize = Math.max(4, Math.min(
-    (width - padding * 2 - gap * (columns - 1)) / columns,
-    (height - padding * 2 - gap * (rows - 1)) / rows,
-  ));
-  const gridWidth = columns * cellSize + (columns - 1) * gap;
-  const gridHeight = rows * cellSize + (rows - 1) * gap;
-  const originX = (width - gridWidth) / 2;
-  const originY = (height - gridHeight) / 2;
-  const channel = planeChannel.value as PlaneChannel;
-  planeCells = [];
-
-  for (let index = 0; index < planeOrder.length; index++) {
-    const neuron = planeOrder[index];
-    const column = index % columns;
-    const row = Math.floor(index / columns);
-    const x = originX + column * (cellSize + gap);
-    const y = originY + row * (cellSize + gap);
-    const sample = lastAtOrBefore(planeSamplesByNeuron.get(neuron.id) ?? [], displayTime, (item) => item.timeMs);
-    const spike = lastAtOrBefore(planeSpikesByNeuron.get(neuron.id) ?? [], displayTime, (item) => item.timeMs);
-    const potential = potentialAt(neuron, sample, displayTime);
-    const activation = THREE.MathUtils.clamp(
-      (potential - neuron.restPotentialMv) / (neuron.thresholdMv - neuron.restPotentialMv),
-      0,
-      1,
-    );
-    const spikeAge = spike ? displayTime - spike.timeMs : Number.POSITIVE_INFINITY;
-    const spikeStrength = THREE.MathUtils.clamp(1 - spikeAge / 5, 0, 1);
-    const refractoryRemaining = sample?.refractoryUntilMs === null || sample?.refractoryUntilMs === undefined
-      ? 0
-      : Math.max(0, sample.refractoryUntilMs - displayTime);
-    const refractoryStrength = THREE.MathUtils.clamp(refractoryRemaining / neuron.refractoryPeriodMs, 0, 1);
-
-    if (channel === "voltage") {
-      const target: [number, number, number] = neuron.polarity === "excitatory" ? [240, 106, 36] : [8, 127, 181];
-      context.fillStyle = mixRgb([236, 242, 244], target, 0.16 + activation * 0.84);
-    } else if (channel === "spike") {
-      context.fillStyle = mixRgb([232, 238, 241], [156, 39, 176], spikeStrength);
-    } else {
-      context.fillStyle = mixRgb([235, 241, 243], [58, 73, 82], refractoryStrength);
-    }
-    context.fillRect(x, y, cellSize, cellSize);
-
-    context.lineWidth = Math.max(1, cellSize * 0.045);
-    context.strokeStyle = "rgba(87, 112, 123, .34)";
-    context.strokeRect(x, y, cellSize, cellSize);
-    if (dataset.pacemakerNeuronIds.includes(neuron.id)) {
-      context.lineWidth = Math.max(1.5, cellSize * 0.07);
-      context.strokeStyle = "#a47b00";
-      context.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-    }
-    if (spikeStrength > 0) {
-      context.lineWidth = Math.max(1.5, cellSize * 0.08);
-      context.strokeStyle = `rgba(156, 39, 176, ${0.3 + spikeStrength * 0.7})`;
-      context.strokeRect(x + cellSize * 0.1, y + cellSize * 0.1, cellSize * 0.8, cellSize * 0.8);
-    }
-    if (selectedId === neuron.id) {
-      context.lineWidth = Math.max(2, cellSize * 0.1);
-      context.strokeStyle = "#152f3b";
-      context.strokeRect(x - 1, y - 1, cellSize + 2, cellSize + 2);
-    }
-
-    if (cellSize >= 22) {
-      const darkBackground = (channel === "voltage" && activation > 0.58)
-        || (channel === "spike" && spikeStrength > 0.5)
-        || (channel === "refractory" && refractoryStrength > 0.45);
-      context.fillStyle = darkBackground ? "rgba(255,255,255,.92)" : "rgba(26,51,62,.8)";
-      context.font = `${Math.max(8, Math.floor(cellSize * 0.23))}px ui-monospace, monospace`;
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText(String(neuron.id), x + cellSize / 2, y + cellSize / 2);
-    }
-    planeCells.push({ neuronId: neuron.id, x, y, size: cellSize });
-  }
-
-  const labels: Record<PlaneChannel, string> = { voltage: "膜电位", spike: "5 ms 放电痕迹", refractory: "剩余不应期" };
-  let selectionText = "未选择神经元";
-  if (selectedId !== null) {
-    const neuron = dataset.neurons.find((item) => item.id === selectedId);
-    if (neuron) {
-      const sample = lastAtOrBefore(planeSamplesByNeuron.get(neuron.id) ?? [], displayTime, (item) => item.timeMs);
-      selectionText = `N${neuron.id} ${(potentialAt(neuron, sample, displayTime)).toFixed(2)} mV`;
-    }
-  }
-  planeInfo.textContent = `固定空间展开 ${columns}×${rows} · ${labels[channel]} · ${selectionText}`;
-};
-
-const drawCharts = (): void => {
-  const rasterContext = canvasContext(raster);
-  const activityContext = canvasContext(activity);
-  const width = raster.width;
-  const height = raster.height;
-  rasterContext.clearRect(0, 0, width, height);
-  for (const spike of flat.spikes) {
-    const x = (spike.timeMs - dataset.startMs) / (dataset.endMs - dataset.startMs) * width;
-    const y = (spike.neuronId + 0.5) / dataset.neurons.length * height;
-    const neuron = dataset.neurons[spike.neuronId];
-    rasterContext.fillStyle = neuron?.polarity === "inhibitory" ? "#087fb5" : "#f06a24";
-    rasterContext.fillRect(x, y, Math.max(1, window.devicePixelRatio), Math.max(1, window.devicePixelRatio));
-  }
-  activityContext.clearRect(0, 0, activity.width, activity.height);
-  const maxSpikes = Math.max(1, ...flat.metrics.map((metric) => metric.spikeCount));
-  activityContext.beginPath();
-  flat.metrics.forEach((metric, index) => {
-    const x = (metric.timeMs - dataset.startMs) / (dataset.endMs - dataset.startMs) * activity.width;
-    const y = activity.height - (metric.spikeCount / maxSpikes) * (activity.height - 8) - 3;
-    if (index === 0) activityContext.moveTo(x, y); else activityContext.lineTo(x, y);
-  });
-  activityContext.strokeStyle = "#087fb5";
-  activityContext.lineWidth = Math.max(1, window.devicePixelRatio);
-  activityContext.stroke();
-};
-
-const drawTimeMarkers = (): void => {
-  drawCharts();
-  const fraction = (displayTime - dataset.startMs) / (dataset.endMs - dataset.startMs);
-  for (const target of [raster, activity]) {
-    const context = target.getContext("2d")!;
-    const x = fraction * target.width;
-    context.strokeStyle = "rgba(24,49,61,.72)";
-    context.lineWidth = Math.max(1, window.devicePixelRatio);
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x, target.height);
-    context.stroke();
-  }
-};
-
-const nudgePlayback = (direction: -1 | 1): void => {
-  playing = false;
-  nudgeDirection = direction;
-  nudgeRemainingSeconds = 0.8;
-  playButton.textContent = "▶";
-};
-
-playButton.addEventListener("click", () => {
-  if (displayTime >= dataset.endMs) displayTime = dataset.startMs;
-  nudgeRemainingSeconds = 0;
-  playing = !playing;
-  playButton.textContent = playing ? "❚❚" : "▶";
-});
-prevButton.addEventListener("click", () => nudgePlayback(-1));
-nextButton.addEventListener("click", () => nudgePlayback(1));
-timeline.addEventListener("input", () => {
-  displayTime = Number(timeline.value);
-  playing = false;
-  nudgeRemainingSeconds = 0;
-  playButton.textContent = "▶";
-  updateUi();
-});
-branch.addEventListener("change", () => setDataset(Number(branch.value)));
-searchGo.addEventListener("click", () => {
-  const id = Number(search.value);
-  if (Number.isInteger(id) && dataset.neurons.some((neuron) => neuron.id === id)) {
-    setSelection(id);
-    neuralScene.focusNeuron(id);
-    backButton.disabled = false;
-  }
-});
-search.addEventListener("keydown", (event) => { if (event.key === "Enter") searchGo.click(); });
-focusButton.addEventListener("click", () => {
-  if (selectedId !== null) {
-    neuralScene.focusNeuron(selectedId);
-    backButton.disabled = false;
-  }
-});
-backButton.addEventListener("click", () => { neuralScene.restoreCamera(); backButton.disabled = neuralScene.cameraHistory.length === 0; });
-isolate.addEventListener("change", () => neuralScene.setIsolated(isolate.checked));
-upstreamButton.addEventListener("click", () => {
-  const synapse = dataset.synapses.find((item) => item.target === selectedId);
-  if (synapse) { setSelection(synapse.source); neuralScene.focusNeuron(synapse.source); backButton.disabled = false; }
-});
-downstreamButton.addEventListener("click", () => {
-  const synapse = dataset.synapses.find((item) => item.source === selectedId);
-  if (synapse) { setSelection(synapse.target); neuralScene.focusNeuron(synapse.target); backButton.disabled = false; }
-});
-planeChannel.addEventListener("change", drawStatePlane);
-statePlane.addEventListener("click", (event) => {
-  const bounds = statePlane.getBoundingClientRect();
-  const x = (event.clientX - bounds.left) * statePlane.width / bounds.width;
-  const y = (event.clientY - bounds.top) * statePlane.height / bounds.height;
-  const cell = planeCells.find((item) => x >= item.x && x <= item.x + item.size && y >= item.y && y <= item.y + item.size);
-  if (cell) setSelection(cell.neuronId);
-});
-window.addEventListener("resize", () => { drawCharts(); drawStatePlane(); });
-
-const animate = (now: number): void => {
-  const delta = Math.min((now - lastFrame) / 1000, 0.05);
-  lastFrame = now;
-  if (playing) {
-    displayTime += delta * 1000 * Number(speedSelect.value);
-    if (displayTime >= dataset.endMs) {
-      displayTime = dataset.endMs;
-      playing = false;
-      playButton.textContent = "▶";
-    }
-  } else if (nudgeRemainingSeconds > 0) {
-    displayTime += nudgeDirection * delta * 1000 * Number(speedSelect.value);
-    nudgeRemainingSeconds = Math.max(0, nudgeRemainingSeconds - delta);
-    if (displayTime <= dataset.startMs || displayTime >= dataset.endMs) {
-      displayTime = THREE.MathUtils.clamp(displayTime, dataset.startMs, dataset.endMs);
-      nudgeRemainingSeconds = 0;
-    }
-  }
-  neuralScene.update(displayTime, delta);
-  if (now - lastUiUpdate > 80) {
-    updateUi();
-    lastUiUpdate = now;
-  }
-  requestAnimationFrame(animate);
-};
-
-const start = async (): Promise<void> => {
-  const response = await fetch("./experiment-001-v1.json");
-  if (!response.ok) throw new Error(`failed to load experiment: ${response.status}`);
-  compactBundle = await response.json() as CompactBundle;
-  if (compactBundle.version !== 1 || compactBundle.branches.length === 0) throw new Error("unsupported or empty playback bundle");
-  compactBundle.branches.forEach((item, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = item.label;
-    branch.append(option);
-  });
-  setDataset(0);
-  loading.classList.add("hidden");
-  requestAnimationFrame((now) => { lastFrame = now; animate(now); });
-};
-
-const decodeDataset = (bundleValue: CompactBundle, value: CompactBranch): PlaybackDataset => {
-  const neurons = bundleValue.topology.neurons.map((item): PlaybackNeuron => ({
-    id: item[0],
-    polarity: item[1] === 1 ? "inhibitory" : "excitatory",
-    position: [item[2], item[3], item[4]],
-    restPotentialMv: item[5],
-    resetPotentialMv: item[6],
-    thresholdMv: item[7],
-    refractoryPeriodMs: item[8],
-    membraneTimeConstantMs: item[9],
-  }));
-  const synapses = bundleValue.topology.synapses.map((item): PlaybackSynapse => ({
-    id: item[0], source: item[1], target: item[2], magnitudeMv: item[3], delayMs: item[4],
-  }));
-  const spikeEvents = value.spikes.map((item): PlaybackSpike => ({ id: item[0], neuronId: item[1], timeMs: item[2] }));
-  const arrivalEvents = value.arrivals.map((item): PlaybackArrival => {
-    const kind = item[5];
-    let origin: ArrivalOrigin;
-    if (kind === 0) origin = { kind: "initialization", eventId: item[6] };
-    else if (kind === 1) origin = { kind: "pacemaker", eventId: item[6] };
-    else if (kind === 2) origin = { kind: "stimulus", eventId: item[6] };
-    else {
-      const packed = item[7];
-      origin = { kind: "synaptic", spikeId: item[6], synapseId: Math.floor(packed / 1000), source: packed % 1000 };
-    }
-    return {
-      sequence: item[0], target: item[1], timeMs: item[2],
-      polarity: item[3] === 1 ? "inhibitory" : "excitatory",
-      magnitudeMv: item[4], origin, ignoredDuringRefractory: item[8] === 1,
-    };
-  });
-  const neuronSamples = value.samples.map((item): PlaybackNeuronSample => ({
-    neuronId: item[0], timeMs: item[1], membranePotentialMv: item[2], refractoryUntilMs: item[3] < 0 ? null : item[3],
-  }));
-  const metricSamples = value.metrics.map((item): PlaybackMetricSample => ({
-    timeMs: item[0], spikeCount: item[1], activeNeuronCount: item[2],
-  }));
-  const inFlightIntervals = value.flights.map((item): PlaybackInFlight => ({
-    spikeId: item[0], synapseId: item[1], source: item[2], target: item[3], sendTimeMs: item[4], arrivalTimeMs: item[5],
-    polarity: item[6] === 1 ? "inhibitory" : "excitatory",
-  }));
-  return {
-    version: 1, label: value.label, startMs: value.startMs, endMs: value.endMs,
-    eventDigest: value.eventDigest, neurons, synapses, pacemakerNeuronIds: value.pacemakerNeuronIds,
-    chunks: [{
-      startMs: value.startMs, endMs: value.endMs, spikeEvents, arrivalEvents,
-      neuronSamples, metricSamples, inFlightIntervals,
-    }],
-  };
-};
-
-start().catch((error: unknown) => {
-  loading.textContent = error instanceof Error ? error.message : String(error);
-});
+start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

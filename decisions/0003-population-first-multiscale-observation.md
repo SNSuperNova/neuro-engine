@@ -1,5 +1,7 @@
 # ADR 0003：群体优先的多尺度观察
 
+> 状态：已被 [ADR 0004](0004-behavior-first-embodied-learning.md) 取代。
+
 - 状态：已接受
 - 日期：2026-08-18
 

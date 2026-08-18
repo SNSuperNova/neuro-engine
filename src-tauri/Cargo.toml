@@ -1,7 +1,7 @@
 [package]
 name = "neuro-engine-app"
 version = "0.1.0"
-description = "Neuro Engine Gate 3 neural microscope"
+description = "Neuro Engine embodied learning laboratory"
 edition = "2024"
 
 [build-dependencies]

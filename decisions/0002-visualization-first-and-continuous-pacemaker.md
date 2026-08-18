@@ -1,5 +1,7 @@
 # ADR 0002：可视化优先与持续起搏
 
+> 状态：已被 [ADR 0004](0004-behavior-first-embodied-learning.md) 取代。
+
 - 状态：已接受
 - 日期：2026-08-18
 

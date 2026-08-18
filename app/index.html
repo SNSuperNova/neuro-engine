@@ -3,82 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Neuro Engine · Neural Microscope</title>
+  <title>Neuro Engine · Embodied Learning Lab</title>
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><strong>Neuro Engine</strong><span class="muted">Gate 3</span></div>
-    <label>运行分支 <select id="branch"></select></label>
-    <div class="search"><input id="search" type="search" inputmode="numeric" placeholder="神经元 ID"><button id="search-go">定位</button></div>
-    <button id="back" disabled>返回视角</button>
-    <div id="comparison" class="comparison" hidden></div>
-    <div id="perf" class="perf">-- FPS</div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · v1</small></div></div>
+    <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
   <main class="workspace">
-    <section id="viewport-wrap" class="viewport-wrap">
-      <canvas id="viewport" aria-label="三维神经元网络"></canvas>
-      <div class="legend">
-        <span><i class="dot excitatory"></i>兴奋</span>
-        <span><i class="dot inhibitory"></i>抑制</span>
-        <span><i class="dot signal"></i>信号</span>
-        <span><i class="ring"></i>起搏源</span>
+    <section class="world-card card">
+      <div class="section-head">
+        <div><span class="eyebrow">BEHAVIOR IS THE OUTPUT</span><h1>二维生存环境</h1></div>
+        <label>对照分支 <select id="trace-select"></select></label>
       </div>
-      <div class="camera-help"><kbd>WASD</kbd> 平移 · <kbd>Q/E</kbd> Z 轴 · 拖动鼠标旋转 · 滚轮前后</div>
-      <div class="axis"><span class="x">X</span><span class="y">Y</span><span class="z">Z</span></div>
-      <div id="loading" class="loading">正在载入实验数据…</div>
+      <div class="world-wrap">
+        <canvas id="world" aria-label="主体在二维环境中的行为"></canvas>
+        <div class="world-legend"><span><i class="agent-dot"></i>主体</span><span><i class="food-dot"></i>食物</span><span><i class="hazard-dot"></i>危险</span><span><i class="path-dot"></i>轨迹</span></div>
+      </div>
+      <div class="transport">
+        <button id="prev" aria-label="后退一步">‹</button>
+        <button id="play" class="primary" aria-label="播放">▶</button>
+        <button id="next" aria-label="前进一步">›</button>
+        <label>速度 <select id="speed"><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="20">20×</option><option value="40">40×</option></select></label>
+        <strong id="step-label">step 0</strong>
+        <input id="timeline" type="range" min="0" max="1" value="0" aria-label="行为时间线">
+      </div>
     </section>
 
-    <div class="analysis-column">
-      <section class="atlas-panel">
-        <div class="atlas-head">
-          <div><span class="eyebrow">NEURAL STATE PLANE</span><h1>神经状态展开</h1></div>
-          <label>通道
-            <select id="plane-channel">
-              <option value="voltage">膜电位</option>
-              <option value="spike">放电事件</option>
-              <option value="refractory">不应期</option>
-            </select>
-          </label>
-        </div>
-        <div id="pattern-panel" class="pattern-panel" hidden>
-          <div id="pattern-grid" class="pattern-grid" aria-label="3×3 输入图形"></div>
-          <div><span class="eyebrow">PHASE 2 INPUT</span><strong>有界持续刺激</strong><small id="pattern-meta"></small></div>
-        </div>
-        <div class="atlas-canvas-wrap"><canvas id="state-plane" aria-label="二维神经状态平面"></canvas></div>
-        <div id="plane-info" class="plane-info">固定空间展开 · 等待数据</div>
+    <section class="state-column">
+      <section class="vitals card">
+        <div class="section-head compact"><div><span class="eyebrow">INTERNAL NEED</span><h2>主体状态</h2></div><strong id="action-name">—</strong></div>
+        <div class="energy-row"><span>能量</span><div class="meter"><i id="energy-bar"></i></div><strong id="energy-value">—</strong></div>
+        <div class="metric-grid"><div><span>已获取食物</span><strong id="food-value">—</strong></div><div><span>即时后果</span><strong id="reward-value">—</strong></div><div><span>位置</span><strong id="position-value">—</strong></div><div><span>方向</span><strong id="heading-value">—</strong></div></div>
       </section>
 
-      <aside class="inspector">
-        <div class="inspector-head"><span class="eyebrow">NEURON INSPECTOR</span><h1 id="neuron-title">未选择神经元</h1></div>
-        <dl id="details" class="details"><div><dt>提示</dt><dd>单击 3D 节点或二维格子</dd></div></dl>
-        <div class="inspector-actions">
-          <button id="focus" disabled>聚焦</button>
-          <button id="upstream" disabled>跳到上游</button>
-          <button id="downstream" disabled>跳到下游</button>
-        </div>
-        <label class="toggle"><input id="isolate" type="checkbox" disabled> 只显示一阶邻域</label>
-        <section class="event-list"><h2>当前事件</h2><div id="events" class="events muted">播放后显示最近输入与放电</div></section>
-      </aside>
-    </div>
-  </main>
+      <section class="card neural-state">
+        <div class="section-head compact"><div><span class="eyebrow">SENSE → STATE → ACTION</span><h2>神经控制器</h2></div><span>12 感觉 · 24 内部 · 4 动作</span></div>
+        <h3>动作概率</h3><div id="action-bars" class="bar-list"></div>
+        <h3>感觉输入</h3><div id="sensor-bars" class="sensor-grid"></div>
+        <h3>内部活动</h3><div id="hidden-grid" class="hidden-grid"></div>
+      </section>
+    </section>
 
-  <footer class="playback">
-    <div class="transport">
-      <button id="prev" aria-label="短时后退" title="按当前速度后退 0.8 秒">◁</button>
-      <button id="play" class="primary" aria-label="播放">▶</button>
-      <button id="next" aria-label="短时前进" title="按当前速度前进 0.8 秒">▷</button>
-      <label>速度 <select id="speed"><option value="0.005">0.005×</option><option value="0.01">0.01×</option><option value="0.02" selected>0.02×</option><option value="0.05">0.05×</option><option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label>
-      <strong id="time">0.000 ms</strong>
-      <span id="digest" class="muted"></span>
-    </div>
-    <input id="timeline" type="range" min="0" max="2500" step="0.1" value="0" aria-label="模拟时间">
-    <div class="charts">
-      <div><span>放电栅格</span><canvas id="raster" height="64"></canvas></div>
-      <div><span>10 ms 活动</span><canvas id="activity" height="64"></canvas></div>
-    </div>
-  </footer>
+    <section class="evidence card">
+      <div class="section-head"><div><span class="eyebrow">HELD-OUT MAPS</span><h2>未见环境行为证据</h2></div><span id="evaluation-count"></span></div>
+      <div id="evaluation-cards" class="evaluation-cards"></div>
+      <div class="acceptance-grid" id="acceptance-grid"></div>
+    </section>
+
+    <section class="learning card">
+      <div class="section-head"><div><span class="eyebrow">PERSISTENT CHANGE</span><h2>训练过程</h2></div><div id="plasticity-summary"></div></div>
+      <canvas id="learning-curve" aria-label="训练期间获取食物变化"></canvas>
+    </section>
+  </main>
 </div>
 <script type="module" src="/src/main.ts"></script>
 </body>

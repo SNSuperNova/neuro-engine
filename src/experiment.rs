@@ -220,94 +220,6 @@ pub fn local_stimulus_inputs(
         .collect()
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Pattern3x3 {
-    pub cells: [bool; 9],
-}
-
-impl Pattern3x3 {
-    pub const BLANK: Self = Self { cells: [false; 9] };
-    pub const CENTER_CROSS: Self = Self {
-        cells: [false, true, false, true, true, true, false, true, false],
-    };
-
-    pub fn active_cell_count(self) -> usize {
-        self.cells.iter().filter(|active| **active).count()
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PatternStimulusSchedule {
-    pub start: SimTime,
-    pub end: SimTime,
-    pub interval: SimDuration,
-    pub magnitude_mv: f64,
-    pub first_event_id: u64,
-}
-
-pub fn pattern_stimulus_inputs(
-    definition: &NetworkDefinition,
-    pattern: Pattern3x3,
-    targets: [NeuronId; 9],
-    schedule: PatternStimulusSchedule,
-) -> Result<Vec<ExternalInput>, ExperimentError> {
-    if schedule.interval.as_micros() == 0 {
-        return Err(ExperimentError::ZeroPatternInterval);
-    }
-    if schedule.end <= schedule.start {
-        return Err(ExperimentError::InvalidScheduleWindow {
-            start: schedule.start,
-            end: schedule.end,
-        });
-    }
-    if !schedule.magnitude_mv.is_finite() || schedule.magnitude_mv <= 0.0 {
-        return Err(ExperimentError::InvalidPositiveParameter {
-            name: "pattern_magnitude_mv",
-            value: schedule.magnitude_mv,
-        });
-    }
-
-    let known_ids = definition
-        .neurons()
-        .iter()
-        .map(|neuron| neuron.id)
-        .collect::<std::collections::BTreeSet<_>>();
-    let unique_targets = targets
-        .into_iter()
-        .collect::<std::collections::BTreeSet<_>>();
-    if unique_targets.len() != targets.len()
-        || targets.iter().any(|target| !known_ids.contains(target))
-    {
-        return Err(ExperimentError::InvalidPatternTargets);
-    }
-
-    let mut inputs = Vec::new();
-    let mut time = schedule.start.as_micros();
-    let mut next_id = schedule.first_event_id;
-    while time < schedule.end.as_micros() {
-        for (active, target) in pattern.cells.iter().zip(targets) {
-            if !active {
-                continue;
-            }
-            inputs.push(ExternalInput::new(
-                EventId(next_id),
-                target,
-                SimTime::from_micros(time),
-                InputPolarity::Excitatory,
-                schedule.magnitude_mv,
-                ExternalInputKind::Stimulus,
-            ));
-            next_id = next_id
-                .checked_add(1)
-                .ok_or(ExperimentError::ExternalEventIdOverflow)?;
-        }
-        time = time
-            .checked_add(schedule.interval.as_micros())
-            .ok_or(ExperimentError::ScheduleTimeOverflow)?;
-    }
-    Ok(inputs)
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Gate2ExperimentConfig {
     pub network: GeneratedNetworkConfig,
@@ -365,75 +277,6 @@ pub struct Gate2ExperimentResult {
     pub stimulus_control_run: NetworkRun,
     pub stimulus_variant_run: NetworkRun,
     pub summary: Gate2Summary,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Phase2ExperimentConfig {
-    pub network: GeneratedNetworkConfig,
-    pub run_end: SimTime,
-    pub pacemaker_start: SimTime,
-    pub pacemaker_interval: SimDuration,
-    pub pacemaker_magnitude_mv: f64,
-    pub pacemaker_neuron_count: u32,
-    pub input_neuron_ids: [NeuronId; 9],
-    pub pattern: Pattern3x3,
-    pub pattern_start: SimTime,
-    pub pattern_end: SimTime,
-    pub pattern_interval: SimDuration,
-    pub pattern_magnitude_mv: f64,
-    pub metric_bin_width: SimDuration,
-}
-
-impl Default for Phase2ExperimentConfig {
-    fn default() -> Self {
-        Self {
-            network: GeneratedNetworkConfig::default(),
-            run_end: SimTime::from_micros(1_600_000),
-            pacemaker_start: SimTime::from_micros(100_000),
-            pacemaker_interval: SimDuration::from_micros(20_000),
-            pacemaker_magnitude_mv: 16.0,
-            pacemaker_neuron_count: 4,
-            input_neuron_ids: [
-                NeuronId(4),
-                NeuronId(5),
-                NeuronId(6),
-                NeuronId(7),
-                NeuronId(8),
-                NeuronId(9),
-                NeuronId(10),
-                NeuronId(11),
-                NeuronId(12),
-            ],
-            pattern: Pattern3x3::CENTER_CROSS,
-            pattern_start: SimTime::from_micros(900_000),
-            pattern_end: SimTime::from_micros(1_300_000),
-            pattern_interval: SimDuration::from_micros(30_000),
-            pattern_magnitude_mv: 10.0,
-            metric_bin_width: SimDuration::from_micros(10_000),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Phase2Summary {
-    pub control: NetworkMetrics,
-    pub pattern: NetworkMetrics,
-    pub trajectory: TrajectoryDifference,
-    pub control_digest: u64,
-    pub pattern_digest: u64,
-    pub pattern_input_event_count: usize,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Phase2ExperimentResult {
-    pub definition: NetworkDefinition,
-    pub control_run: NetworkRun,
-    pub pattern_run: NetworkRun,
-    pub input_neuron_ids: [NeuronId; 9],
-    pub pattern: Pattern3x3,
-    pub pattern_start: SimTime,
-    pub pattern_end: SimTime,
-    pub summary: Phase2Summary,
 }
 
 /// Frozen engineering acceptance bands for `experiment-001/v1`.
@@ -701,84 +544,6 @@ pub fn run_gate2_experiment(
     })
 }
 
-pub fn run_phase2_experiment(
-    config: Phase2ExperimentConfig,
-) -> Result<Phase2ExperimentResult, ExperimentError> {
-    validate_phase2_config(config)?;
-    let definition = generate_network(config.network)?;
-    let pacemaker_targets = (0..config.pacemaker_neuron_count)
-        .map(NeuronId)
-        .collect::<Vec<_>>();
-    let base_inputs = pacemaker_inputs(
-        &pacemaker_targets,
-        config.pacemaker_start,
-        config.run_end,
-        config.pacemaker_interval,
-        config.pacemaker_magnitude_mv,
-        100_000,
-    )?;
-    let control_run = simulate_network(&definition, &base_inputs, config.run_end)
-        .map_err(ExperimentError::Network)?;
-
-    let pattern_inputs = pattern_stimulus_inputs(
-        &definition,
-        config.pattern,
-        config.input_neuron_ids,
-        PatternStimulusSchedule {
-            start: config.pattern_start,
-            end: config.pattern_end,
-            interval: config.pattern_interval,
-            magnitude_mv: config.pattern_magnitude_mv,
-            first_event_id: 2_000_000,
-        },
-    )?;
-    let pattern_input_event_count = pattern_inputs.len();
-    let mut variant_inputs = base_inputs;
-    variant_inputs.extend(pattern_inputs);
-    let pattern_run = simulate_network(&definition, &variant_inputs, config.run_end)
-        .map_err(ExperimentError::Network)?;
-
-    let metric_config = MetricsConfig {
-        window_start: config.pattern_start,
-        window_end: config.pattern_end,
-        bin_width: config.metric_bin_width,
-        synchronous_fraction_threshold: 0.20,
-        maximum_period_lag: SimDuration::from_micros(200_000),
-    };
-    let control = compute_network_metrics(&definition, &control_run, metric_config)
-        .map_err(ExperimentError::Metrics)?;
-    let pattern = compute_network_metrics(&definition, &pattern_run, metric_config)
-        .map_err(ExperimentError::Metrics)?;
-    let trajectory = compare_spike_trajectories(
-        &definition,
-        &control_run,
-        &pattern_run,
-        config.pattern_start,
-        config.run_end,
-        config.metric_bin_width,
-    )
-    .map_err(ExperimentError::Metrics)?;
-    let summary = Phase2Summary {
-        control,
-        pattern,
-        trajectory,
-        control_digest: control_run.event_log.stable_digest(),
-        pattern_digest: pattern_run.event_log.stable_digest(),
-        pattern_input_event_count,
-    };
-
-    Ok(Phase2ExperimentResult {
-        definition,
-        control_run,
-        pattern_run,
-        input_neuron_ids: config.input_neuron_ids,
-        pattern: config.pattern,
-        pattern_start: config.pattern_start,
-        pattern_end: config.pattern_end,
-        summary,
-    })
-}
-
 fn last_spike_at_or_after(run: &NetworkRun, start: SimTime) -> Option<SimTime> {
     run.event_log
         .spikes()
@@ -851,39 +616,6 @@ fn validate_gate2_config(config: Gate2ExperimentConfig) -> Result<(), Experiment
     Ok(())
 }
 
-fn validate_phase2_config(config: Phase2ExperimentConfig) -> Result<(), ExperimentError> {
-    if config.pacemaker_neuron_count == 0
-        || config.pacemaker_neuron_count
-            > config.network.neuron_count - config.network.inhibitory_neuron_count
-    {
-        return Err(ExperimentError::InvalidPacemakerNeuronCount(
-            config.pacemaker_neuron_count,
-        ));
-    }
-    if !(config.pacemaker_start < config.pattern_start
-        && config.pattern_start < config.pattern_end
-        && config.pattern_end < config.run_end)
-    {
-        return Err(ExperimentError::InvalidExperimentTimeline);
-    }
-    if config.metric_bin_width.as_micros() == 0 {
-        return Err(ExperimentError::ZeroMetricBinWidth);
-    }
-    let input_ids = config
-        .input_neuron_ids
-        .into_iter()
-        .collect::<std::collections::BTreeSet<_>>();
-    if input_ids.len() != config.input_neuron_ids.len()
-        || config
-            .input_neuron_ids
-            .iter()
-            .any(|id| id.0 >= config.network.neuron_count || id.0 < config.pacemaker_neuron_count)
-    {
-        return Err(ExperimentError::InvalidPatternTargets);
-    }
-    Ok(())
-}
-
 fn euclidean_distance(left: Position3, right: Position3) -> f64 {
     squared_distance(left, right).sqrt()
 }
@@ -936,10 +668,8 @@ pub enum ExperimentError {
     ScheduleTimeOverflow,
     NoPacemakerTargets,
     ZeroPacemakerInterval,
-    ZeroPatternInterval,
     InvalidScheduleWindow { start: SimTime, end: SimTime },
     InvalidStimulusTargetCount(usize),
-    InvalidPatternTargets,
     InvalidPacemakerNeuronCount(u32),
     InvalidExperimentTimeline,
     ZeroMetricBinWidth,
@@ -974,7 +704,6 @@ impl Display for ExperimentError {
             Self::ZeroPacemakerInterval => {
                 formatter.write_str("pacemaker interval must be positive")
             }
-            Self::ZeroPatternInterval => formatter.write_str("pattern interval must be positive"),
             Self::InvalidScheduleWindow { start, end } => write!(
                 formatter,
                 "invalid schedule window {}..{} us",
@@ -984,9 +713,6 @@ impl Display for ExperimentError {
             Self::InvalidStimulusTargetCount(count) => {
                 write!(formatter, "invalid local stimulus target count {count}")
             }
-            Self::InvalidPatternTargets => formatter.write_str(
-                "pattern targets must contain nine unique, known, non-pacemaker neurons",
-            ),
             Self::InvalidPacemakerNeuronCount(count) => {
                 write!(formatter, "invalid pacemaker neuron count {count}")
             }

@@ -1,21 +1,23 @@
-//! Deterministic, event-driven primitives for Neuro Engine.
-//!
-//! Gate 0 intentionally contains only a single-neuron LIF model. Network
-//! scheduling, synapses, storage, and rendering belong to later gates.
+//! Deterministic embodied-learning experiments and retained neural simulation
+//! primitives for Neuro Engine.
 
+pub mod embodied;
 pub mod experiment;
 pub mod lif;
 pub mod metrics;
 pub mod network;
-pub mod phase2;
-pub mod playback;
+
+pub use embodied::{
+    ACTION_COUNT, AdaptiveController, AgentAction, ArenaConfig, BehaviorFrame, BehaviorTrace,
+    ControllerConfig, EmbodiedAcceptanceReport, EmbodiedError, EmbodiedExperimentConfig,
+    EmbodiedExperimentResult, EpisodeSummary, EvaluationReport, GridPosition, HIDDEN_COUNT,
+    Heading, PlasticityReport, SENSOR_COUNT, TrainingCurvePoint, run_embodied_experiment,
+};
 
 pub use experiment::{
     Gate2AcceptanceCriteria, Gate2AcceptanceReport, Gate2ExperimentConfig, Gate2ExperimentResult,
-    Gate2Summary, GeneratedNetworkConfig, Pattern3x3, PatternStimulusSchedule,
-    Phase2ExperimentConfig, Phase2ExperimentResult, Phase2Summary, generate_network,
-    local_stimulus_inputs, pacemaker_inputs, pattern_stimulus_inputs, run_gate2_experiment,
-    run_phase2_experiment,
+    Gate2Summary, GeneratedNetworkConfig, generate_network, local_stimulus_inputs,
+    pacemaker_inputs, run_gate2_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,
@@ -26,22 +28,8 @@ pub use metrics::{
     compute_network_metrics,
 };
 pub use network::{
-    ActivityRegulatorConfig, EventLog, ExternalInput, ExternalInputKind, InputOrigin, InputRecord,
-    LogEvent, NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity,
-    NeuronSpec, Position3, PropagationSpec, RegulationRecord, SimulationLimits, SpikeId, SynapseId,
-    SynapseSpec, simulate_network, simulate_network_with_limits, simulate_network_with_regulator,
-};
-pub use phase2::{
-    AblationComparison, AccuracyReport, ActivityRegulatorReport, FunctionalGroupReport,
-    FunctionalNeuronScore, InputStabilityEvaluation, Phase2AnalysisError, Phase2HypothesisReport,
-    Phase2PatternId, Phase2ProtocolConfig, Phase2ProtocolReport, Phase2ProtocolResult,
-    Phase2RawEvent, Phase2StabilityCriteria, Phase2TrialArtifact, ReadoutReport,
-    SeedExperimentReport, StructureSeedScreen, TrialMetadata, TrialResponse, TrialSplit,
-    degree_preserving_connection_shuffle, evaluate_phase2_input_stability, run_phase2_protocol,
-    run_phase2_trial_artifact, screen_phase2_structure_seeds, silence_neurons,
-};
-pub use playback::{
-    ArrivalOrigin, PlaybackArrival, PlaybackBundle, PlaybackChunk, PlaybackDataset, PlaybackError,
-    PlaybackInFlight, PlaybackMetricSample, PlaybackNeuron, PlaybackNeuronSample, PlaybackSpike,
-    PlaybackSynapse, build_playback_dataset,
+    EventLog, ExternalInput, ExternalInputKind, InputOrigin, InputRecord, LogEvent,
+    NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
+    Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
+    simulate_network, simulate_network_with_limits,
 };

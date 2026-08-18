@@ -1,13 +1,10 @@
 # Phase 2 v1：模式输入、统计读出与因果消融
 
-> 状态：实验闭环已完成；科学验收未通过。H2 成立，H1 未跨结构种子稳定成立，H3 不成立。按停止条件，不扩大网络、不加入学习机制，也不把有限的可视效果解释为功能。
+> 状态：历史负结果。实验闭环已完成但科学验收未通过；实现已在具身方向重构中移除，可从提交 `81a1fd3` 复现。H2 成立，H1 未跨结构种子稳定成立，H3 不成立。
 
 ## 1. 可复现实验
 
-```powershell
-cargo run --release --example phase2_full -- --output target/phase2-v1
-cargo run --release --example phase2_export_raw -- --output target/phase2-v1/raw-events.jsonl
-```
+旧复现命令和源码不再位于当前分支，请检出提交 `81a1fd3` 后运行当时报告中的 `phase2_full` 与 `phase2_export_raw` 示例。
 
 第一条命令生成 `report.json` 和 `responses.json`；第二条确定性重跑同一批试验，逐行输出包含全部输入、突触到达、放电和传播门控记录的原始事件。原始 JSONL 很大，默认只写入 `target/`，不提交仓库。可先加 `--quick` 验证管线和事件摘要一致性。
 

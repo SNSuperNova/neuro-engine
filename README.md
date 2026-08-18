@@ -1,68 +1,67 @@
 # Neuro Engine
 
-一个可观察、可干预、可回放的脉冲神经网络动力学沙盒。
+一个以行为证据为中心的最小具身学习实验室。
 
-项目当前不以复制真实大脑、图片识别或训练通用 AI 为目标。第一阶段只研究一个问题：
+项目不再试图从随机点神经网络的复杂放电中猜测“意义”。当前目标是让一个具有能量需求、感觉、内部状态和动作能力的主体，通过环境后果改变突触，并在未见环境中表现出可重复、可消融的学习。
 
-> 包含传播延迟、兴奋和抑制的简化循环网络，能否形成可复现、不过度爆发的持续活动，并对局部刺激表现出可测量的状态变化？
+## 当前结果
 
-## 当前阶段
+`embodied-learning/v1` 使用 15×15 二维环境、12 个感觉通道、24 个带泄漏与适应的内部单元和 4 个动作单元。动作突触采用奖励调制资格迹。
 
-Gate 0～3 已实现：仓库包含 Rust 事件驱动 LIF 内核、确定性网络传播、空间延迟、指标计算、版本化对照实验，以及同时显示 3D 网络与二维神经状态平面的 Tauri + Three.js“神经显微镜”。当前冻结基线以持续起搏支持的稳定活动为正常运行条件；撤除起搏只是依赖性诊断。Phase 2 v1 已完成模式输入、统计读出、置乱对照和真实网络消融的实现与跨种子运行，但 H1/H3 未通过，因此暂停扩大规模，详见 [Phase 2 v1 报告](experiments/phase2-v1.md)。第一阶段边界仍由 [MVP.md](MVP.md) 约束。
+在 80 张未见地图上：
 
-运行验证：
+| 条件 | 平均食物 / 7 | 完成率 | 最终能量 |
+|---|---:|---:|---:|
+| 未经训练 | 0.50 | 0% | 3.4 |
+| 关闭学习 | 0.50 | 0% | 3.4 |
+| 学习后 | 7.00 | 100% | 39.6 |
+| 打乱已学习突触 | 0.00 | 0% | 8.4 |
+| 消融重要内部单元 | 0.35 | 0% | 8.1 |
+
+这证明当前版本形成了可由行为直接观察、由连接置乱和内部消融验证的学习闭环；不宣称它是生命、意识或真实人脑模型。
+
+## 运行
 
 ```powershell
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
 cargo test --all-targets --release
-cargo run --example gate0
-cargo run --release --example gate2
-cargo run --release --example gate2_scan
-cargo run --release --example phase2
-cargo run --release --example phase2_scan
-cargo run --release --example export_playback
+cargo run --release --example embodied_lab
 npm install
 npm run dev
+```
+
+浏览器打开 [http://127.0.0.1:1420](http://127.0.0.1:1420)。Web 仪表盘可以同步查看主体轨迹、能量、感觉输入、内部活动、动作概率、训练曲线和未见地图对照。
+
+桌面壳：
+
+```powershell
 npm run tauri dev
 ```
 
-Gate 2 的参数、验收区间和实测结果见 [experiments/experiment-001-v1.md](experiments/experiment-001-v1.md)。
-Phase 2 最小 `3×3` 成对试验及首次输入扫描见 [experiments/phase2-p2-0.md](experiments/phase2-p2-0.md)；完整统计实验、复现命令和负结果见 [experiments/phase2-v1.md](experiments/phase2-v1.md)。
+## 代码结构
 
-文档阅读顺序：
+```text
+src/embodied.rs             二维世界、主体、控制器、可塑性与实验
+examples/embodied_lab.rs    生成版本化实验数据
+tests/embodied.rs           确定性、闭环、可塑性和行为验收
+app/                        具身行为仪表盘
+src/lif.rs                  保留的单神经元 LIF 基础
+src/network.rs              保留的确定性事件网络内核
+src/experiment.rs           保留的早期网络生成与基线实验
+experiments/                版本化结果与失败记录
+```
 
-1. [MVP.md](MVP.md)：现在做什么、不做什么；
-2. [MODEL_LIF.md](MODEL_LIF.md)：第一版计算模型；
-3. [ARCHITECTURE.md](ARCHITECTURE.md)：模块和数据边界；
-4. [EXPERIMENT_001.md](EXPERIMENT_001.md)：如何证明第一版有效；
-5. [VISUALIZATION.md](VISUALIZATION.md)：已实现的 3D 游览、时间回放和性能规格；
-6. [POPULATION_VIEW.md](POPULATION_VIEW.md)：群体统计、区域信息流与功能证据门槛；
-7. [PHASE_2.md](PHASE_2.md)：`3×3` 模式刺激、自然功能群、简单读出和因果验证；
-8. [DESIGN.md](DESIGN.md)：长期愿景和后续研究方向；
-9. [decisions](decisions/)：已经作出的重要工程决策。
+## 文档
 
-## 项目原则
+- [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
+- [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；
+- [ROADMAP.md](ROADMAP.md)：下一阶段只允许逐项加入的机制；
+- [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
+- [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
-- 模型是用于探索假设的简化计算模型，不宣称具有完整生物真实性；
-- 模拟结果由数值指标和可重复实验验证，不能只凭动画判断；
-- 模拟内核不依赖图形界面，并能以无界面方式运行；
-- 显示帧率、播放速度和相机操作不能影响模拟结果；
-- 新机制必须能单独关闭，以便进行对照实验；
-- Gate 4 仍以可关闭、可比较的干预分支为边界，不直接扩展到学习、生长、视觉输入和复杂神经元。
+## 原则
 
-## Gate 3 操作
-
-- `WASD`：在 XY 平面移动；
-- `Q / E`：降低或升高 Z 轴位置；
-- 拖动鼠标：旋转视角；滚轮：沿视线前后移动；
-- 单击神经元或输入 ID：选择并检查；
-- 右侧 `10×10` 固定空间展开：切换膜电位、5 ms 放电痕迹和剩余不应期；二维选择与 3D、检查器同步；
-- 时间轴、播放按钮和倍速：查看同一份确定性实验结果；
-- 运行分支：切换持续起搏对照、局部刺激和撤除起搏诊断。
-
-## 文档中的结论等级
-
-- **已决定**：当前实现必须遵守，改变时需要增加决策记录；
-- **暂定**：可以用于第一轮实现，但必须通过实验校准；
-- **开放问题**：尚未决定，不应被代码暗中固化。
+- 行为是输出，不用外部分类器替主体解释意义；
+- 学习必须在未见环境中优于关闭学习对照；
+- 每个新机制必须可关闭并拥有独立实验；
+- 画面用于理解已经定义的行为，不替代统计与因果证据；
+- 当前闭环没有稳定前，不扩大规模、不模拟完整人脑。

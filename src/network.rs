@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
@@ -253,19 +253,10 @@ pub struct NetworkSpike {
     pub time: SimTime,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RegulationRecord {
-    pub episode_id: u64,
-    pub time: SimTime,
-    pub trigger_neuron_id: NeuronId,
-    pub unique_spike_count: usize,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum LogEvent {
     Input(InputRecord),
     Spike(NetworkSpike),
-    Regulation(RegulationRecord),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -277,21 +268,14 @@ impl EventLog {
     pub fn inputs(&self) -> impl Iterator<Item = &InputRecord> {
         self.events.iter().filter_map(|event| match event {
             LogEvent::Input(input) => Some(input),
-            LogEvent::Spike(_) | LogEvent::Regulation(_) => None,
+            LogEvent::Spike(_) => None,
         })
     }
 
     pub fn spikes(&self) -> impl Iterator<Item = &NetworkSpike> {
         self.events.iter().filter_map(|event| match event {
-            LogEvent::Input(_) | LogEvent::Regulation(_) => None,
+            LogEvent::Input(_) => None,
             LogEvent::Spike(spike) => Some(spike),
-        })
-    }
-
-    pub fn regulations(&self) -> impl Iterator<Item = &RegulationRecord> {
-        self.events.iter().filter_map(|event| match event {
-            LogEvent::Regulation(record) => Some(record),
-            LogEvent::Input(_) | LogEvent::Spike(_) => None,
         })
     }
 
@@ -349,13 +333,6 @@ impl EventLog {
                     mix_u64(&mut digest, u64::from(spike.neuron_id.0));
                     mix_u64(&mut digest, spike.time.as_micros());
                 }
-                LogEvent::Regulation(record) => {
-                    mix_u64(&mut digest, 3);
-                    mix_u64(&mut digest, record.episode_id);
-                    mix_u64(&mut digest, record.time.as_micros());
-                    mix_u64(&mut digest, u64::from(record.trigger_neuron_id.0));
-                    mix_u64(&mut digest, record.unique_spike_count as u64);
-                }
             }
         }
         digest
@@ -377,31 +354,12 @@ pub struct NetworkRun {
     pub event_log: EventLog,
     pub max_in_flight_inputs: usize,
     pub in_flight_inputs_at_end: usize,
-    pub regulation_episode_count: usize,
-    pub suppressed_propagation_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SimulationLimits {
     pub maximum_processed_inputs: usize,
     pub maximum_queued_inputs: usize,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ActivityRegulatorConfig {
-    pub window: SimDuration,
-    pub unique_spike_threshold: usize,
-    pub cooldown: SimDuration,
-}
-
-impl Default for ActivityRegulatorConfig {
-    fn default() -> Self {
-        Self {
-            window: SimDuration::from_micros(10_000),
-            unique_spike_threshold: 18,
-            cooldown: SimDuration::from_micros(5_000),
-        }
-    }
 }
 
 impl Default for SimulationLimits {
@@ -428,27 +386,11 @@ pub fn simulate_network(
     external_inputs: &[ExternalInput],
     end_time: SimTime,
 ) -> Result<NetworkRun, NetworkError> {
-    simulate_network_internal(
+    simulate_network_with_limits(
         definition,
         external_inputs,
         end_time,
         SimulationLimits::default(),
-        None,
-    )
-}
-
-pub fn simulate_network_with_regulator(
-    definition: &NetworkDefinition,
-    external_inputs: &[ExternalInput],
-    end_time: SimTime,
-    regulator: ActivityRegulatorConfig,
-) -> Result<NetworkRun, NetworkError> {
-    simulate_network_internal(
-        definition,
-        external_inputs,
-        end_time,
-        SimulationLimits::default(),
-        Some(regulator),
     )
 }
 
@@ -458,16 +400,6 @@ pub fn simulate_network_with_limits(
     end_time: SimTime,
     limits: SimulationLimits,
 ) -> Result<NetworkRun, NetworkError> {
-    simulate_network_internal(definition, external_inputs, end_time, limits, None)
-}
-
-fn simulate_network_internal(
-    definition: &NetworkDefinition,
-    external_inputs: &[ExternalInput],
-    end_time: SimTime,
-    limits: SimulationLimits,
-    regulator: Option<ActivityRegulatorConfig>,
-) -> Result<NetworkRun, NetworkError> {
     if end_time < definition.start_time {
         return Err(NetworkError::EndBeforeStart {
             start_time: definition.start_time,
@@ -476,13 +408,6 @@ fn simulate_network_internal(
     }
     if limits.maximum_processed_inputs == 0 || limits.maximum_queued_inputs == 0 {
         return Err(NetworkError::InvalidSimulationLimits);
-    }
-    if let Some(config) = regulator
-        && (config.window.as_micros() == 0
-            || config.unique_spike_threshold == 0
-            || config.cooldown.as_micros() == 0)
-    {
-        return Err(NetworkError::InvalidActivityRegulator);
     }
 
     let mut id_to_index = BTreeMap::new();
@@ -556,10 +481,6 @@ fn simulate_network_internal(
     let mut processed_input_count = 0_usize;
     let mut next_spike_id = 0_u64;
     let mut event_log = EventLog::default();
-    let mut recent_spikes = VecDeque::<(SimTime, NeuronId)>::new();
-    let mut regulation_until = None::<SimTime>;
-    let mut next_regulation_episode = 0_u64;
-    let mut suppressed_propagation_count = 0_usize;
 
     while let Some((time, mut scheduled)) = queue.pop_first() {
         if time > end_time {
@@ -630,77 +551,37 @@ fn simulate_network_internal(
                 };
                 event_log.events.push(LogEvent::Spike(spike));
 
-                let mut suppress_propagation = false;
-                if let Some(regulator) = regulator {
-                    recent_spikes.push_back((time, target));
-                    while recent_spikes.front().is_some_and(|(spike_time, _)| {
-                        time.as_micros().saturating_sub(spike_time.as_micros())
-                            > regulator.window.as_micros()
-                    }) {
-                        recent_spikes.pop_front();
-                    }
-                    let unique_spikes = recent_spikes
-                        .iter()
-                        .map(|(_, neuron_id)| *neuron_id)
-                        .collect::<BTreeSet<_>>()
-                        .len();
-                    suppress_propagation = regulation_until.is_some_and(|until| time < until);
-                    if !suppress_propagation && unique_spikes >= regulator.unique_spike_threshold {
-                        suppress_propagation = true;
-                        regulation_until = Some(
-                            time.checked_add(regulator.cooldown)
-                                .map_err(NetworkError::Model)?,
-                        );
-                        event_log
-                            .events
-                            .push(LogEvent::Regulation(RegulationRecord {
-                                episode_id: next_regulation_episode,
-                                time,
-                                trigger_neuron_id: target,
-                                unique_spike_count: unique_spikes,
-                            }));
-                        next_regulation_episode = next_regulation_episode
-                            .checked_add(1)
-                            .ok_or(NetworkError::EventSequenceOverflow)?;
-                        recent_spikes.clear();
-                    }
-                }
-
-                if suppress_propagation {
-                    suppressed_propagation_count += outgoing[neuron_index].len();
-                } else {
-                    let source_polarity = definition.neurons[neuron_index]
-                        .polarity
-                        .as_input_polarity();
-                    for synapse in &outgoing[neuron_index] {
-                        let arrival_time = time
-                            .checked_add(synapse.propagation.resolved_delay().map_err(
-                                |reason| NetworkError::InvalidPropagation {
-                                    synapse_id: synapse.id,
-                                    reason: Box::new(reason),
-                                },
-                            )?)
-                            .map_err(NetworkError::Model)?;
-                        let sequence = allocate_event_id(&mut next_sequence)?;
-                        queue.entry(arrival_time).or_default().push(ScheduledInput {
-                            sequence,
-                            time: arrival_time,
-                            target: synapse.target,
-                            polarity: source_polarity,
-                            magnitude_mv: synapse.magnitude_mv,
-                            origin: InputOrigin::Synaptic {
-                                spike_id,
+                let source_polarity = definition.neurons[neuron_index]
+                    .polarity
+                    .as_input_polarity();
+                for synapse in &outgoing[neuron_index] {
+                    let arrival_time = time
+                        .checked_add(synapse.propagation.resolved_delay().map_err(|reason| {
+                            NetworkError::InvalidPropagation {
                                 synapse_id: synapse.id,
-                                source: synapse.source,
-                            },
+                                reason: Box::new(reason),
+                            }
+                        })?)
+                        .map_err(NetworkError::Model)?;
+                    let sequence = allocate_event_id(&mut next_sequence)?;
+                    queue.entry(arrival_time).or_default().push(ScheduledInput {
+                        sequence,
+                        time: arrival_time,
+                        target: synapse.target,
+                        polarity: source_polarity,
+                        magnitude_mv: synapse.magnitude_mv,
+                        origin: InputOrigin::Synaptic {
+                            spike_id,
+                            synapse_id: synapse.id,
+                            source: synapse.source,
+                        },
+                    });
+                    queued_count += 1;
+                    in_flight_input_count += 1;
+                    if queued_count > limits.maximum_queued_inputs {
+                        return Err(NetworkError::QueuedInputLimitExceeded {
+                            limit: limits.maximum_queued_inputs,
                         });
-                        queued_count += 1;
-                        in_flight_input_count += 1;
-                        if queued_count > limits.maximum_queued_inputs {
-                            return Err(NetworkError::QueuedInputLimitExceeded {
-                                limit: limits.maximum_queued_inputs,
-                            });
-                        }
                     }
                 }
                 max_in_flight_inputs = max_in_flight_inputs.max(in_flight_input_count);
@@ -721,8 +602,6 @@ fn simulate_network_internal(
         event_log,
         max_in_flight_inputs,
         in_flight_inputs_at_end: in_flight_input_count,
-        regulation_episode_count: next_regulation_episode as usize,
-        suppressed_propagation_count,
     })
 }
 
@@ -785,7 +664,6 @@ pub enum NetworkError {
     EventSequenceOverflow,
     SpikeSequenceOverflow,
     InvalidSimulationLimits,
-    InvalidActivityRegulator,
     ProcessedInputLimitExceeded {
         limit: usize,
     },
@@ -880,9 +758,6 @@ impl Display for NetworkError {
             Self::SpikeSequenceOverflow => formatter.write_str("spike sequence overflow"),
             Self::InvalidSimulationLimits => {
                 formatter.write_str("simulation limits must be greater than zero")
-            }
-            Self::InvalidActivityRegulator => {
-                formatter.write_str("activity regulator parameters must be greater than zero")
             }
             Self::ProcessedInputLimitExceeded { limit } => {
                 write!(formatter, "processed input limit exceeded ({limit})")

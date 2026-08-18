@@ -2,7 +2,7 @@
 name = "neuro-engine"
 version = "0.1.0"
 edition = "2024"
-description = "Deterministic event-driven spiking network simulation core"
+description = "Deterministic embodied learning laboratory with retained neural simulation primitives"
 license = "MIT"
 
 [lib]

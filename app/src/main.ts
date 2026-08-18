@@ -604,6 +604,8 @@ let dataset: PlaybackDataset;
 let flat: FlatPlayback;
 let displayTime = 0;
 let playing = false;
+let nudgeDirection: -1 | 1 = 1;
+let nudgeRemainingSeconds = 0;
 let selectedId: number | null = null;
 let lastFrame = performance.now();
 let lastUiUpdate = 0;
@@ -626,6 +628,7 @@ const setDataset = (index: number): void => {
   flat = flatten(dataset);
   displayTime = dataset.startMs;
   playing = false;
+  nudgeRemainingSeconds = 0;
   playButton.textContent = "▶";
   timeline.min = String(dataset.startMs);
   timeline.max = String(dataset.endMs);
@@ -774,27 +777,25 @@ const drawTimeMarkers = (): void => {
   }
 };
 
-const jumpSpike = (direction: -1 | 1): void => {
-  const relevant = selectedId === null ? flat.spikes : flat.spikes.filter((spike) => spike.neuronId === selectedId);
-  const target = direction > 0
-    ? relevant.find((spike) => spike.timeMs > displayTime + 0.0001)
-    : [...relevant].reverse().find((spike) => spike.timeMs < displayTime - 0.0001);
-  if (target) displayTime = target.timeMs;
+const nudgePlayback = (direction: -1 | 1): void => {
   playing = false;
+  nudgeDirection = direction;
+  nudgeRemainingSeconds = 0.8;
   playButton.textContent = "▶";
-  updateUi();
 };
 
 playButton.addEventListener("click", () => {
   if (displayTime >= dataset.endMs) displayTime = dataset.startMs;
+  nudgeRemainingSeconds = 0;
   playing = !playing;
   playButton.textContent = playing ? "❚❚" : "▶";
 });
-prevButton.addEventListener("click", () => jumpSpike(-1));
-nextButton.addEventListener("click", () => jumpSpike(1));
+prevButton.addEventListener("click", () => nudgePlayback(-1));
+nextButton.addEventListener("click", () => nudgePlayback(1));
 timeline.addEventListener("input", () => {
   displayTime = Number(timeline.value);
   playing = false;
+  nudgeRemainingSeconds = 0;
   playButton.textContent = "▶";
   updateUi();
 });
@@ -835,6 +836,13 @@ const animate = (now: number): void => {
       displayTime = dataset.endMs;
       playing = false;
       playButton.textContent = "▶";
+    }
+  } else if (nudgeRemainingSeconds > 0) {
+    displayTime += nudgeDirection * delta * 1000 * Number(speedSelect.value);
+    nudgeRemainingSeconds = Math.max(0, nudgeRemainingSeconds - delta);
+    if (displayTime <= dataset.startMs || displayTime >= dataset.endMs) {
+      displayTime = THREE.MathUtils.clamp(displayTime, dataset.startMs, dataset.endMs);
+      nudgeRemainingSeconds = 0;
     }
   }
   neuralScene.update(displayTime, delta);

@@ -4,6 +4,7 @@
 pub mod embodied;
 pub mod experiment;
 pub mod gate_a;
+pub mod gate_b;
 pub mod lif;
 pub mod metrics;
 pub mod network;
@@ -25,6 +26,13 @@ pub use gate_a::{
     ConfidenceInterval, GateAAcceptanceReport, GateACurvePoint, GateAExperimentConfig,
     GateAExperimentResult, GateAMetricIntervals, GateAMetricPoint, GateASampleEfficiency,
     GateASeedRun, GateAVariantReport, run_gate_a_experiment,
+};
+pub use gate_b::{
+    ForkSide, GATE_B_SENSOR_COUNT, GateBAcceptanceReport, GateBBehaviorTrace, GateBCondition,
+    GateBConfidenceInterval, GateBControllerBudget, GateBControllerKind, GateBControllerReport,
+    GateBExperimentConfig, GateBExperimentResult, GateBMetricIntervals, GateBMetricPoint,
+    GateBPairedEffect, GateBSampleEfficiency, GateBSeedMetric, GateBTraceFrame,
+    GateBTrainingCurvePoint, GateBTrialSummary, run_gate_b_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,

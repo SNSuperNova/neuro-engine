@@ -41,6 +41,19 @@ interface GateADataset {
   variants: AuditVariant[]; conclusions: string[];
   acceptance: Record<string, boolean> & { passed: boolean };
 }
+type ForkSide = "left" | "right";
+type GateBCondition = "delayed-cue" | "cue-visible-at-fork" | "cue-randomized" | "history-shuffled";
+type GateBController = "stateless" | "state-reset" | "leaky-state";
+interface GateBMetricPoint { correctChoiceFraction: number; branchChoiceFraction: number; foodFraction: number; meanFinalEnergy: number; meanSteps: number; rightChoiceFraction: number; leftTargetAccuracy: number; rightTargetAccuracy: number }
+interface GateBMetricIntervals { correctChoiceFraction: Interval; branchChoiceFraction: Interval; foodFraction: Interval; meanFinalEnergy: Interval; meanSteps: Interval; rightChoiceFraction: Interval; leftTargetAccuracy: Interval; rightTargetAccuracy: Interval }
+interface GateBFrame { step: number; positionBefore: Position; headingBefore: Heading; position: Position; heading: Heading; visibleCue: ForkSide | null; action: Action; reward: number; energy: number; branchChoice: ForkSide | null; hiddenActivity: number[]; actionProbabilities: number[] }
+interface GateBTrace { label: string; condition: GateBCondition; controller: GateBController; target: ForkSide; presentedCue: ForkSide; frames: GateBFrame[]; summary: { steps: number; branchChoice: ForkSide | null; correctChoice: boolean; foodEaten: boolean; finalEnergy: number; totalReward: number } }
+interface GateBReport { condition: GateBCondition; controller: GateBController; metrics: GateBMetricIntervals; sampleEfficiency: { accuracyThreshold: number; reachedSeedCount: number; reachedSeedFraction: number; meanEpisodesWhenReached: Interval | null }; trainingCurve: { episode: number; correctChoiceFraction: Interval }[] }
+interface GateBDataset {
+  version: string; config: { modelSeedCount: number; trainingEpisodes: number; evaluationEpisodes: number; maximumSteps: number; cueSteps: number; controller: { hiddenLeak: number } };
+  reports: GateBReport[]; pairedEffects: { id: string; leftLabel: string; rightLabel: string; effect: GateBMetricIntervals }[];
+  traces: GateBTrace[]; conclusions: string[]; acceptance: Record<string, boolean> & { passed: boolean };
+}
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -52,6 +65,11 @@ const worldCanvas = byId<HTMLCanvasElement>("world");
 const curveCanvas = byId<HTMLCanvasElement>("learning-curve");
 const gateACurveCanvas = byId<HTMLCanvasElement>("gate-a-curve");
 const gateASelect = byId<HTMLSelectElement>("gate-a-select");
+const gateBWorldCanvas = byId<HTMLCanvasElement>("gate-b-world");
+const gateBCurveCanvas = byId<HTMLCanvasElement>("gate-b-curve");
+const gateBTraceSelect = byId<HTMLSelectElement>("gate-b-trace-select");
+const gateBRange = byId<HTMLInputElement>("gate-b-range");
+const gateBPlay = byId<HTMLButtonElement>("gate-b-play");
 const traceSelect = byId<HTMLSelectElement>("trace-select");
 const timeline = byId<HTMLInputElement>("timeline");
 const play = byId<HTMLButtonElement>("play");
@@ -61,6 +79,11 @@ const speed = byId<HTMLSelectElement>("speed");
 
 let dataset: Dataset;
 let gateA: GateADataset;
+let gateB: GateBDataset;
+let gateBTrace: GateBTrace;
+let gateBFrameIndex = 0;
+let gateBPlaying = false;
+let gateBLastTick = performance.now();
 let trace: Trace;
 let frameIndex = 0;
 let playing = false;
@@ -71,6 +94,8 @@ const labels: Record<string, string> = {
   untrained: "未经训练", learned: "学习后", shuffled: "打乱突触", lesioned: "内部单元消融",
   "learning-disabled": "关闭学习", forward: "前进", "turn-left": "左转", "turn-right": "右转", eat: "进食",
   north: "北", east: "东", south: "南", west: "西",
+  left: "左", right: "右", stateless: "无状态", "state-reset": "每步清空", "leaky-state": "泄漏状态",
+  "delayed-cue": "延迟线索", "cue-visible-at-fork": "岔路可见", "cue-randomized": "随机线索", "history-shuffled": "历史置乱",
 };
 
 const fitCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContext2D => {
@@ -207,6 +232,65 @@ const renderGateA = () => {
   drawGateACurve();
 };
 
+const gateBPhase = (frame: GateBFrame) => {
+  if (frame.visibleCue && frame.step <= gateB.config.cueSteps) return "线索写入";
+  if (frame.positionBefore.y > 2) return "无信息延迟";
+  if (frame.positionBefore.y === 2 && frame.positionBefore.x === 4) return frame.branchChoice ? "岔路选择" : "岔路决策";
+  return frame.reward > 0 ? "获得食物" : "分支结果";
+};
+
+const drawGateBWorld = () => {
+  const ctx = fitCanvas(gateBWorldCanvas); const rect = gateBWorldCanvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height); ctx.fillStyle = "#f7faf7"; ctx.fillRect(0, 0, rect.width, rect.height);
+  const cell = Math.min((rect.width - 70) / 5, (rect.height - 55) / 8); const ox = rect.width / 2 - 2.5 * cell; const oy = (rect.height - 8 * cell) / 2;
+  const center = (point: Position): [number, number] => [ox + (point.x - 2 + .5) * cell, oy + (point.y - 1 + .5) * cell];
+  const open = [{x:3,y:2},{x:5,y:2}, ...Array.from({length:7}, (_,i)=>({x:4,y:i+2}))];
+  for (const point of open) { const [x,y]=center(point); ctx.fillStyle="#edf4ef";ctx.strokeStyle="#cbd9cf";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(x-cell*.45,y-cell*.45,cell*.9,cell*.9,7);ctx.fill();ctx.stroke(); }
+  const target = gateBTrace.target === "left" ? {x:3,y:2} : {x:5,y:2}; const other = gateBTrace.target === "left" ? {x:5,y:2} : {x:3,y:2};
+  let [tx,ty]=center(target); ctx.fillStyle="#dff3e7";ctx.strokeStyle="#35a46e";ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(tx-cell*.43,ty-cell*.43,cell*.86,cell*.86,7);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#25835a";ctx.font="600 10px system-ui";ctx.textAlign="center";ctx.fillText("食物",tx,ty+4);
+  const [wx,wy]=center(other);ctx.fillStyle="#87958e";ctx.font="10px system-ui";ctx.fillText("无奖励",wx,wy+4);
+  const frames=gateBTrace.frames.slice(0,gateBFrameIndex+1);if(frames.length){ctx.strokeStyle="rgba(37,139,94,.38)";ctx.lineWidth=4;ctx.lineCap="round";ctx.beginPath();frames.forEach((frame,index)=>{const [x,y]=center(frame.position);index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
+  const frame=gateBTrace.frames[gateBFrameIndex];const [ax,ay]=center(frame.position);ctx.fillStyle="#174f45";ctx.beginPath();ctx.arc(ax,ay,Math.max(7,cell*.17),0,Math.PI*2);ctx.fill();
+  if(frame.visibleCue){ctx.fillStyle="#f2b84b";ctx.font="700 12px system-ui";ctx.fillText(`线索：${labels[frame.visibleCue]}`,rect.width/2,18);}
+  ctx.fillStyle="#718078";ctx.font="10px system-ui";ctx.fillText("观察画面标出真实目标；控制器输入不包含目标位置",rect.width/2,rect.height-8);
+};
+
+const renderGateBFrame = () => {
+  const frame=gateBTrace.frames[gateBFrameIndex];gateBRange.value=String(gateBFrameIndex);
+  byId("gate-b-step").textContent=`step ${frame.step} / ${gateBTrace.frames.length}`;
+  byId("gate-b-phase").textContent=gateBPhase(frame);byId("gate-b-cue").textContent=frame.visibleCue?labels[frame.visibleCue]:"关闭";
+  byId("gate-b-target").textContent=labels[gateBTrace.target];byId("gate-b-choice").textContent=frame.branchChoice?labels[frame.branchChoice]:"未选择";
+  byId("gate-b-action").textContent=labels[frame.action];byId("gate-b-reward").textContent=`${frame.reward>=0?"+":""}${frame.reward.toFixed(3)}`;
+  const actions=byId("gate-b-action-bars");actions.replaceChildren();frame.actionProbabilities.forEach((value,index)=>actions.append(makeBar(labels[["forward","turn-left","turn-right","eat"][index]],value)));
+  const hidden=byId("gate-b-hidden");hidden.replaceChildren();frame.hiddenActivity.forEach((value,index)=>{const cell=document.createElement("i");cell.title=`H${index}: ${value.toFixed(3)}`;cell.style.setProperty("--activity",String(Math.abs(value)));cell.className=value>=0?"excited":"suppressed";hidden.append(cell);});
+  [...byId("gate-b-events").children].forEach((item,index)=>item.classList.toggle("active",index===gateBFrameIndex));drawGateBWorld();
+};
+
+const selectGateBTrace = () => {
+  gateBTrace=gateB.traces.find(item=>item.label===gateBTraceSelect.value)??gateB.traces[0];gateBFrameIndex=0;gateBPlaying=false;gateBPlay.textContent="▶";gateBRange.max=String(gateBTrace.frames.length-1);
+  const events=byId("gate-b-events");events.replaceChildren(...gateBTrace.frames.map((frame,index)=>{const button=document.createElement("button");button.className=frame.visibleCue?"cue":frame.branchChoice?"decision":"delay";button.innerHTML=`<i>${index+1}</i><span>${gateBPhase(frame)}</span>`;button.addEventListener("click",()=>setGateBFrame(index));return button;}));renderGateBFrame();
+};
+
+const setGateBFrame = (value:number) => { gateBFrameIndex=Math.max(0,Math.min(gateBTrace.frames.length-1,value));renderGateBFrame(); };
+
+const drawGateBCurve = () => {
+  const reports=gateB.reports.filter(report=>report.condition==="delayed-cue");const ctx=fitCanvas(gateBCurveCanvas);const rect=gateBCurveCanvas.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);
+  const pad={l:48,r:20,t:20,b:32},w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b;const xOf=(episode:number)=>pad.l+episode/gateB.config.trainingEpisodes*w;const yOf=(value:number)=>pad.t+h-Math.max(0,Math.min(1,value))*h;
+  ctx.strokeStyle="#d8e3db";ctx.fillStyle="#718078";ctx.font="11px system-ui";ctx.textAlign="right";for(let i=0;i<=4;i++){const value=i/4,y=yOf(value);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();ctx.fillText(`${value*100}%`,pad.l-8,y+4);}
+  const colors:Record<GateBController,string>={stateless:"#8a9891","state-reset":"#d08a43","leaky-state":"#23845d"};for(const report of reports){const points=report.trainingCurve,color=colors[report.controller];ctx.fillStyle=`${color}20`;ctx.beginPath();points.forEach((point,index)=>{const x=xOf(point.episode),y=yOf(point.correctChoiceFraction.upper95);index?ctx.lineTo(x,y):ctx.moveTo(x,y);});[...points].reverse().forEach(point=>ctx.lineTo(xOf(point.episode),yOf(point.correctChoiceFraction.lower95)));ctx.closePath();ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();points.forEach((point,index)=>{const x=xOf(point.episode),y=yOf(point.correctChoiceFraction.mean);index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
+  ctx.textAlign="left";let lx=pad.l+8;for(const report of reports){ctx.fillStyle=colors[report.controller];ctx.fillRect(lx,pad.t+4,14,3);ctx.fillText(labels[report.controller],lx+19,pad.t+8);lx+=92;}ctx.fillStyle="#718078";ctx.textAlign="center";ctx.fillText("训练回合",pad.l+w/2,rect.height-6);
+};
+
+const renderGateB = () => {
+  byId("gate-b-protocol").textContent=`${gateB.config.modelSeedCount} 模型种子 × ${gateB.config.evaluationEpisodes} 均衡测试 · leak ${gateB.config.controller.hiddenLeak.toFixed(2)}`;
+  const acceptanceLabels:Record<string,string>={visibleControlLearnable:"岔路可见均可学",randomizedControlAtChance:"随机线索为机会水平",leakyBeatsStateReset:"泄漏状态显著胜出",leakyReachesSeventyPercent:"延迟正确率 ≥ 70%",historyShuffleHurts:"置乱历史显著退化",leftRightConsistent:"左右镜像一致",deterministic:"完全确定性"};const grid=byId("gate-b-acceptance");grid.replaceChildren();for(const [key,label] of Object.entries(acceptanceLabels)){const pass=gateB.acceptance[key];const item=document.createElement("div");item.className=pass?"pass":"fail";item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`;grid.append(item);}
+  gateBTraceSelect.replaceChildren(...gateB.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=`${labels[trace.condition]} · ${labels[trace.controller]}`;if(trace.condition==="delayed-cue"&&trace.controller==="leaky-state")option.selected=true;return option;}));
+  const comparison=byId("gate-b-comparison");comparison.replaceChildren(...gateB.reports.filter(report=>report.condition==="delayed-cue").map(report=>{const card=document.createElement("article");const metric=report.metrics.correctChoiceFraction;card.className=report.controller==="leaky-state"?"memory":"";card.innerHTML=`<span>${labels[report.controller]}</span><strong>${(metric.mean*100).toFixed(1)}%</strong><small>95% CI ${(metric.lower95*100).toFixed(1)}–${(metric.upper95*100).toFixed(1)}%</small><dl><div><dt>左目标</dt><dd>${(report.metrics.leftTargetAccuracy.mean*100).toFixed(1)}%</dd></div><div><dt>右目标</dt><dd>${(report.metrics.rightTargetAccuracy.mean*100).toFixed(1)}%</dd></div><div><dt>到达岔路</dt><dd>${(report.metrics.branchChoiceFraction.mean*100).toFixed(0)}%</dd></div></dl>`;return card;}));
+  const effects=byId("gate-b-effects");effects.replaceChildren(...gateB.pairedEffects.map(effect=>{const card=document.createElement("article");const value=effect.effect.correctChoiceFraction;card.innerHTML=`<span>${effect.id==="leaky-vs-state-reset"?"泄漏状态 − 每步清空":"原历史 − 置乱历史"}</span><strong>+${(value.mean*100).toFixed(1)} pp</strong><small>配对 95% CI ${(value.lower95*100).toFixed(1)}–${(value.upper95*100).toFixed(1)} pp</small>`;return card;}));
+  selectGateBTrace();drawGateBCurve();
+};
+
 const renderEvidence = () => {
   const cards=byId("evaluation-cards");cards.replaceChildren();
   for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
@@ -222,18 +306,21 @@ play.addEventListener("click",()=>{playing=!playing;play.textContent=playing?"�
 prev.addEventListener("click",()=>setFrame(frameIndex-1)); next.addEventListener("click",()=>setFrame(frameIndex+1));
 timeline.addEventListener("input",()=>setFrame(Number(timeline.value))); traceSelect.addEventListener("change",selectTrace);
 gateASelect.addEventListener("change", drawGateACurve);
-window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();}});
+gateBTraceSelect.addEventListener("change",selectGateBTrace);
+gateBPlay.addEventListener("click",()=>{gateBPlaying=!gateBPlaying;gateBPlay.textContent=gateBPlaying?"Ⅱ":"▶";gateBLastTick=performance.now();});
+byId("gate-b-prev").addEventListener("click",()=>setGateBFrame(gateBFrameIndex-1));byId("gate-b-next").addEventListener("click",()=>setGateBFrame(gateBFrameIndex+1));gateBRange.addEventListener("input",()=>setGateBFrame(Number(gateBRange.value)));
+window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();}});
 
-const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}requestAnimationFrame(animate); };
+const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}if(gateBPlaying&&now-gateBLastTick>=650){gateBLastTick=now;if(gateBFrameIndex>=gateBTrace.frames.length-1){gateBPlaying=false;gateBPlay.textContent="▶";}else setGateBFrame(gateBFrameIndex+1);}requestAnimationFrame(animate); };
 
 const start = async () => {
-  const [behaviorResponse, gateAResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json")]);
-  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);
-  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;
+  const [behaviorResponse, gateAResponse,gateBResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json")]);
+  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);
+  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;
   ready=true;
-  byId("version").textContent=gateA.version;byId("acceptance-label").textContent=gateA.acceptance.passed?"Gate A 验收通过":"Gate A 验收失败";byId("acceptance-dot").className=gateA.acceptance.passed?"pass":"fail";
+  byId("version").textContent=gateB.version;byId("acceptance-label").textContent=gateB.acceptance.passed?"Gate B 验收通过":"Gate B 验收失败";byId("acceptance-dot").className=gateB.acceptance.passed?"pass":"fail";
   traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
-  renderEvidence();renderGateA();drawCurve();selectTrace();requestAnimationFrame(animate);
+  renderEvidence();renderGateA();renderGateB();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
 start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

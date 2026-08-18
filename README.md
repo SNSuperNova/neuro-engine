@@ -22,12 +22,15 @@
 
 Gate A 又使用 9 个辅助条件、每项 12 个独立模型种子进行了审计：移除距离塑形后，学习相对关闭学习的平均食物增益仍为 `5.218`，95% CI `[4.544, 5.891]`；完全移除食物方向后增益降为 `0.676 [0.255, 1.097]`。因此学习不依赖距离塑形，但精确方向感觉仍是主要人工辅助。
 
+Gate B 使用早期线索消失后的 T 型岔路证明了连续状态的功能贡献：`leaky-state` 在 12 个未参与机制选择的模型种子上达到 `81.8% [73.6%, 90.0%]`，相同预算的 `state-reset` 为 `51.2%`；配对增益是 `30.6 [22.6, 38.6]` 个百分点，历史置乱后降至 `48.8%`。这证明短期状态有用，但不代表形成了概念或类脑记忆。
+
 ## 运行
 
 ```powershell
 cargo test --all-targets --release
 cargo run --release --example embodied_lab
 cargo run --release --example gate_a_lab
+cargo run --release --example gate_b_lab
 npm install
 npm run dev
 ```
@@ -44,6 +47,7 @@ npm run tauri dev
 
 ```text
 src/embodied.rs             二维世界、主体、控制器、可塑性与实验
+src/gate_b.rs               延迟线索环境、等预算控制器和配对统计
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -59,9 +63,10 @@ experiments/                版本化结果与失败记录
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；
 - [ROADMAP.md](ROADMAP.md)：从奖励审计、状态必要性到脉冲对照的递进实验路线；
-- [GATE_B.md](GATE_B.md)：下一阶段延迟线索任务和防泄漏验收的冻结规格；
+- [GATE_B.md](GATE_B.md)：已完成的延迟线索任务和防泄漏验收冻结规格；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
 - [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)：奖励塑形与方向感觉的多种子审计；
+- [experiments/gate-b-v1.2.md](experiments/gate-b-v1.2.md)：连续状态必要性的多种子配对实验；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

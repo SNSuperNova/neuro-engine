@@ -31,6 +31,8 @@ v1 不宣称模拟真实生命、意识或完整生物神经元。它只建立�
 
 当前学习算法的公式、与 Reservoir Computing/策略梯度/三因素规则的关系，以及尚未证明的能力，集中记录在 [LEARNING.md](LEARNING.md)。下一阶段不会默认增加生物复杂度，而会依照 [ROADMAP.md](ROADMAP.md) 先验证奖励捷径、状态必要性和时间信用分配。
 
+Gate A 已完成奖励与感觉辅助审计，结果见 [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)。下一阶段任务已冻结在 [GATE_B.md](GATE_B.md)。
+
 ## 验收标准
 
 正式报告必须同时给出：

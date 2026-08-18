@@ -126,6 +126,42 @@ pub struct ControllerConfig {
     pub weight_limit: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RewardConfig {
+    pub energy_delta_weight: f64,
+    pub distance_progress_weight: f64,
+}
+
+impl Default for RewardConfig {
+    fn default() -> Self {
+        Self {
+            energy_delta_weight: 1.0,
+            distance_progress_weight: 0.035,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SensorConfig {
+    pub food_direction_enabled: bool,
+    pub food_direction_precision: f64,
+    pub food_direction_noise: f64,
+    pub food_direction_dropout: f64,
+}
+
+impl Default for SensorConfig {
+    fn default() -> Self {
+        Self {
+            food_direction_enabled: true,
+            food_direction_precision: 1.0,
+            food_direction_noise: 0.0,
+            food_direction_dropout: 0.0,
+        }
+    }
+}
+
 impl Default for ControllerConfig {
     fn default() -> Self {
         Self {
@@ -147,6 +183,8 @@ pub struct EmbodiedExperimentConfig {
     pub seed: u64,
     pub arena: ArenaConfig,
     pub controller: ControllerConfig,
+    pub reward: RewardConfig,
+    pub sensors: SensorConfig,
     pub training_episodes: usize,
     pub evaluation_episodes: usize,
     pub curve_window: usize,
@@ -158,9 +196,35 @@ impl Default for EmbodiedExperimentConfig {
             seed: 0x4e45_5552_4f4c_4946,
             arena: ArenaConfig::default(),
             controller: ControllerConfig::default(),
+            reward: RewardConfig::default(),
+            sensors: SensorConfig::default(),
             training_episodes: 1_200,
             evaluation_episodes: 80,
             curve_window: 40,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RewardBreakdown {
+    pub energy_delta: f64,
+    pub distance_progress: f64,
+    pub total: f64,
+}
+
+impl RewardBreakdown {
+    fn add_assign(&mut self, other: Self) {
+        self.energy_delta += other.energy_delta;
+        self.distance_progress += other.distance_progress;
+        self.total += other.total;
+    }
+
+    fn divided_by(self, divisor: f64) -> Self {
+        Self {
+            energy_delta: self.energy_delta / divisor,
+            distance_progress: self.distance_progress / divisor,
+            total: self.total / divisor,
         }
     }
 }
@@ -175,6 +239,7 @@ pub struct BehaviorFrame {
     pub foods_eaten: usize,
     pub action: AgentAction,
     pub reward: f64,
+    pub reward_breakdown: RewardBreakdown,
     pub action_probabilities: Vec<f64>,
     pub sensors: Vec<f64>,
     pub hidden_activity: Vec<f64>,
@@ -202,6 +267,7 @@ pub struct EpisodeSummary {
     pub hazard_contacts: usize,
     pub completed: bool,
     pub total_reward: f64,
+    pub reward_breakdown: RewardBreakdown,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -215,6 +281,7 @@ pub struct EvaluationReport {
     pub mean_collisions: f64,
     pub mean_hazard_contacts: f64,
     pub completion_fraction: f64,
+    pub mean_reward_breakdown: RewardBreakdown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -225,6 +292,7 @@ pub struct TrainingCurvePoint {
     pub mean_steps_survived: f64,
     pub mean_final_energy: f64,
     pub mean_reward: f64,
+    pub mean_reward_breakdown: RewardBreakdown,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -297,6 +365,8 @@ impl DeterministicRng {
 #[derive(Clone, Debug)]
 struct Arena {
     config: ArenaConfig,
+    reward_config: RewardConfig,
+    sensor_config: SensorConfig,
     position: GridPosition,
     heading: Heading,
     energy: f64,
@@ -309,11 +379,19 @@ struct Arena {
     collisions: usize,
     hazard_contacts: usize,
     total_reward: f64,
+    reward_breakdown: RewardBreakdown,
 }
 
 impl Arena {
-    fn new(config: ArenaConfig, seed: u64) -> Result<Self, EmbodiedError> {
+    fn new(
+        config: ArenaConfig,
+        reward_config: RewardConfig,
+        sensor_config: SensorConfig,
+        seed: u64,
+    ) -> Result<Self, EmbodiedError> {
         validate_arena(config)?;
+        validate_reward(reward_config)?;
+        validate_sensors(sensor_config)?;
         let mut rng = DeterministicRng::new(seed);
         let position = GridPosition {
             x: config.width / 2,
@@ -344,6 +422,8 @@ impl Arena {
         let initial_food = food.iter().copied().collect();
         Ok(Self {
             config,
+            reward_config,
+            sensor_config,
             position,
             heading,
             energy: config.initial_energy,
@@ -356,6 +436,7 @@ impl Arena {
             collisions: 0,
             hazard_contacts: 0,
             total_reward: 0.0,
+            reward_breakdown: RewardBreakdown::default(),
         })
     }
 
@@ -404,10 +485,11 @@ impl Arena {
         ]
     }
 
-    fn sensors(&self) -> [f64; SENSOR_COUNT] {
-        let food_direction = Self::nearest(self.position, self.food.iter())
+    fn sensors(&self, rng: &mut DeterministicRng) -> [f64; SENSOR_COUNT] {
+        let raw_food_direction = Self::nearest(self.position, self.food.iter())
             .map(|(target, _)| self.directional_signal(target))
             .unwrap_or([0.0; 4]);
+        let food_direction = self.observe_food_direction(raw_food_direction, rng);
         let hazard_direction = Self::nearest(self.position, self.hazards.iter())
             .map(|(target, _)| self.directional_signal(target))
             .unwrap_or([0.0; 4]);
@@ -428,7 +510,25 @@ impl Arena {
         ]
     }
 
-    fn step(&mut self, action: AgentAction) -> f64 {
+    fn observe_food_direction(&self, raw: [f64; 4], rng: &mut DeterministicRng) -> [f64; 4] {
+        if self.sensor_config == SensorConfig::default() {
+            return raw;
+        }
+        if !self.sensor_config.food_direction_enabled
+            || rng.unit() < self.sensor_config.food_direction_dropout
+        {
+            return [0.0; 4];
+        }
+        let mean = raw.iter().sum::<f64>() / raw.len() as f64;
+        raw.map(|value| {
+            let directional = mean
+                + self.sensor_config.food_direction_precision * (value - mean)
+                + rng.signed(self.sensor_config.food_direction_noise);
+            directional.clamp(0.0, 1.0)
+        })
+    }
+
+    fn step(&mut self, action: AgentAction) -> RewardBreakdown {
         let before_energy = self.energy;
         let before_distance = self.nearest_food_distance();
         self.energy -= self.config.passive_cost;
@@ -462,10 +562,17 @@ impl Arena {
             (Some(before), Some(after)) => f64::from(before - after),
             _ => 0.0,
         };
-        let reward =
-            (self.energy - before_energy) / self.config.food_energy + 0.035 * distance_progress;
-        self.previous_reward = reward;
-        self.total_reward += reward;
+        let energy_delta = self.reward_config.energy_delta_weight
+            * ((self.energy - before_energy) / self.config.food_energy);
+        let distance_progress = self.reward_config.distance_progress_weight * distance_progress;
+        let reward = RewardBreakdown {
+            energy_delta,
+            distance_progress,
+            total: energy_delta + distance_progress,
+        };
+        self.previous_reward = reward.total;
+        self.total_reward += reward.total;
+        self.reward_breakdown.add_assign(reward);
         reward
     }
 
@@ -482,6 +589,7 @@ impl Arena {
             hazard_contacts: self.hazard_contacts,
             completed: self.food.is_empty(),
             total_reward: self.total_reward,
+            reward_breakdown: self.reward_breakdown,
         }
     }
 }
@@ -685,26 +793,39 @@ impl AdaptiveController {
     }
 }
 
+#[derive(Clone, Copy)]
+struct EpisodeEnvironmentConfig {
+    arena: ArenaConfig,
+    reward: RewardConfig,
+    sensors: SensorConfig,
+}
+
 fn run_episode(
     controller: &mut AdaptiveController,
-    arena_config: ArenaConfig,
+    environment: EpisodeEnvironmentConfig,
     map_seed: u64,
     action_seed: u64,
     plastic: bool,
     trace_label: Option<&str>,
 ) -> Result<(EpisodeSummary, Option<BehaviorTrace>), EmbodiedError> {
-    let mut arena = Arena::new(arena_config, map_seed)?;
+    let mut arena = Arena::new(
+        environment.arena,
+        environment.reward,
+        environment.sensors,
+        map_seed,
+    )?;
     let initial_food = arena.initial_food.clone();
     let hazards = arena.hazards.iter().copied().collect::<Vec<_>>();
     let mut action_rng = DeterministicRng::new(action_seed);
+    let mut sensor_rng = DeterministicRng::new(map_seed ^ 0x5345_4e53_4f52_5301);
     controller.reset_episode_state();
     let mut frames = Vec::new();
     while !arena.done() {
-        let sensors = arena.sensors();
+        let sensors = arena.sensors(&mut sensor_rng);
         let (action, probabilities) = controller.choose_action(sensors, &mut action_rng);
         let hidden_activity = controller.hidden;
-        let reward = arena.step(action);
-        controller.apply_reward(action, reward, plastic);
+        let reward_breakdown = arena.step(action);
+        controller.apply_reward(action, reward_breakdown.total, plastic);
         if trace_label.is_some() {
             frames.push(BehaviorFrame {
                 step: arena.step,
@@ -713,7 +834,8 @@ fn run_episode(
                 energy: arena.energy,
                 foods_eaten: arena.foods_eaten,
                 action,
-                reward,
+                reward: reward_breakdown.total,
+                reward_breakdown,
                 action_probabilities: probabilities.to_vec(),
                 sensors: sensors.to_vec(),
                 hidden_activity: hidden_activity.to_vec(),
@@ -735,7 +857,7 @@ fn run_episode(
 
 fn evaluate_controller(
     controller: &AdaptiveController,
-    arena: ArenaConfig,
+    environment: EpisodeEnvironmentConfig,
     episode_count: usize,
     seed: u64,
     label: &str,
@@ -748,7 +870,7 @@ fn evaluate_controller(
         summaries.push(
             run_episode(
                 &mut evaluation_controller,
-                arena,
+                environment,
                 map_seed,
                 action_seed,
                 false,
@@ -758,6 +880,10 @@ fn evaluate_controller(
         );
     }
     let count = summaries.len() as f64;
+    let mut mean_reward_breakdown = RewardBreakdown::default();
+    for summary in &summaries {
+        mean_reward_breakdown.add_assign(summary.reward_breakdown);
+    }
     Ok(EvaluationReport {
         label: label.to_owned(),
         episode_count,
@@ -788,11 +914,16 @@ fn evaluate_controller(
             / count,
         completion_fraction: summaries.iter().filter(|summary| summary.completed).count() as f64
             / count,
+        mean_reward_breakdown: mean_reward_breakdown.divided_by(count),
     })
 }
 
 fn mean_episode(summaries: &[EpisodeSummary], episode: usize) -> TrainingCurvePoint {
     let count = summaries.len().max(1) as f64;
+    let mut mean_reward_breakdown = RewardBreakdown::default();
+    for summary in summaries {
+        mean_reward_breakdown.add_assign(summary.reward_breakdown);
+    }
     TrainingCurvePoint {
         episode,
         mean_foods_eaten: summaries
@@ -815,6 +946,7 @@ fn mean_episode(summaries: &[EpisodeSummary], episode: usize) -> TrainingCurvePo
             .map(|summary| summary.total_reward)
             .sum::<f64>()
             / count,
+        mean_reward_breakdown: mean_reward_breakdown.divided_by(count),
     }
 }
 
@@ -822,6 +954,11 @@ pub fn run_embodied_experiment(
     config: EmbodiedExperimentConfig,
 ) -> Result<EmbodiedExperimentResult, EmbodiedError> {
     validate_experiment(config)?;
+    let environment = EpisodeEnvironmentConfig {
+        arena: config.arena,
+        reward: config.reward,
+        sensors: config.sensors,
+    };
     let initial = AdaptiveController::new(config.controller, config.seed ^ 0x434f_4e54_524f_4c01)?;
     let mut learned = initial.clone();
     let mut learning_disabled = initial.clone();
@@ -832,17 +969,11 @@ pub fn run_embodied_experiment(
             .seed
             .wrapping_add((episode as u64).wrapping_mul(0xd1b5_4a32_d192_ed03));
         let action_seed = map_seed ^ 0x5452_4149_4e01;
-        let (summary, _) = run_episode(
-            &mut learned,
-            config.arena,
-            map_seed,
-            action_seed,
-            true,
-            None,
-        )?;
+        let (summary, _) =
+            run_episode(&mut learned, environment, map_seed, action_seed, true, None)?;
         let _ = run_episode(
             &mut learning_disabled,
-            config.arena,
+            environment,
             map_seed,
             action_seed,
             false,
@@ -863,35 +994,35 @@ pub fn run_embodied_experiment(
     let evaluations = vec![
         evaluate_controller(
             &initial,
-            config.arena,
+            environment,
             config.evaluation_episodes,
             evaluation_seed,
             "untrained",
         )?,
         evaluate_controller(
             &learning_disabled,
-            config.arena,
+            environment,
             config.evaluation_episodes,
             evaluation_seed,
             "learning-disabled",
         )?,
         evaluate_controller(
             &learned,
-            config.arena,
+            environment,
             config.evaluation_episodes,
             evaluation_seed,
             "learned",
         )?,
         evaluate_controller(
             &shuffled,
-            config.arena,
+            environment,
             config.evaluation_episodes,
             evaluation_seed,
             "shuffled",
         )?,
         evaluate_controller(
             &lesioned,
-            config.arena,
+            environment,
             config.evaluation_episodes,
             evaluation_seed,
             "lesioned",
@@ -909,7 +1040,7 @@ pub fn run_embodied_experiment(
         let mut trace_controller = source.clone();
         let (_, trace) = run_episode(
             &mut trace_controller,
-            config.arena,
+            environment,
             trace_seed,
             trace_seed ^ 0x4143_5449_4f4e,
             false,
@@ -1041,9 +1172,36 @@ fn validate_controller(config: ControllerConfig) -> Result<(), EmbodiedError> {
     Ok(())
 }
 
+fn validate_reward(config: RewardConfig) -> Result<(), EmbodiedError> {
+    if !config.energy_delta_weight.is_finite()
+        || !config.distance_progress_weight.is_finite()
+        || config.energy_delta_weight < 0.0
+        || config.distance_progress_weight < 0.0
+        || (config.energy_delta_weight == 0.0 && config.distance_progress_weight == 0.0)
+    {
+        return Err(EmbodiedError::InvalidReward);
+    }
+    Ok(())
+}
+
+fn validate_sensors(config: SensorConfig) -> Result<(), EmbodiedError> {
+    if !config.food_direction_precision.is_finite()
+        || !config.food_direction_noise.is_finite()
+        || !config.food_direction_dropout.is_finite()
+        || !(0.0..=1.0).contains(&config.food_direction_precision)
+        || !(0.0..=1.0).contains(&config.food_direction_dropout)
+        || !(0.0..=1.0).contains(&config.food_direction_noise)
+    {
+        return Err(EmbodiedError::InvalidSensors);
+    }
+    Ok(())
+}
+
 fn validate_experiment(config: EmbodiedExperimentConfig) -> Result<(), EmbodiedError> {
     validate_arena(config.arena)?;
     validate_controller(config.controller)?;
+    validate_reward(config.reward)?;
+    validate_sensors(config.sensors)?;
     if config.training_episodes == 0 || config.evaluation_episodes == 0 || config.curve_window == 0
     {
         return Err(EmbodiedError::InvalidExperiment);
@@ -1055,6 +1213,8 @@ fn validate_experiment(config: EmbodiedExperimentConfig) -> Result<(), EmbodiedE
 pub enum EmbodiedError {
     InvalidArena,
     InvalidController,
+    InvalidReward,
+    InvalidSensors,
     InvalidExperiment,
 }
 
@@ -1065,6 +1225,8 @@ impl Display for EmbodiedError {
             Self::InvalidController => {
                 formatter.write_str("invalid adaptive controller configuration")
             }
+            Self::InvalidReward => formatter.write_str("invalid embodied reward configuration"),
+            Self::InvalidSensors => formatter.write_str("invalid embodied sensor configuration"),
             Self::InvalidExperiment => {
                 formatter.write_str("invalid embodied experiment configuration")
             }

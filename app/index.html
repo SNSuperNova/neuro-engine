@@ -8,7 +8,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · v1</small></div></div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate A</small></div></div>
     <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
@@ -36,7 +36,7 @@
       <section class="vitals card">
         <div class="section-head compact"><div><span class="eyebrow">INTERNAL NEED</span><h2>主体状态</h2></div><strong id="action-name">—</strong></div>
         <div class="energy-row"><span>能量</span><div class="meter"><i id="energy-bar"></i></div><strong id="energy-value">—</strong></div>
-        <div class="metric-grid"><div><span>已获取食物</span><strong id="food-value">—</strong></div><div><span>即时后果</span><strong id="reward-value">—</strong></div><div><span>位置</span><strong id="position-value">—</strong></div><div><span>方向</span><strong id="heading-value">—</strong></div></div>
+        <div class="metric-grid"><div><span>已获取食物</span><strong id="food-value">—</strong></div><div><span>即时后果</span><strong id="reward-value">—</strong></div><div><span>能量后果</span><strong id="energy-reward-value">—</strong></div><div><span>距离塑形</span><strong id="distance-reward-value">—</strong></div><div><span>位置</span><strong id="position-value">—</strong></div><div><span>方向</span><strong id="heading-value">—</strong></div></div>
       </section>
 
       <section class="card neural-state">
@@ -56,6 +56,19 @@
     <section class="learning card">
       <div class="section-head"><div><span class="eyebrow">PERSISTENT CHANGE</span><h2>训练过程</h2></div><div id="plasticity-summary"></div></div>
       <canvas id="learning-curve" aria-label="训练期间获取食物变化"></canvas>
+    </section>
+
+    <section id="gate-a-audit" class="audit card">
+      <div class="section-head"><div><span class="eyebrow">GATE A · REWARD &amp; SENSOR AUDIT</span><h2>人工辅助依赖审计</h2></div><span id="gate-a-protocol"></span></div>
+      <p class="audit-intro">每张卡片汇总独立模型种子；区间是模型种子均值的 95% 置信区间，而不是把同一模型的地图当作独立样本。</p>
+      <div id="gate-a-acceptance" class="acceptance-grid gate-a-acceptance"></div>
+      <div id="gate-a-variants" class="gate-a-variants"></div>
+    </section>
+
+    <section id="gate-a-learning" class="gate-a-learning card">
+      <div class="section-head"><div><span class="eyebrow">MULTI-SEED LEARNING CURVE</span><h2>跨种子训练曲线</h2></div><label>审计条件 <select id="gate-a-select"></select></label></div>
+      <div id="gate-a-config" class="gate-a-config"></div>
+      <canvas id="gate-a-curve" aria-label="Gate A 多随机种子学习曲线和95%置信区间"></canvas>
     </section>
   </main>
 </div>

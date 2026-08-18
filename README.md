@@ -20,11 +20,14 @@
 
 这证明当前版本形成了可由行为直接观察、由连接置乱和内部消融验证的学习闭环；不宣称它是生命、意识或真实人脑模型。
 
+Gate A 又使用 9 个辅助条件、每项 12 个独立模型种子进行了审计：移除距离塑形后，学习相对关闭学习的平均食物增益仍为 `5.218`，95% CI `[4.544, 5.891]`；完全移除食物方向后增益降为 `0.676 [0.255, 1.097]`。因此学习不依赖距离塑形，但精确方向感觉仍是主要人工辅助。
+
 ## 运行
 
 ```powershell
 cargo test --all-targets --release
 cargo run --release --example embodied_lab
+cargo run --release --example gate_a_lab
 npm install
 npm run dev
 ```
@@ -56,7 +59,9 @@ experiments/                版本化结果与失败记录
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；
 - [ROADMAP.md](ROADMAP.md)：从奖励审计、状态必要性到脉冲对照的递进实验路线；
+- [GATE_B.md](GATE_B.md)：下一阶段延迟线索任务和防泄漏验收的冻结规格；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
+- [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)：奖励塑形与方向感觉的多种子审计；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

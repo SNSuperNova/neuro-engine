@@ -3,6 +3,7 @@
 
 pub mod embodied;
 pub mod experiment;
+pub mod gate_a;
 pub mod lif;
 pub mod metrics;
 pub mod network;
@@ -11,13 +12,19 @@ pub use embodied::{
     ACTION_COUNT, AdaptiveController, AgentAction, ArenaConfig, BehaviorFrame, BehaviorTrace,
     ControllerConfig, EmbodiedAcceptanceReport, EmbodiedError, EmbodiedExperimentConfig,
     EmbodiedExperimentResult, EpisodeSummary, EvaluationReport, GridPosition, HIDDEN_COUNT,
-    Heading, PlasticityReport, SENSOR_COUNT, TrainingCurvePoint, run_embodied_experiment,
+    Heading, PlasticityReport, RewardBreakdown, RewardConfig, SENSOR_COUNT, SensorConfig,
+    TrainingCurvePoint, run_embodied_experiment,
 };
 
 pub use experiment::{
     Gate2AcceptanceCriteria, Gate2AcceptanceReport, Gate2ExperimentConfig, Gate2ExperimentResult,
     Gate2Summary, GeneratedNetworkConfig, generate_network, local_stimulus_inputs,
     pacemaker_inputs, run_gate2_experiment,
+};
+pub use gate_a::{
+    ConfidenceInterval, GateAAcceptanceReport, GateACurvePoint, GateAExperimentConfig,
+    GateAExperimentResult, GateAMetricIntervals, GateAMetricPoint, GateASampleEfficiency,
+    GateASeedRun, GateAVariantReport, run_gate_a_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,

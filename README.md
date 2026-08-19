@@ -38,7 +38,9 @@ Map 0 随后在统一 24 单元底层上扫描 64 组循环增益、内部可塑
 
 Map 1 只把参考范数投影替换为活动目标与慢速权重回拉，并在 Map 0 候选区局部重绘。正式确认中，新机制 72 次运行有 59 次因权重漂移不稳定；相对旧机制平均探针得分仅 `+1.2 pp`，权重漂移却增加 `1.766`，重复反转和损伤恢复总体下降。该机制已作为负结果淘汰。当前瓶颈仍指向局部可塑性与稳定性的冲突，而不是节点数量。
 
-Map 2 已完成最小动态基座审计。软边界可塑性把相对权重漂移平均降低 `0.687`，持续供能在断供时产生 `13.9 pp` 探针下降；冻结两者后的 720 试次无重置连续流达到 `66.1%`，逐试次重置为 `67.6%`，断供为 `55.7%`，冻结可塑性为 `53.0%`。6 个相邻确认配置形成跨种子稳定区域。M0 随后把它冻结为 `reference-substrate/v1`：候选机制只能通过局部、有界动作接口改变载体，不能读取目标或直接写入动作读出；Map 2A/B/C 完整 JSON 已逐字段回归，原发布哈希保持不变。下一步按[动态调整机制计划](ADAPTIVE_MECHANISMS.md)执行 M1 多规则保留边界，Scale 0 后移。
+Map 2 已完成最小动态基座审计。软边界可塑性把相对权重漂移平均降低 `0.687`，持续供能在断供时产生 `13.9 pp` 探针下降；冻结两者后的 720 试次无重置连续流达到 `66.1%`，逐试次重置为 `67.6%`，断供为 `55.7%`，冻结可塑性为 `53.0%`。6 个相邻确认配置形成跨种子稳定区域。M0 随后把它冻结为 `reference-substrate/v1`：候选机制只能通过局部、有界动作接口改变载体，不能读取目标或直接写入动作读出；Map 2A/B/C 完整 JSON 已逐字段回归，原发布哈希保持不变。M1 已在这一冻结基座上完成，Scale 0 继续后移。
+
+M1 现已完成四规则连续保留诊断。A 离开前为 `83.4%`，经过 B/C/D 后回归初始为 `60.7%`；但 B/C/D 连续学习最终只有 `55.4%`，四个规则单独训练时的最低准确率也只有 `51.3%`。因此六个参考参数点全部归为容量不足，不能把 A 的下降单独解释成覆盖性遗忘。冻结可塑性和随机后果对照分别为 `45.9%`、`47.6%`，说明现有调整有效但不足。下一候选是固定总连接预算的 M2C 结构调整，不进入元可塑性或节点扩容。
 
 ## 运行
 
@@ -58,6 +60,7 @@ cargo run --release --example map2a_lab
 cargo run --release --example map2b_lab
 cargo run --release --example map2c_lab
 cargo run --release --example mechanism_m0_lab
+cargo run --release --example mechanism_m1_lab
 npm install
 npm run dev
 ```
@@ -83,6 +86,7 @@ src/learnability_map.rs     统一探针、四轴扫描、独立确认和因果�
 src/map1.rs                 双时间尺度内稳态、局部重绘和旧机制配对
 src/adaptive_mechanism.rs   参考载体清单与受约束候选机制接口
 src/mechanism_m0.rs         M0 冻结发布清单与能力边界
+src/mechanism_m1.rs         M1 多规则保留协议、失败分类与配对对照
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -101,6 +105,7 @@ experiments/                版本化结果与失败记录
 - [FOUNDATION_AUDIT.md](FOUNDATION_AUDIT.md)：后续最小动态基座、持续供能和规模扫描的执行边界；
 - [ADAPTIVE_MECHANISMS.md](ADAPTIVE_MECHANISMS.md)：M0～M4 调整机制研究主线与条件分支；
 - [experiments/mechanism-m0-v0.1.md](experiments/mechanism-m0-v0.1.md)：参考载体、权限接口、Map 2 回归和能力边界冻结记录；
+- [experiments/mechanism-m1-v0.2.md](experiments/mechanism-m1-v0.2.md)：四规则连续保留、单规则容量和条件分支诊断；
 - [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；

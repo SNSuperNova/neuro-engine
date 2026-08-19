@@ -15,6 +15,7 @@ pub mod lif;
 pub mod map1;
 pub mod map2;
 pub mod mechanism_m0;
+pub mod mechanism_m1;
 pub mod metrics;
 pub mod network;
 
@@ -102,6 +103,10 @@ pub use map2::{
 };
 pub use mechanism_m0::{
     FrozenArtifact, M0CapabilityResult, M0InterfaceAudit, MechanismM0Release, mechanism_m0_release,
+};
+pub use mechanism_m1::{
+    M1AcceptanceReport, M1Control, M1ExperimentConfig, M1ExperimentResult, M1FailureClass,
+    M1ParameterSummary, M1PhaseResult, M1Rule, M1SeedResult, M1SingleRuleResult, run_m1_experiment,
 };
 pub use metrics::{
     MetricsConfig, MetricsError, NetworkMetrics, TrajectoryDifference, compare_spike_trajectories,

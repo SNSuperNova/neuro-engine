@@ -5,6 +5,9 @@ use crate::adaptive_mechanism::{
     HomeostasisObservation, MechanismStateContract, PlasticityAdjustment, PlasticityObservation,
     REFERENCE_MECHANISM_ID,
 };
+use crate::mechanism_m1::{
+    M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
+};
 
 use crate::{EmbodiedError, GATE_B_SENSOR_COUNT, HIDDEN_COUNT};
 
@@ -762,6 +765,36 @@ impl<M: AdjustmentMechanism> MapController<M> {
         self.baseline = 0.0;
     }
 
+    fn train_multisymbol_readout(&mut self, seed: u64) {
+        for episode in 0..self.config.pretraining_episodes {
+            let symbol = (episode + seed.count_ones() as usize) % 4;
+            let mut rng =
+                Rng::new(seed ^ 0x4d31_5052_4541_4354 ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+            let trial = self.symbol_trial(M1Rule::A, symbol, &mut rng, 0.04, true, false);
+            let reward = if trial.chosen_right == trial.target_right {
+                1.0
+            } else {
+                -1.0
+            };
+            let advantage = reward - self.baseline;
+            self.baseline = self.config.reward_baseline_decay * self.baseline
+                + (1.0 - self.config.reward_baseline_decay) * reward;
+            let chosen = usize::from(trial.chosen_right);
+            for action in 0..ACTION_COUNT {
+                let error = f64::from(action == chosen) - trial.probabilities[action];
+                for hidden in 0..HIDDEN_COUNT {
+                    self.action_weights[action][hidden] = (self.action_weights[action][hidden]
+                        + self.config.policy_learning_rate
+                            * advantage
+                            * error
+                            * self.hidden[hidden])
+                        .clamp(-self.config.weight_limit, self.config.weight_limit);
+                }
+            }
+        }
+        self.baseline = 0.0;
+    }
+
     fn trial(
         &mut self,
         original_rule: bool,
@@ -805,6 +838,57 @@ impl<M: AdjustmentMechanism> MapController<M> {
         let chosen_right = rng.unit() > probabilities[0];
         Trial {
             target_right: if original_rule { cue_right } else { !cue_right },
+            chosen_right,
+            probabilities,
+            recurrent_eligibility: eligibility,
+            activity,
+            resource,
+            mean_absolute_activity: activity_sum.map(|sum| sum / total_steps as f64),
+        }
+    }
+
+    fn symbol_trial(
+        &mut self,
+        rule: M1Rule,
+        symbol: usize,
+        rng: &mut Rng,
+        exploration: f64,
+        reset_before: bool,
+        capture_activity: bool,
+    ) -> Trial {
+        if reset_before {
+            self.reset_state();
+        }
+        let mut eligibility = [[0.0; PLASTIC_RECURRENT_PER_UNIT]; HIDDEN_COUNT];
+        let mut activity = Vec::new();
+        let mut resource = Vec::new();
+        let mut activity_sum = [0.0; HIDDEN_COUNT];
+        let total_steps = self.config.cue_steps + self.config.memory_delay_steps;
+        for step in 0..total_steps {
+            let cue_visible = step < self.config.cue_steps;
+            let sensors = symbol_sensors(step, total_steps, cue_visible, symbol);
+            let previous = self.step(sensors);
+            for target in 0..HIDDEN_COUNT {
+                activity_sum[target] += self.hidden[target].abs();
+                let sensitivity = 1.0 - self.hidden[target].powi(2);
+                for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+                    let source = self.recurrent_slots[target][slot];
+                    eligibility[target][slot] = self.config.eligibility_decay
+                        * eligibility[target][slot]
+                        + previous[source] * sensitivity;
+                }
+            }
+            if capture_activity {
+                activity.push(self.hidden);
+                resource.push(self.resource);
+            }
+        }
+        let probabilities = self
+            .probabilities()
+            .map(|value| value * (1.0 - exploration) + exploration / ACTION_COUNT as f64);
+        let chosen_right = rng.unit() > probabilities[0];
+        Trial {
+            target_right: rule.target_right(symbol),
             chosen_right,
             probabilities,
             recurrent_eligibility: eligibility,
@@ -974,6 +1058,15 @@ impl<M: AdjustmentMechanism> MapController<M> {
             drift += (current - reference).abs() / reference.max(1e-12);
         }
         (maximum, drift / HIDDEN_COUNT as f64)
+    }
+
+    fn action_readout_digest(&self) -> u64 {
+        self.action_weights
+            .iter()
+            .flatten()
+            .fold(0xcbf2_9ce4_8422_2325, |hash, value| {
+                (hash ^ value.to_bits()).wrapping_mul(0x1000_0000_01b3)
+            })
     }
 
     fn perturbation_gain(&self) -> f64 {
@@ -1519,6 +1612,313 @@ pub fn run_continuous_seed_with_adjustment_mechanism<M: AdjustmentMechanism>(
     }
 }
 
+pub(crate) fn run_multirule_seed_with_mechanisms(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: M1Control,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M1SeedProtocol,
+) -> M1SeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_434f_4e54_524c,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let readout_before = controller.action_readout_digest();
+    if control == M1Control::SingleRuleCapacity {
+        return run_single_rule_capacity(controller, parameters, seed, protocol, readout_before);
+    }
+    let map_control = match control {
+        M1Control::FrozenPlasticity => Map0Control::FrozenPlasticity,
+        M1Control::RandomConsequence => Map0Control::RandomReward,
+        _ => Map0Control::Baseline,
+    };
+    let reset_between_trials = control == M1Control::ResetBetweenTrials;
+    let mut phase_results = Vec::new();
+    let mut resource_sum = 0.0;
+    let mut resource_samples = 0usize;
+    let mut resource_minimum = f64::INFINITY;
+    let mut state_reset_count = 0usize;
+    for (phase_index, rule) in M1Rule::SEQUENCE.into_iter().enumerate() {
+        let phase_seed =
+            seed ^ 0x4d31_5048_4153_4501 ^ (phase_index as u64).wrapping_mul(SEED_STRIDE);
+        let initial_accuracy = evaluate_multisymbol_rule(
+            &controller,
+            rule,
+            protocol.evaluation_trial_count,
+            phase_seed ^ 0x494e_4954,
+        );
+        let mut trials_to_threshold =
+            (initial_accuracy >= protocol.accuracy_threshold).then_some(0);
+        let mut correct = 0usize;
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + phase_seed.count_ones() as usize) % 4;
+            let mut rng = Rng::new(
+                phase_seed ^ 0x4d31_4143_5449_4f4e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = controller.symbol_trial(
+                rule,
+                symbol,
+                &mut rng,
+                protocol.exploration,
+                reset_between_trials,
+                false,
+            );
+            state_reset_count += usize::from(reset_between_trials);
+            correct += usize::from(trial.chosen_right == trial.target_right);
+            controller.adapt_trial(
+                &trial,
+                map_control,
+                control == M1Control::RandomConsequence,
+                phase_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            for level in controller.resource {
+                resource_sum += level;
+                resource_samples += 1;
+                resource_minimum = resource_minimum.min(level);
+            }
+            let completed = episode + 1;
+            if trials_to_threshold.is_none()
+                && completed.is_multiple_of(protocol.threshold_check_interval)
+            {
+                let accuracy = evaluate_multisymbol_rule(
+                    &controller,
+                    rule,
+                    protocol.evaluation_trial_count,
+                    phase_seed ^ 0x4348_4543_4b01 ^ completed as u64,
+                );
+                if accuracy >= protocol.accuracy_threshold {
+                    trials_to_threshold = Some(completed);
+                }
+            }
+        }
+        let departure_accuracy = evaluate_multisymbol_rule(
+            &controller,
+            rule,
+            protocol.evaluation_trial_count,
+            phase_seed ^ 0x4649_4e41_4c01,
+        );
+        phase_results.push(M1PhaseResult {
+            phase_index,
+            rule,
+            initial_accuracy,
+            online_accuracy: correct as f64 / protocol.phase_trial_count as f64,
+            departure_accuracy,
+            trials_to_threshold,
+        });
+    }
+    let initial_a_accuracy = phase_results[0].initial_accuracy;
+    let departure_a_accuracy = phase_results[0].departure_accuracy;
+    let return_a_initial_accuracy = phase_results[4].initial_accuracy;
+    let return_a_final_accuracy = phase_results[4].departure_accuracy;
+    let mean_novel_rule_final_accuracy = phase_results[1..4]
+        .iter()
+        .map(|phase| phase.departure_accuracy)
+        .sum::<f64>()
+        / 3.0;
+    let acquisition_trials = phase_results[1..4]
+        .iter()
+        .filter_map(|phase| phase.trials_to_threshold)
+        .collect::<Vec<_>>();
+    let mean_first_acquisition_trials = (acquisition_trials.len() == 3)
+        .then(|| acquisition_trials.iter().sum::<usize>() as f64 / acquisition_trials.len() as f64);
+    let return_reacquisition_trials = phase_results[4].trials_to_threshold;
+    let reacquisition_speedup = mean_first_acquisition_trials
+        .zip(return_reacquisition_trials)
+        .map(|(first, reacquisition)| first - reacquisition as f64);
+    let (maximum_absolute_weight, mean_relative_weight_drift) = controller.weight_dynamics();
+    let mean_resource_level = resource_sum / resource_samples.max(1) as f64;
+    let readout_after = controller.action_readout_digest();
+    let finite = controller.hidden.iter().all(|value| value.is_finite())
+        && controller.resource.iter().all(|value| value.is_finite())
+        && phase_results.iter().all(|phase| {
+            [
+                phase.initial_accuracy,
+                phase.online_accuracy,
+                phase.departure_accuracy,
+            ]
+            .into_iter()
+            .all(f64::is_finite)
+        })
+        && [
+            mean_novel_rule_final_accuracy,
+            mean_resource_level,
+            resource_minimum,
+            maximum_absolute_weight,
+            mean_relative_weight_drift,
+        ]
+        .into_iter()
+        .all(f64::is_finite);
+    M1SeedResult {
+        parameter_id: parameters.id,
+        seed,
+        control,
+        phase_results,
+        single_rule_results: Vec::new(),
+        initial_a_accuracy,
+        departure_a_accuracy,
+        return_a_initial_accuracy,
+        return_a_final_accuracy,
+        retention_drop: departure_a_accuracy - return_a_initial_accuracy,
+        mean_novel_rule_final_accuracy,
+        mean_first_acquisition_trials,
+        return_reacquisition_trials,
+        reacquisition_speedup,
+        minimum_single_rule_final_accuracy: 0.0,
+        mean_resource_level,
+        minimum_resource_level: resource_minimum,
+        mean_relative_weight_drift,
+        maximum_absolute_weight,
+        state_reset_count,
+        action_readout_digest_before: readout_before,
+        action_readout_digest_after: readout_after,
+        finite,
+    }
+}
+
+fn run_single_rule_capacity<M: AdjustmentMechanism>(
+    controller: MapController<M>,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    protocol: M1SeedProtocol,
+    readout_before: u64,
+) -> M1SeedResult {
+    let mut single_rule_results = Vec::new();
+    let mut resource_sum = 0.0;
+    let mut resource_samples = 0usize;
+    let mut resource_minimum = f64::INFINITY;
+    let mut drift_sum = 0.0;
+    let mut maximum_absolute_weight = 0.0_f64;
+    let mut all_finite = true;
+    let mut readout_after = readout_before;
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let mut candidate = controller.clone();
+        candidate.reset_state();
+        let rule_seed =
+            seed ^ 0x4d31_5349_4e47_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let initial_accuracy = evaluate_multisymbol_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let mut trials_to_threshold =
+            (initial_accuracy >= protocol.accuracy_threshold).then_some(0);
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + rule_seed.count_ones() as usize) % 4;
+            let mut rng = Rng::new(
+                rule_seed ^ 0x4d31_4143_5449_4f4e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial =
+                candidate.symbol_trial(rule, symbol, &mut rng, protocol.exploration, false, false);
+            candidate.adapt_trial(
+                &trial,
+                Map0Control::Baseline,
+                false,
+                rule_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            for level in candidate.resource {
+                resource_sum += level;
+                resource_samples += 1;
+                resource_minimum = resource_minimum.min(level);
+            }
+            let completed = episode + 1;
+            if trials_to_threshold.is_none()
+                && completed.is_multiple_of(protocol.threshold_check_interval)
+                && evaluate_multisymbol_rule(
+                    &candidate,
+                    rule,
+                    protocol.evaluation_trial_count,
+                    rule_seed ^ 0x4348_4543_4b01 ^ completed as u64,
+                ) >= protocol.accuracy_threshold
+            {
+                trials_to_threshold = Some(completed);
+            }
+        }
+        let final_accuracy = evaluate_multisymbol_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x4649_4e41_4c01,
+        );
+        let (maximum, drift) = candidate.weight_dynamics();
+        maximum_absolute_weight = maximum_absolute_weight.max(maximum);
+        drift_sum += drift;
+        readout_after = candidate.action_readout_digest();
+        all_finite &= candidate.hidden.iter().all(|value| value.is_finite())
+            && candidate.resource.iter().all(|value| value.is_finite())
+            && final_accuracy.is_finite()
+            && drift.is_finite();
+        single_rule_results.push(M1SingleRuleResult {
+            rule,
+            initial_accuracy,
+            final_accuracy,
+            trials_to_threshold,
+        });
+    }
+    let minimum_single_rule_final_accuracy = single_rule_results
+        .iter()
+        .map(|result| result.final_accuracy)
+        .fold(f64::INFINITY, f64::min);
+    let initial_a_accuracy = single_rule_results[0].initial_accuracy;
+    let final_a_accuracy = single_rule_results[0].final_accuracy;
+    M1SeedResult {
+        parameter_id: parameters.id,
+        seed,
+        control: M1Control::SingleRuleCapacity,
+        phase_results: Vec::new(),
+        single_rule_results,
+        initial_a_accuracy,
+        departure_a_accuracy: final_a_accuracy,
+        return_a_initial_accuracy: final_a_accuracy,
+        return_a_final_accuracy: final_a_accuracy,
+        retention_drop: 0.0,
+        mean_novel_rule_final_accuracy: 0.0,
+        mean_first_acquisition_trials: None,
+        return_reacquisition_trials: None,
+        reacquisition_speedup: None,
+        minimum_single_rule_final_accuracy,
+        mean_resource_level: resource_sum / resource_samples.max(1) as f64,
+        minimum_resource_level: resource_minimum,
+        mean_relative_weight_drift: drift_sum / M1Rule::UNIQUE.len() as f64,
+        maximum_absolute_weight,
+        state_reset_count: 0,
+        action_readout_digest_before: readout_before,
+        action_readout_digest_after: readout_after,
+        finite: all_finite,
+    }
+}
+
+fn evaluate_multisymbol_rule<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    rule: M1Rule,
+    trial_count: usize,
+    seed: u64,
+) -> f64 {
+    let mut evaluation = controller.clone();
+    let mut correct = 0usize;
+    for episode in 0..trial_count {
+        let symbol = (episode + seed.count_ones() as usize) % 4;
+        let mut rng =
+            Rng::new(seed ^ 0x4d31_4556_414c_0101 ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+        let trial = evaluation.symbol_trial(rule, symbol, &mut rng, 0.0, false, false);
+        correct += usize::from(trial.chosen_right == trial.target_right);
+    }
+    correct as f64 / trial_count.max(1) as f64
+}
+
 fn adapt_phase<M: AdjustmentMechanism>(
     controller: &mut MapController<M>,
     original_rule: bool,
@@ -1944,6 +2344,24 @@ fn sensors(
     values[1] = step as f64 / total_steps.max(1) as f64;
     if cue_visible {
         values[if cue_right { 3 } else { 2 }] = 1.0;
+    }
+    values[4] = f64::from(!cue_visible);
+    values[5] = f64::from(step + 1 == total_steps);
+    values
+}
+
+fn symbol_sensors(
+    step: usize,
+    total_steps: usize,
+    cue_visible: bool,
+    symbol: usize,
+) -> [f64; GATE_B_SENSOR_COUNT] {
+    let mut values = [0.0; GATE_B_SENSOR_COUNT];
+    values[0] = 1.0;
+    values[1] = step as f64 / total_steps.max(1) as f64;
+    if cue_visible {
+        values[2] = if symbol & 1 == 0 { -1.0 } else { 1.0 };
+        values[3] = if symbol & 2 == 0 { -1.0 } else { 1.0 };
     }
     values[4] = f64::from(!cue_visible);
     values[5] = f64::from(step + 1 == total_steps);

@@ -20,6 +20,7 @@
     "recurrentScale": 0.6,
     "policyLearningRate": 0.055,
     "internalLearningRate": 0.1,
+    "homeostasisStrength": 1.0,
     "adaptationExploration": 0.16,
     "softmaxTemperature": 0.4,
     "rewardBaselineDecay": 0.92,

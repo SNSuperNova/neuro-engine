@@ -9,7 +9,9 @@ pub mod gate_c;
 pub mod gate_d;
 pub mod gate_e;
 pub mod gate_f;
+pub mod learnability_map;
 pub mod lif;
+pub mod map1;
 pub mod metrics;
 pub mod network;
 
@@ -68,9 +70,19 @@ pub use gate_f::{
     GateFSeedMetric, GateFTraceFrame, GateFWeightIntervals, GateFWeightPoint,
     run_gate_f_experiment,
 };
+pub use learnability_map::{
+    Map0AcceptanceReport, Map0Control, Map0ControlSummary, Map0DynamicsMetrics,
+    Map0ExperimentConfig, Map0ExperimentResult, Map0Interval, Map0ParameterPoint,
+    Map0ParameterSummary, Map0ProbeMetrics, Map0RegionClass, Map0SeedResult, Map0Thresholds,
+    run_map0_experiment,
+};
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,
     NeuronSnapshot, SimDuration, SimTime, SimulationTrace, SpikeEvent, TimedInput, simulate_neuron,
+};
+pub use map1::{
+    Map1AcceptanceReport, Map1ExperimentConfig, Map1ExperimentResult, Map1MechanismComparison,
+    run_map1_experiment,
 };
 pub use metrics::{
     MetricsConfig, MetricsError, NetworkMetrics, TrajectoryDifference, compare_spike_trajectories,

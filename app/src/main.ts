@@ -80,6 +80,14 @@ interface GateFReport { controller: GateFController; phase: GateFPhase; rule: "o
 interface GateFTraceFrame { step: number; cueVisible: boolean; cueRight: boolean; hiddenActivity: number[] }
 interface GateFTrace { label: string; controller: GateFController; phase: GateFPhase; rule: "original" | "reversed"; cueRight: boolean; targetRight: boolean; chosenRight: boolean; reward: number; actionProbabilities: number[]; frames: GateFTraceFrame[] }
 interface GateFDataset { version: string; task: string; config: { modelSeedCount: number; pretrainingEpisodes: number; adaptationEpisodes: number; evaluationEpisodes: number; checkpoints: number[]; adaptationExploration: number }; reports: GateFReport[]; pairedEffects: { id: string; effect: { accuracy: Interval } }[]; adaptation: { controller: GateFController; reversalEpisodesTo75Percent: number | null; restorationEpisodesTo75Percent: number | null }[]; traces: GateFTrace[]; acceptance: Record<string, boolean> & { passed: boolean } }
+type Map0Class = "rigid" | "learnable-stable" | "task-specialized" | "unstable";
+type Map0Control = "baseline" | "reference-norm-homeostasis" | "frozen-plasticity" | "shuffled-structure" | "no-homeostasis" | "no-exploration" | "random-reward";
+type Map0Axis = "recurrentGain" | "internalLearningRate" | "homeostasisStrength" | "explorationRate";
+interface Map0Parameters { id: number; recurrentGain: number; internalLearningRate: number; homeostasisStrength: number; explorationRate: number }
+interface Map0Summary { parameters: Map0Parameters; control: Map0Control; seedCount: number; formationProbability: Interval; meanProbeScore: number; meanMemoryAccuracy: number; meanDelayedCreditAccuracy: number; meanReversalAccuracy: number; meanRestorationAccuracy: number; meanRepeatedReversalAccuracy: number; meanPerturbationRecoveryAccuracy: number; meanPerturbationInitialAccuracy: number; meanPerturbationDamageDrop: number; meanPerturbationRecoveryGain: number; meanSaturationFraction: number; meanSynchronyFraction: number; meanRelativeWeightDrift: number; dominantClass: Map0Class }
+interface Map0Dataset { version: string; config: { developmentConfigCount: number; developmentSeedCount: number; confirmationSeedCount: number; recurrentGainRange: number[]; internalLearningRateRange: number[]; homeostasisStrengthRange: number[]; explorationRateRange: number[] }; developmentSummaries: Map0Summary[]; confirmationSummaries: Map0Summary[]; confirmationParameterIds: number[]; controlSummaries: { control: Map0Control; parameterId: number; formationProbability: Interval; meanProbeScore: number; formationProbabilityChangeFromBaseline: number; meanProbeScoreChangeFromBaseline: number }[]; stableRegionParameterIds: number[]; conclusions: string[]; acceptance: Record<string, boolean> & { passed: boolean; stableRegionFound: boolean } }
+interface Map1Comparison { parameterId: number; dualTimescaleFormationProbability: Interval; referenceNormFormationProbability: Interval; formationProbabilityChange: number; meanProbeScoreChange: number; repeatedReversalAccuracyChange: number; perturbationRecoveryGainChange: number; meanWeightDriftChange: number }
+interface Map1Dataset extends Omit<Map0Dataset,"config"> { config: Map0Dataset["config"] & { activityTarget: number; activityEmaRate: number; excitabilityAdjustmentRate: number; weightNormRelaxationRate: number; minimumExcitabilityGain: number; maximumExcitabilityGain: number }; referenceNormSummaries: Map0Summary[]; mechanismComparisons: Map1Comparison[]; acceptance: Record<string, boolean> & { passed: boolean; stableRegionFound: boolean; mechanismImprovesTradeoff: boolean } }
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -108,6 +116,15 @@ const gateERange = byId<HTMLInputElement>("gate-e-range");
 const gateFCurveCanvas = byId<HTMLCanvasElement>("gate-f-curve");
 const gateFTraceSelect = byId<HTMLSelectElement>("gate-f-trace-select");
 const gateFRange = byId<HTMLInputElement>("gate-f-range");
+const map0Canvas = byId<HTMLCanvasElement>("map0-phase");
+const map0Stage = byId<HTMLSelectElement>("map0-stage");
+const map0X = byId<HTMLSelectElement>("map0-x");
+const map0Y = byId<HTMLSelectElement>("map0-y");
+const map0Parameter = byId<HTMLSelectElement>("map0-parameter");
+const map1Canvas = byId<HTMLCanvasElement>("map1-phase");
+const map1X = byId<HTMLSelectElement>("map1-x");
+const map1Y = byId<HTMLSelectElement>("map1-y");
+const map1Parameter = byId<HTMLSelectElement>("map1-parameter");
 const traceSelect = byId<HTMLSelectElement>("trace-select");
 const timeline = byId<HTMLInputElement>("timeline");
 const play = byId<HTMLButtonElement>("play");
@@ -132,6 +149,10 @@ let gateEFrameIndex = 0;
 let gateF: GateFDataset;
 let gateFTrace: GateFTrace;
 let gateFFrameIndex = 0;
+let map0: Map0Dataset;
+let map0SelectedId = 0;
+let map1: Map1Dataset;
+let map1SelectedId = 0;
 let gateBTrace: GateBTrace;
 let gateBFrameIndex = 0;
 let gateBPlaying = false;
@@ -152,6 +173,7 @@ const labels: Record<string, string> = {
   "continuous-state": "连续状态", "lif-spiking": "LIF 脉冲",
   "fixed-internal": "冻结内部", "plastic-sensory": "感觉可塑", "plastic-recurrent": "循环可塑", "plastic-recurrent-no-homeostasis": "循环可塑 · 无内稳态",
   "before-change": "变化前", reversal: "规则反转", restoration: "恢复原规则",
+  "learnable-stable": "稳定可学习", "task-specialized": "任务特化", rigid: "僵硬", unstable: "不稳定",
 };
 
 const fitCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContext2D => {
@@ -526,6 +548,56 @@ const renderGateF = () => {
   gateFTraceSelect.replaceChildren(...gateF.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=`${labels[trace.controller]} · ${labels[trace.phase]}`;if(trace.controller==="plastic-recurrent"&&trace.phase==="reversal")option.selected=true;return option;}));selectGateFTrace();drawGateFCurve();
 };
 
+const map0AxisLabels:Record<Map0Axis,string>={recurrentGain:"循环增益",internalLearningRate:"内部可塑率",homeostasisStrength:"内稳态强度",explorationRate:"探索率"};
+const map0ClassColors:Record<Map0Class,string>={"learnable-stable":"#23845d","task-specialized":"#d49a35",rigid:"#88958e",unstable:"#cf5b53"};
+const map0ControlLabels:Record<Map0Control,string>={baseline:"基线","reference-norm-homeostasis":"旧参考范数","frozen-plasticity":"冻结可塑性","shuffled-structure":"置乱结构","no-homeostasis":"关闭内稳态","no-exploration":"关闭探索","random-reward":"随机后果"};
+const map0Summaries=()=>map0Stage.value==="confirmation"?map0.confirmationSummaries:map0.developmentSummaries;
+const map0Range=(axis:Map0Axis)=>({recurrentGain:map0.config.recurrentGainRange,internalLearningRate:map0.config.internalLearningRateRange,homeostasisStrength:map0.config.homeostasisStrengthRange,explorationRate:map0.config.explorationRateRange}[axis]);
+
+const drawMap0 = () => {
+  const summaries=map0Summaries(),xAxis=map0X.value as Map0Axis,yAxis=map0Y.value as Map0Axis,ctx=fitCanvas(map0Canvas),rect=map0Canvas.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);
+  const pad={l:58,r:22,t:22,b:46},w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b,xRange=map0Range(xAxis),yRange=map0Range(yAxis);
+  const xOf=(value:number)=>pad.l+(value-xRange[0])/(xRange[1]-xRange[0])*w,yOf=(value:number)=>pad.t+h-(value-yRange[0])/(yRange[1]-yRange[0])*h;
+  ctx.font="10px system-ui";ctx.fillStyle="#718078";ctx.strokeStyle="#dce5de";for(let i=0;i<=4;i++){const x=pad.l+i/4*w,y=pad.t+h-i/4*h;ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+h);ctx.stroke();ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();ctx.textAlign="center";ctx.fillText((xRange[0]+i/4*(xRange[1]-xRange[0])).toFixed(2),x,pad.t+h+18);ctx.textAlign="right";ctx.fillText((yRange[0]+i/4*(yRange[1]-yRange[0])).toFixed(2),pad.l-8,y+3);}
+  for(const summary of summaries){const x=xOf(summary.parameters[xAxis]),y=yOf(summary.parameters[yAxis]),radius=5+summary.formationProbability.mean*10;ctx.fillStyle=map0ClassColors[summary.dominantClass];ctx.globalAlpha=.82;ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(summary.parameters.id===map0SelectedId){ctx.strokeStyle="#173e34";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,radius+4,0,Math.PI*2);ctx.stroke();}ctx.fillStyle="#334f46";ctx.textAlign="center";ctx.fillText(String(summary.parameters.id),x,y-radius-4);}
+  ctx.fillStyle="#52675e";ctx.textAlign="center";ctx.fillText(map0AxisLabels[xAxis],pad.l+w/2,rect.height-7);ctx.save();ctx.translate(13,pad.t+h/2);ctx.rotate(-Math.PI/2);ctx.fillText(map0AxisLabels[yAxis],0,0);ctx.restore();
+};
+
+const map0Bar=(label:string,value:number,percent=true)=>{const row=document.createElement("div"),shown=percent?`${(value*100).toFixed(1)}%`:value.toFixed(3);row.innerHTML=`<span>${label}</span><div><i style="width:${Math.min(100,Math.max(0,value*100))}%"></i></div><strong>${shown}</strong>`;return row;};
+const renderMap0Inspector=()=>{
+  const summaries=map0Summaries();let summary=summaries.find(item=>item.parameters.id===map0SelectedId);if(!summary){summary=summaries[0];map0SelectedId=summary.parameters.id;}
+  map0Parameter.value=String(map0SelectedId);const p=summary.parameters;byId("map0-parameters").innerHTML=`<div><span>形成概率</span><strong>${(summary.formationProbability.mean*100).toFixed(1)}%</strong></div><div><span>分类</span><strong>${labels[summary.dominantClass]??summary.dominantClass}</strong></div><div><span>循环增益</span><strong>${p.recurrentGain.toFixed(3)}</strong></div><div><span>可塑率</span><strong>${p.internalLearningRate.toFixed(3)}</strong></div><div><span>内稳态</span><strong>${p.homeostasisStrength.toFixed(3)}</strong></div><div><span>探索率</span><strong>${p.explorationRate.toFixed(3)}</strong></div>`;
+  byId("map0-probes").replaceChildren(map0Bar("短期记忆",summary.meanMemoryAccuracy),map0Bar("延迟信用",summary.meanDelayedCreditAccuracy),map0Bar("规则反转",summary.meanReversalAccuracy),map0Bar("恢复旧规则",summary.meanRestorationAccuracy),map0Bar("重复反转",summary.meanRepeatedReversalAccuracy),map0Bar("损伤后正确率",summary.meanPerturbationInitialAccuracy),map0Bar("损伤幅度",summary.meanPerturbationDamageDrop),map0Bar("恢复增益",summary.meanPerturbationRecoveryGain));
+  byId("map0-dynamics").replaceChildren(map0Bar("饱和比例",summary.meanSaturationFraction),map0Bar("同步比例",summary.meanSynchronyFraction),map0Bar("权重漂移",Math.min(1,summary.meanRelativeWeightDrift),false));
+  const controls=map0.controlSummaries.filter(item=>item.parameterId===map0SelectedId);byId("map0-control-grid").replaceChildren(...controls.map(item=>{const card=document.createElement("article");card.innerHTML=`<span>${map0ControlLabels[item.control]}</span><strong>${(item.meanProbeScore*100).toFixed(0)}% 探针</strong><small>得分变化 ${item.meanProbeScoreChangeFromBaseline>=0?"+":""}${(item.meanProbeScoreChangeFromBaseline*100).toFixed(1)} pp · 形成 ${(item.formationProbability.mean*100).toFixed(1)}%</small>`;return card;}));drawMap0();
+};
+const renderMap0=()=>{
+  byId("map0-status").textContent=map0.acceptance.stableRegionFound?`找到 ${map0.stableRegionParameterIds.length} 点候选区域`:"测绘完成 · 未找到稳定区域";
+  const acceptanceLabels:Record<string,string>={deterministicSampling:"确定性采样",developmentAndConfirmationSeedsDisjoint:"种子严格隔离",allDevelopmentRunsComplete:"开发扫描完整",confirmationRunsComplete:"独立确认完整",causalControlsComplete:"因果对照完整",causalInterventionDetected:"检测到因果变化",finiteOutputs:"数值有限"};const grid=byId("map0-acceptance");grid.replaceChildren();for(const [key,label] of Object.entries(acceptanceLabels)){const pass=map0.acceptance[key];const item=document.createElement("div");item.className=pass?"pass":"fail";item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`;grid.append(item);}
+  map0Parameter.replaceChildren(...map0.developmentSummaries.map(summary=>{const option=document.createElement("option");option.value=String(summary.parameters.id);option.textContent=`配置 ${summary.parameters.id}`;return option;}));map0SelectedId=[...map0.developmentSummaries].sort((a,b)=>(b.formationProbability.mean*2+b.meanProbeScore)-(a.formationProbability.mean*2+a.meanProbeScore))[0].parameters.id;byId("map0-conclusions").replaceChildren(...map0.conclusions.map(text=>{const p=document.createElement("p");p.textContent=text;return p;}));renderMap0Inspector();
+};
+
+const map1Range=(axis:Map0Axis)=>({recurrentGain:map1.config.recurrentGainRange,internalLearningRate:map1.config.internalLearningRateRange,homeostasisStrength:map1.config.homeostasisStrengthRange,explorationRate:map1.config.explorationRateRange}[axis]);
+const drawMap1=()=>{
+  const summaries=map1.confirmationSummaries,xAxis=map1X.value as Map0Axis,yAxis=map1Y.value as Map0Axis,ctx=fitCanvas(map1Canvas),rect=map1Canvas.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);
+  const pad={l:58,r:22,t:22,b:46},w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b,xRange=map1Range(xAxis),yRange=map1Range(yAxis),xOf=(value:number)=>pad.l+(value-xRange[0])/(xRange[1]-xRange[0])*w,yOf=(value:number)=>pad.t+h-(value-yRange[0])/(yRange[1]-yRange[0])*h;
+  ctx.font="10px system-ui";ctx.fillStyle="#718078";ctx.strokeStyle="#dce5de";for(let i=0;i<=4;i++){const x=pad.l+i/4*w,y=pad.t+h-i/4*h;ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+h);ctx.stroke();ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();ctx.textAlign="center";ctx.fillText((xRange[0]+i/4*(xRange[1]-xRange[0])).toFixed(2),x,pad.t+h+18);ctx.textAlign="right";ctx.fillText((yRange[0]+i/4*(yRange[1]-yRange[0])).toFixed(2),pad.l-8,y+3);}
+  for(const summary of summaries){const x=xOf(summary.parameters[xAxis]),y=yOf(summary.parameters[yAxis]),radius=7+summary.meanProbeScore*8;ctx.fillStyle=map0ClassColors[summary.dominantClass];ctx.globalAlpha=.86;ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(summary.parameters.id===map1SelectedId){ctx.strokeStyle="#173e34";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,radius+4,0,Math.PI*2);ctx.stroke();}ctx.fillStyle="#334f46";ctx.textAlign="center";ctx.fillText(String(summary.parameters.id),x,y-radius-4);}
+  ctx.fillStyle="#52675e";ctx.textAlign="center";ctx.fillText(map0AxisLabels[xAxis],pad.l+w/2,rect.height-7);ctx.save();ctx.translate(13,pad.t+h/2);ctx.rotate(-Math.PI/2);ctx.fillText(map0AxisLabels[yAxis],0,0);ctx.restore();
+};
+const signed=(value:number,digits=1)=>`${value>=0?"+":""}${(value*100).toFixed(digits)} pp`;
+const renderMap1Inspector=()=>{
+  const summary=map1.confirmationSummaries.find(item=>item.parameters.id===map1SelectedId)??map1.confirmationSummaries[0];map1SelectedId=summary.parameters.id;map1Parameter.value=String(map1SelectedId);const reference=map1.referenceNormSummaries.find(item=>item.parameters.id===map1SelectedId)!;const comparison=map1.mechanismComparisons.find(item=>item.parameterId===map1SelectedId)!;const p=summary.parameters;
+  byId("map1-parameters").innerHTML=`<div><span>双尺度分类</span><strong>${labels[summary.dominantClass]}</strong></div><div><span>旧机制分类</span><strong>${labels[reference.dominantClass]}</strong></div><div><span>循环增益</span><strong>${p.recurrentGain.toFixed(3)}</strong></div><div><span>可塑率</span><strong>${p.internalLearningRate.toFixed(3)}</strong></div><div><span>内稳态</span><strong>${p.homeostasisStrength.toFixed(3)}</strong></div><div><span>探索率</span><strong>${p.explorationRate.toFixed(3)}</strong></div>`;
+  byId("map1-mechanism-grid").innerHTML=`<article><span>平均探针</span><strong>${(summary.meanProbeScore*100).toFixed(1)}%</strong><small>旧机制 ${(reference.meanProbeScore*100).toFixed(1)}% · ${signed(comparison.meanProbeScoreChange)}</small></article><article><span>重复反转</span><strong>${(summary.meanRepeatedReversalAccuracy*100).toFixed(1)}%</strong><small>旧机制 ${(reference.meanRepeatedReversalAccuracy*100).toFixed(1)}% · ${signed(comparison.repeatedReversalAccuracyChange)}</small></article><article><span>损伤恢复增益</span><strong>${signed(summary.meanPerturbationRecoveryGain)}</strong><small>旧机制 ${signed(reference.meanPerturbationRecoveryGain)} · 变化 ${signed(comparison.perturbationRecoveryGainChange)}</small></article><article class="warning"><span>相对权重漂移</span><strong>${summary.meanRelativeWeightDrift.toFixed(2)}</strong><small>旧机制 ${reference.meanRelativeWeightDrift.toFixed(2)} · 变化 ${comparison.meanWeightDriftChange>=0?"+":""}${comparison.meanWeightDriftChange.toFixed(2)}</small></article>`;
+  const controls=map1.controlSummaries.filter(item=>item.parameterId===map1SelectedId);byId("map1-control-grid").replaceChildren(...controls.map(item=>{const card=document.createElement("article");card.innerHTML=`<span>${map0ControlLabels[item.control]}</span><strong>${(item.meanProbeScore*100).toFixed(0)}% 探针</strong><small>得分变化 ${signed(item.meanProbeScoreChangeFromBaseline)} · 形成 ${(item.formationProbability.mean*100).toFixed(1)}%</small>`;return card;}));drawMap1();
+};
+const renderMap1=()=>{
+  byId("map1-status").textContent=map1.acceptance.stableRegionFound?`找到 ${map1.stableRegionParameterIds.length} 点候选区域`:"机制被淘汰 · 漂移失控";
+  const acceptanceLabels:Record<string,string>={onlyHomeostasisMechanismChanged:"仅更换内稳态",developmentAndConfirmationSeedsDisjoint:"开发/确认隔离",allDevelopmentRunsComplete:"开发扫描完整",confirmationRunsComplete:"独立确认完整",referenceMechanismControlsComplete:"旧机制配对完整",causalControlsComplete:"因果对照完整",causalInterventionDetected:"检测到因果变化",finiteOutputs:"数值有限",mechanismImprovesTradeoff:"改善学习—漂移权衡"};const grid=byId("map1-acceptance");grid.replaceChildren();for(const [key,label] of Object.entries(acceptanceLabels)){const pass=map1.acceptance[key];const item=document.createElement("div");item.className=pass?"pass":"fail";item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`;grid.append(item);}
+  byId("map1-protocol").textContent=`活动目标 ${map1.config.activityTarget.toFixed(2)} · EMA ${map1.config.activityEmaRate.toFixed(2)} · 权重慢回拉 ${map1.config.weightNormRelaxationRate.toFixed(2)}`;map1Parameter.replaceChildren(...map1.confirmationSummaries.map(summary=>{const option=document.createElement("option");option.value=String(summary.parameters.id);option.textContent=`配置 ${summary.parameters.id}`;return option;}));map1SelectedId=[...map1.confirmationSummaries].sort((a,b)=>b.meanProbeScore-a.meanProbeScore)[0].parameters.id;byId("map1-conclusions").replaceChildren(...map1.conclusions.map(text=>{const p=document.createElement("p");p.textContent=text;return p;}));renderMap1Inspector();
+};
+
 const renderEvidence = () => {
   const cards=byId("evaluation-cards");cards.replaceChildren();
   for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
@@ -550,20 +622,23 @@ gateETraceSelect.addEventListener("change",selectGateETrace);
 gateERange.addEventListener("input",()=>{gateEFrameIndex=Number(gateERange.value);renderGateEFrame();});
 gateFTraceSelect.addEventListener("change",selectGateFTrace);
 gateFRange.addEventListener("input",()=>{gateFFrameIndex=Number(gateFRange.value);renderGateFFrame();});
+map0Stage.addEventListener("change",()=>{const summaries=map0Summaries();map0SelectedId=summaries[0].parameters.id;renderMap0Inspector();});
+map0X.addEventListener("change",drawMap0);map0Y.addEventListener("change",drawMap0);map0Parameter.addEventListener("change",()=>{map0SelectedId=Number(map0Parameter.value);renderMap0Inspector();});
+map1X.addEventListener("change",drawMap1);map1Y.addEventListener("change",drawMap1);map1Parameter.addEventListener("change",()=>{map1SelectedId=Number(map1Parameter.value);renderMap1Inspector();});
 gateBPlay.addEventListener("click",()=>{gateBPlaying=!gateBPlaying;gateBPlay.textContent=gateBPlaying?"Ⅱ":"▶";gateBLastTick=performance.now();});
 byId("gate-b-prev").addEventListener("click",()=>setGateBFrame(gateBFrameIndex-1));byId("gate-b-next").addEventListener("click",()=>setGateBFrame(gateBFrameIndex+1));gateBRange.addEventListener("input",()=>setGateBFrame(Number(gateBRange.value)));
-window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();drawGateDBoundary();drawGateEBoundary();drawGateERaster();drawGateFCurve();}});
+window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();drawGateDBoundary();drawGateEBoundary();drawGateERaster();drawGateFCurve();drawMap0();drawMap1();}});
 
 const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}if(gateBPlaying&&now-gateBLastTick>=650){gateBLastTick=now;if(gateBFrameIndex>=gateBTrace.frames.length-1){gateBPlaying=false;gateBPlay.textContent="▶";}else setGateBFrame(gateBFrameIndex+1);}requestAnimationFrame(animate); };
 
 const start = async () => {
-  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse,gateFResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json"),fetch("/gate-f-v1.6.json")]);
-  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);if(!gateFResponse.ok)throw new Error(`Gate F dataset ${gateFResponse.status}`);
-  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];gateF=await gateFResponse.json() as GateFDataset;
+  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse,gateFResponse,map0Response,map1Response]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json"),fetch("/gate-f-v1.6.json"),fetch("/map0-v0.1.json"),fetch("/map1-v0.2.json")]);
+  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);if(!gateFResponse.ok)throw new Error(`Gate F dataset ${gateFResponse.status}`);if(!map0Response.ok)throw new Error(`Map 0 dataset ${map0Response.status}`);if(!map1Response.ok)throw new Error(`Map 1 dataset ${map1Response.status}`);
+  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];gateF=await gateFResponse.json() as GateFDataset;map0=await map0Response.json() as Map0Dataset;map1=await map1Response.json() as Map1Dataset;
   ready=true;
-  byId("version").textContent=gateF.version;byId("acceptance-label").textContent=gateF.acceptance.passed?"Gate F 验收通过":"Gate F 验收失败";byId("acceptance-dot").className=gateF.acceptance.passed?"pass":"fail";
+  byId("version").textContent=map1.version;byId("acceptance-label").textContent=map1.acceptance.passed?(map1.acceptance.stableRegionFound?"Map 1 找到候选区域":"Map 1 完成 · 机制淘汰"):"Map 1 协议失败";byId("acceptance-dot").className=map1.acceptance.passed?"pass":"fail";
   traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
-  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();renderGateF();drawCurve();selectTrace();requestAnimationFrame(animate);
+  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();renderGateF();renderMap0();renderMap1();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
 start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

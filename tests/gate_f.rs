@@ -30,6 +30,10 @@ fn invalid_protocol_is_rejected() {
             ..quick_config()
         },
         GateFExperimentConfig {
+            homeostasis_strength: 1.1,
+            ..quick_config()
+        },
+        GateFExperimentConfig {
             checkpoints: [0, 10, 5, 20, 40],
             ..quick_config()
         },

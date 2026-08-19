@@ -1,8 +1,8 @@
 # Neuro Engine
 
-一个以行为证据为中心的最小具身学习实验室。
+一个以行为证据研究宏观功能形成的动态系统实验室。
 
-项目不再试图从随机点神经网络的复杂放电中猜测“意义”。当前目标是让一个具有能量需求、感觉、内部状态和动作能力的主体，通过环境后果改变突触，并在未见环境中表现出可重复、可消融的学习。
+项目不再试图从随机点神经网络的复杂放电中猜测“意义”。当前目标是寻找稳定、可学习的动力学区域：让具有状态、局部可塑性和内稳态的系统通过环境后果形成宏观能力，并用未见条件、独立种子和内部干预检验这些能力是否可重复。具身主体是当前主要实验探针，不是最终研究边界。
 
 ## 当前结果
 
@@ -34,6 +34,10 @@ Gate E 把事件式 LIF 接入同一延迟线索闭环。在连续泄漏与脉�
 
 Gate F 冻结动作读出后反转线索—目标规则。冻结内部网络保持 `0.0%`，感觉投影可塑性在 800 回合后达到 `100.0%`，局部循环可塑性达到 `91.3% [79.0%, 103.6%]`，并都能在规则恢复后重新达到 100%。关闭内稳态的循环控制行为相近，但开放权重组范数漂移约 658%。因此内部突触变化可以承担这个受控任务的持续适应，而归一化目前只证明能控制参数尺度；该结果仍依赖二元规则、强制探索和预对齐通路。
 
+Map 0 随后在统一 24 单元底层上扫描 64 组循环增益、内部可塑率、内稳态和探索参数。512 个开发运行之后，6 个候选配置又完成 72 个独立确认和 360 个因果对照。确认阶段没有系统同时通过记忆、延迟信用、重复切换、损伤恢复和稳定性标准：71/72 为任务特化，1/72 因权重漂移不稳定。协议完整通过，但没有找到稳定可学习区域，因此当前不进入 Gate G。
+
+Map 1 只把参考范数投影替换为活动目标与慢速权重回拉，并在 Map 0 候选区局部重绘。正式确认中，新机制 72 次运行有 59 次因权重漂移不稳定；相对旧机制平均探针得分仅 `+1.2 pp`，权重漂移却增加 `1.766`，重复反转和损伤恢复总体下降。该机制已作为负结果淘汰。当前瓶颈仍指向局部可塑性与稳定性的冲突，而不是节点数量。
+
 ## 运行
 
 ```powershell
@@ -46,6 +50,8 @@ cargo run --release --example gate_c_lab
 cargo run --release --example gate_d_lab
 cargo run --release --example gate_e_lab
 cargo run --release --example gate_f_lab
+cargo run --release --example map0_lab
+cargo run --release --example map1_lab
 npm install
 npm run dev
 ```
@@ -67,6 +73,8 @@ src/gate_c.rs               延迟能量环境、资格迹矩阵和因果对照
 src/gate_d.rs               稀疏循环动力学、置乱控制和稳定性审计
 src/gate_e.rs               连续状态与 LIF 的等预算行为、损伤和成本比较
 src/gate_f.rs               冻结读出后的内部可塑性、规则反转与内稳态对照
+src/learnability_map.rs     统一探针、四轴扫描、独立确认和因果对照
+src/map1.rs                 双时间尺度内稳态、局部重绘和旧机制配对
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -78,10 +86,14 @@ experiments/                版本化结果与失败记录
 
 ## 文档
 
+- [RESEARCH_PROGRAM.md](RESEARCH_PROGRAM.md)：总研究假设、灰盒方法、系统自由度和功能形成标准；
+- [LEARNABILITY_MAP.md](LEARNABILITY_MAP.md)：稳定可学习性地图的阶段设计背景；
+- [MAP_0.md](MAP_0.md)：已完成的统一探针、参数扫描和区域判定冻结规格；
+- [MAP_1.md](MAP_1.md)：已完成的双时间尺度内稳态单机制修订规格；
 - [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；
-- [ROADMAP.md](ROADMAP.md)：从奖励审计、状态必要性到脉冲对照的递进实验路线；
+- [ROADMAP.md](ROADMAP.md)：已完成 Gate、稳定可学习性地图与后续条件路线；
 - [GATE_B.md](GATE_B.md)：已完成的延迟线索任务和防泄漏验收冻结规格；
 - [GATE_B_ROBUSTNESS.md](GATE_B_ROBUSTNESS.md)：已完成的状态延迟、线索带宽与持续干扰边界扫描；
 - [GATE_C.md](GATE_C.md)：已完成的资格迹 × 延迟能量冻结规格；
@@ -96,6 +108,8 @@ experiments/                版本化结果与失败记录
 - [experiments/gate-d-v1.4.md](experiments/gate-d-v1.4.md)：结构化循环延长可靠记忆的多种子实验；
 - [experiments/gate-e-v1.5.md](experiments/gate-e-v1.5.md)：LIF 的记忆收益、CPU 代价和损伤边界；
 - [experiments/gate-f-v1.6.md](experiments/gate-f-v1.6.md)：冻结动作读出后的规则反转、恢复和权重稳定性；
+- [experiments/map0-v0.1.md](experiments/map0-v0.1.md)：稳定可学习性地图的正式负结果与机制边界；
+- [experiments/map1-v0.2.md](experiments/map1-v0.2.md)：双时间尺度内稳态的配对负结果；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

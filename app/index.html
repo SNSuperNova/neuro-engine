@@ -8,7 +8,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate F</small></div></div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Dual-timescale Homeostasis · Map 1</small></div></div>
     <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
@@ -195,6 +195,55 @@
           <small class="observer-note">归一化控制保持 0%；无内稳态循环在反转后漂移约 658%。</small>
         </aside>
       </div>
+    </section>
+
+    <section class="map0 card">
+      <div class="section-head"><div><span class="eyebrow">MAP 0 · STABLE LEARNABILITY</span><h2>稳定可学习性地图</h2></div><strong id="map0-status">载入中</strong></div>
+      <p class="audit-intro">每个点是一组底层参数；颜色表示跨探针分类，大小表示独立系统种子中的功能形成概率。确认种子没有参与参数选择。</p>
+      <div id="map0-acceptance" class="acceptance-grid map0-acceptance"></div>
+      <div class="map0-layout">
+        <div>
+          <div class="map0-toolbar">
+            <label>数据 <select id="map0-stage"><option value="development">开发扫描</option><option value="confirmation">独立确认</option></select></label>
+            <label>横轴 <select id="map0-x"><option value="recurrentGain">循环增益</option><option value="internalLearningRate">内部可塑率</option><option value="homeostasisStrength">内稳态</option><option value="explorationRate">探索率</option></select></label>
+            <label>纵轴 <select id="map0-y"><option value="internalLearningRate">内部可塑率</option><option value="recurrentGain">循环增益</option><option value="homeostasisStrength">内稳态</option><option value="explorationRate">探索率</option></select></label>
+          </div>
+          <canvas id="map0-phase" aria-label="Map 0 参数区域与功能形成概率"></canvas>
+          <div class="map0-legend"><span class="learnable">稳定可学习</span><span class="specialized">任务特化</span><span class="rigid">僵硬</span><span class="unstable">不稳定</span></div>
+        </div>
+        <aside class="map0-inspector">
+          <label>配置下钻 <select id="map0-parameter"></select></label>
+          <div id="map0-parameters" class="map0-parameters"></div>
+          <h3>固定探针组</h3><div id="map0-probes" class="map0-bars"></div>
+          <h3>稳定性</h3><div id="map0-dynamics" class="map0-bars"></div>
+        </aside>
+      </div>
+      <div class="map0-controls"><h3>确认阶段因果对照</h3><div id="map0-control-grid"></div></div>
+      <div id="map0-conclusions" class="map0-conclusions"></div>
+    </section>
+
+    <section class="map1 card">
+      <div class="section-head"><div><span class="eyebrow">MAP 1 · ONE-MECHANISM REVISION</span><h2>双时间尺度内稳态局部重绘</h2></div><strong id="map1-status">载入中</strong></div>
+      <p class="audit-intro">节点、结构、六项探针、阈值与随机世界保持不变。每个确认点都用相同种子配对比较“活动目标 + 慢速权重回拉”和 Map 0 的参考范数规则。</p>
+      <p id="map1-protocol" class="map1-protocol"></p>
+      <div id="map1-acceptance" class="acceptance-grid map1-acceptance"></div>
+      <div class="map0-layout">
+        <div>
+          <div class="map0-toolbar">
+            <label>横轴 <select id="map1-x"><option value="recurrentGain">循环增益</option><option value="internalLearningRate">内部可塑率</option><option value="homeostasisStrength">内稳态</option><option value="explorationRate">探索率</option></select></label>
+            <label>纵轴 <select id="map1-y"><option value="internalLearningRate">内部可塑率</option><option value="recurrentGain">循环增益</option><option value="homeostasisStrength">内稳态</option><option value="explorationRate">探索率</option></select></label>
+          </div>
+          <canvas id="map1-phase" aria-label="Map 1 独立确认局部参数相图"></canvas>
+          <div class="map0-legend"><span class="learnable">稳定可学习</span><span class="specialized">任务特化</span><span class="rigid">僵硬</span><span class="unstable">不稳定</span></div>
+        </div>
+        <aside class="map0-inspector">
+          <label>确认配置 <select id="map1-parameter"></select></label>
+          <div id="map1-parameters" class="map0-parameters"></div>
+          <h3>同种子机制配对</h3><div id="map1-mechanism-grid" class="map1-mechanism-grid"></div>
+        </aside>
+      </div>
+      <div class="map0-controls"><h3>双时间尺度机制的因果对照</h3><div id="map1-control-grid"></div></div>
+      <div id="map1-conclusions" class="map0-conclusions"></div>
     </section>
   </main>
 </div>

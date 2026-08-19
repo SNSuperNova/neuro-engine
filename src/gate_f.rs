@@ -67,6 +67,7 @@ pub struct GateFExperimentConfig {
     pub recurrent_scale: f64,
     pub policy_learning_rate: f64,
     pub internal_learning_rate: f64,
+    pub homeostasis_strength: f64,
     pub adaptation_exploration: f64,
     pub softmax_temperature: f64,
     pub reward_baseline_decay: f64,
@@ -88,6 +89,7 @@ impl Default for GateFExperimentConfig {
             recurrent_scale: 0.60,
             policy_learning_rate: 0.055,
             internal_learning_rate: 0.10,
+            homeostasis_strength: 1.0,
             adaptation_exploration: 0.16,
             softmax_temperature: 0.40,
             reward_baseline_decay: 0.92,
@@ -443,7 +445,12 @@ impl Controller {
             if current <= 1e-12 {
                 continue;
             }
-            let scale = reference / current;
+            let target_scale = reference / current;
+            let scale = if self.config.homeostasis_strength == 1.0 {
+                target_scale
+            } else {
+                1.0 + self.config.homeostasis_strength * (target_scale - 1.0)
+            };
             match kind {
                 GateFControllerKind::PlasticSensory => {
                     self.input_weights[target][2] *= scale;
@@ -1423,6 +1430,7 @@ fn validate_config(config: GateFExperimentConfig) -> Result<(), EmbodiedError> {
         config.recurrent_scale,
         config.policy_learning_rate,
         config.internal_learning_rate,
+        config.homeostasis_strength,
         config.adaptation_exploration,
         config.softmax_temperature,
         config.reward_baseline_decay,
@@ -1448,6 +1456,7 @@ fn validate_config(config: GateFExperimentConfig) -> Result<(), EmbodiedError> {
         || config.recurrent_scale <= 0.0
         || config.policy_learning_rate <= 0.0
         || config.internal_learning_rate <= 0.0
+        || !(0.0..=1.0).contains(&config.homeostasis_strength)
         || !(0.0..0.5).contains(&config.adaptation_exploration)
         || config.softmax_temperature <= 0.0
         || !(0.0..1.0).contains(&config.reward_baseline_decay)

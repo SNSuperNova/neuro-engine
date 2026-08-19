@@ -1,0 +1,562 @@
+{
+  "version": "adaptive-mechanism/m1x-v0.9-fixed-subspace-reachability",
+  "config": {
+    "m1Protocol": {
+      "map2Protocol": {
+        "map2bProtocol": {
+          "map2aProtocol": {
+            "map1Protocol": {
+              "seed": 5566818783092277505,
+              "developmentConfigCount": 48,
+              "developmentSeedCount": 8,
+              "confirmationSeedCount": 12,
+              "confirmationCandidateCount": 6,
+              "recurrentGainRange": [
+                0.1,
+                0.45
+              ],
+              "internalLearningRateRange": [
+                0.06,
+                0.16
+              ],
+              "homeostasisStrengthRange": [
+                0.25,
+                1.0
+              ],
+              "explorationRateRange": [
+                0.04,
+                0.18
+              ],
+              "activityTarget": 0.35,
+              "activityEmaRate": 0.05,
+              "excitabilityAdjustmentRate": 0.02,
+              "weightNormRelaxationRate": 0.03,
+              "minimumExcitabilityGain": 0.65,
+              "maximumExcitabilityGain": 1.35,
+              "probeProtocol": {
+                "seed": 5566818783092277505,
+                "developmentConfigCount": 64,
+                "developmentSeedCount": 8,
+                "confirmationSeedCount": 12,
+                "confirmationCandidateCount": 6,
+                "pretrainingEpisodes": 320,
+                "adaptationEpisodes": 240,
+                "evaluationEpisodes": 80,
+                "thresholdCheckInterval": 20,
+                "cueSteps": 2,
+                "memoryDelaySteps": 8,
+                "rewardDelaySteps": 6,
+                "eligibilityDecay": 0.88,
+                "hiddenLeak": 0.8,
+                "policyLearningRate": 0.055,
+                "softmaxTemperature": 0.4,
+                "rewardBaselineDecay": 0.92,
+                "weightLimit": 2.5,
+                "recurrentGainRange": [
+                  0.1,
+                  0.45
+                ],
+                "internalLearningRateRange": [
+                  0.06,
+                  0.16
+                ],
+                "homeostasisStrengthRange": [
+                  0.25,
+                  1.0
+                ],
+                "explorationRateRange": [
+                  0.04,
+                  0.18
+                ],
+                "thresholds": {
+                  "memoryAccuracy": 0.65,
+                  "delayedCreditAccuracy": 0.65,
+                  "reversalAccuracy": 0.7,
+                  "restorationAccuracy": 0.7,
+                  "repeatedReversalAccuracy": 0.7,
+                  "perturbationRecoveryAccuracy": 0.65,
+                  "minimumPerturbationDamageDrop": 0.15,
+                  "minimumPerturbationRecoveryGain": 0.1,
+                  "maximumSaturationFraction": 0.25,
+                  "maximumSynchronyFraction": 0.5,
+                  "maximumRelativeWeightDrift": 1.0,
+                  "minimumRegionFormationProbability": 0.5,
+                  "minimumRegionSize": 3,
+                  "minimumCausalProbabilityDrop": 0.15,
+                  "minimumCausalProbeScoreDrop": 0.1
+                }
+              }
+            },
+            "softBoundScale": 1.0,
+            "minimumMeanWeightDriftReduction": 0.25,
+            "maximumAccuracyDegradation": 0.02
+          },
+          "initialResource": 0.75,
+          "supplyRate": 0.007,
+          "maintenanceCost": 0.001,
+          "activityCost": 0.012,
+          "plasticityCost": 0.05,
+          "minimumModulation": 0.6,
+          "minimumNoSupplyResourceDrop": 0.2,
+          "minimumNoSupplyProbeScoreDrop": 0.1,
+          "maximumProbeScoreDegradation": 0.02,
+          "maximumWeightDriftIncrease": 0.05
+        },
+        "streamTrialCount": 720,
+        "minimumChangeGap": 30,
+        "changeProbability": 0.025,
+        "settlingWindow": 20,
+        "exploration": 0.12,
+        "minimumRuleChanges": 5,
+        "minimumOverallAccuracy": 0.6,
+        "minimumSettledAccuracy": 0.65,
+        "maximumRelativeWeightDrift": 1.0,
+        "minimumResourceLevel": 0.05,
+        "minimumFormationProbability": 0.5,
+        "minimumRegionSize": 3,
+        "maximumResetAdvantage": 0.05,
+        "minimumNoSupplyAccuracyDrop": 0.1,
+        "minimumFrozenAccuracyDrop": 0.1
+      },
+      "referenceParameterIds": [
+        0,
+        16,
+        20,
+        21,
+        29,
+        45
+      ],
+      "developmentSeedCount": 4,
+      "confirmationSeedCount": 8,
+      "phaseTrialCount": 240,
+      "evaluationTrialCount": 48,
+      "thresholdCheckInterval": 20,
+      "accuracyThreshold": 0.7,
+      "minimumRetainedAccuracy": 0.6,
+      "maximumRetentionDrop": 0.15,
+      "maximumRelativeWeightDrift": 1.0,
+      "minimumMeanResourceLevel": 0.2,
+      "minimumSingleRuleAccuracy": 0.7,
+      "minimumRetentionProbability": 0.5,
+      "minimumCausalAccuracyDrop": 0.05,
+      "maximumResetRetentionAdvantage": 0.05
+    },
+    "learningRates": [
+      0.01,
+      0.03,
+      0.08
+    ],
+    "oracleIterations": 120,
+    "oracleTrainingTrials": 32,
+    "oracleRestartCount": 3,
+    "restartJitter": 0.08,
+    "minimumNovelBehaviorAccuracy": 0.7,
+    "minimumNovelTargetProbability": 0.7,
+    "minimumSingleNovelAccuracy": 0.65,
+    "minimumOracleAdvantage": 0.1,
+    "minimumLossReduction": 0.1,
+    "maximumSaturationFraction": 0.25
+  },
+  "diagnosticContract": [
+    "the oracle exists only in isolated clones and may read target labels; no oracle state, label, gradient, or optimized weight is written back to the online system",
+    "nodes, sensory weights, recurrent topology, 48 adjustable recurrent slots, A-trained action readout, task streams, and evaluation budget remain frozen",
+    "the norm-envelope oracle projects each target pair to its carrier reference norm; the absolute-bound oracle changes the same 48 values only and clamps them to the existing absolute weight limit",
+    "true-target and shuffled-target oracles use identical iterations, restarts, training trials, optimizer, and bounds; frozen weights use the same evaluation streams",
+    "development selects one learning rate; independent confirmation cannot change optimizer settings, controls, thresholds, or the decision order",
+    "failure means the preregistered high-information search did not reach the threshold; it is empirical evidence, not a proof of mathematical impossibility"
+  ],
+  "carrierParameters": [
+    {
+      "id": 0,
+      "recurrentGain": 0.275,
+      "internalLearningRate": 0.09333333333333332,
+      "homeostasisStrength": 0.4,
+      "explorationRate": 0.06
+    },
+    {
+      "id": 16,
+      "recurrentGain": 0.28593749999999996,
+      "internalLearningRate": 0.15259259259259259,
+      "homeostasisStrength": 0.64,
+      "explorationRate": 0.1057142857142857
+    },
+    {
+      "id": 20,
+      "recurrentGain": 0.3296875,
+      "internalLearningRate": 0.07851851851851852,
+      "homeostasisStrength": 0.52,
+      "explorationRate": 0.04857142857142857
+    },
+    {
+      "id": 21,
+      "recurrentGain": 0.2421875,
+      "internalLearningRate": 0.11185185185185184,
+      "homeostasisStrength": 0.67,
+      "explorationRate": 0.06857142857142857
+    },
+    {
+      "id": 29,
+      "recurrentGain": 0.2640625,
+      "internalLearningRate": 0.07234567901234568,
+      "homeostasisStrength": 0.28600000000000003,
+      "explorationRate": 0.09142857142857141
+    },
+    {
+      "id": 45,
+      "recurrentGain": 0.25859374999999996,
+      "internalLearningRate": 0.1019753086419753,
+      "homeostasisStrength": 0.526,
+      "explorationRate": 0.13714285714285712
+    }
+  ],
+  "developmentLearningRateSummaries": [
+    {
+      "learningRate": 0.01,
+      "runCount": 24,
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.8984375,
+        "lower95": 0.8812946463829324,
+        "upper95": 0.9155803536170676
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9788773148148148,
+        "lower95": 0.9614689533553771,
+        "upper95": 0.9962856762742525
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.8985478733730538,
+        "lower95": 0.8856947949881939,
+        "upper95": 0.9114009517579136
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.7795138888888888,
+        "lower95": 0.7407357214775675,
+        "upper95": 0.8182920563002102
+      },
+      "meanTrainingLossReduction": {
+        "mean": 5.994287223439721,
+        "lower95": 5.409495694902937,
+        "upper95": 6.579078751976505
+      },
+      "meanSaturationFraction": {
+        "mean": 0.019832658179012346,
+        "lower95": 0.018408298751332985,
+        "upper95": 0.021257017606691707
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "learningRate": 0.03,
+      "runCount": 24,
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9623842592592595,
+        "lower95": 0.9485065774214206,
+        "upper95": 0.9762619410970984
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9910300925925926,
+        "lower95": 0.9821122452515348,
+        "upper95": 0.9999479399336503
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9650776322779312,
+        "lower95": 0.9508891556517187,
+        "upper95": 0.9792661089041437
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.8906249999999999,
+        "lower95": 0.8488230081004344,
+        "upper95": 0.9324269918995653
+      },
+      "meanTrainingLossReduction": {
+        "mean": 6.089138568609908,
+        "lower95": 5.495573824247965,
+        "upper95": 6.68270331297185
+      },
+      "meanSaturationFraction": {
+        "mean": 0.016775173611111114,
+        "lower95": 0.015695044314715863,
+        "upper95": 0.017855302907506365
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "learningRate": 0.08,
+      "runCount": 24,
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9832175925925929,
+        "lower95": 0.9722894247929693,
+        "upper95": 0.9941457603922165
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9918981481481483,
+        "lower95": 0.983677957646822,
+        "upper95": 1.0001183386494745
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9820042389456093,
+        "lower95": 0.9720283986749095,
+        "upper95": 0.991980079216309
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.9522569444444443,
+        "lower95": 0.9195127746717515,
+        "upper95": 0.9850011142171371
+      },
+      "meanTrainingLossReduction": {
+        "mean": 6.094013253184349,
+        "lower95": 5.544930587842795,
+        "upper95": 6.643095918525904
+      },
+      "meanSaturationFraction": {
+        "mean": 0.010786795910493828,
+        "lower95": 0.009505804977527815,
+        "upper95": 0.01206778684345984
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "selectedLearningRate": 0.08,
+  "confirmationSummaries": [
+    {
+      "control": "frozen-weights",
+      "learningRate": 0.08,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.78125,
+        "lower95": 0.7479985121232073,
+        "upper95": 0.8145014878767927
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.4282407407407407,
+        "lower95": 0.4177873142269497,
+        "upper95": 0.4386941672545317
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.4265046296296297,
+        "lower95": 0.41556372725335927,
+        "upper95": 0.43744553200590014
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.4308167232761993,
+        "lower95": 0.4217736906792827,
+        "upper95": 0.4398597558731159
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.2816840277777778,
+        "lower95": 0.25552353657952936,
+        "upper95": 0.3078445189760262
+      },
+      "meanTrainingLossReduction": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "meanSaturationFraction": {
+        "mean": 0.020921344521604934,
+        "lower95": 0.01841534769466524,
+        "upper95": 0.023427341348544628
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "norm-envelope-oracle",
+      "learningRate": 0.08,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.8710937499999999,
+        "lower95": 0.8186641407277203,
+        "upper95": 0.9235233592722795
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.7317708333333335,
+        "lower95": 0.7055516483532104,
+        "upper95": 0.7579900183134566
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.8035300925925929,
+        "lower95": 0.7609407036349429,
+        "upper95": 0.8461194815502429
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.7341751160612273,
+        "lower95": 0.7065878649698534,
+        "upper95": 0.7617623671526013
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.5577256944444444,
+        "lower95": 0.5270105790070682,
+        "upper95": 0.5884408098818207
+      },
+      "meanTrainingLossReduction": {
+        "mean": 5.222241462739517,
+        "lower95": 4.631326020916878,
+        "upper95": 5.813156904562157
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 1.2966653801926509,
+        "lower95": 1.2153152347287943,
+        "upper95": 1.3780155256565074
+      },
+      "meanSaturationFraction": {
+        "mean": 0.028807990933641964,
+        "lower95": 0.027026906212068918,
+        "upper95": 0.03058907565521501
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "absolute-bound-oracle",
+      "learningRate": 0.08,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.98046875,
+        "lower95": 0.9640935577656646,
+        "upper95": 0.9968439422343354
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9725115740740743,
+        "lower95": 0.9627940144076916,
+        "upper95": 0.982229133740457
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9823495370370375,
+        "lower95": 0.973287915175689,
+        "upper95": 0.991411158898386
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9691440831244306,
+        "lower95": 0.9585639538273482,
+        "upper95": 0.979724212421513
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.92578125,
+        "lower95": 0.8989811430731492,
+        "upper95": 0.9525813569268508
+      },
+      "meanTrainingLossReduction": {
+        "mean": 5.850243001955725,
+        "lower95": 5.228349660095024,
+        "upper95": 6.472136343816427
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 4.534790005246395,
+        "lower95": 4.381494753073115,
+        "upper95": 4.688085257419676
+      },
+      "meanSaturationFraction": {
+        "mean": 0.012111786265432098,
+        "lower95": 0.010947447856692973,
+        "upper95": 0.013276124674171223
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "shuffled-target-oracle",
+      "learningRate": 0.08,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.49392361111111116,
+        "lower95": 0.47307855001590265,
+        "upper95": 0.5147686722063197
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.552662037037037,
+        "lower95": 0.5264986358133305,
+        "upper95": 0.5788254382607435
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.6095196759259259,
+        "lower95": 0.5772578389325623,
+        "upper95": 0.6417815129192895
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.5484556937131673,
+        "lower95": 0.529622384606006,
+        "upper95": 0.5672890028203286
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.45833333333333326,
+        "lower95": 0.4230962521367734,
+        "upper95": 0.49357041452989314
+      },
+      "meanTrainingLossReduction": {
+        "mean": 4.5716257472982225,
+        "lower95": 4.0356753549515565,
+        "upper95": 5.107576139644888
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 3.7189903104602116,
+        "lower95": 3.5556659502590597,
+        "upper95": 3.8823146706613634
+      },
+      "meanSaturationFraction": {
+        "mean": 0.01649245273919753,
+        "lower95": 0.01473805708766578,
+        "upper95": 0.018246848390729282
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "pairedEffects": {
+    "absoluteOverFrozenBehavior": {
+      "mean": 0.5442708333333335,
+      "lower95": 0.5351941200769654,
+      "upper95": 0.5533475465897015
+    },
+    "absoluteOverShuffledBehavior": {
+      "mean": 0.41984953703703703,
+      "lower95": 0.3897316213737412,
+      "upper95": 0.4499674527003329
+    },
+    "absoluteOverFrozenTargetProbability": {
+      "mean": 0.5383273598482311,
+      "lower95": 0.5283795770594363,
+      "upper95": 0.5482751426370259
+    },
+    "absoluteOverShuffledTargetProbability": {
+      "mean": 0.42068838941126313,
+      "lower95": 0.39713742134595637,
+      "upper95": 0.4442393574765699
+    },
+    "absoluteOverEnvelopeBehavior": {
+      "mean": 0.2407407407407407,
+      "lower95": 0.21849419344217036,
+      "upper95": 0.26298728803931104
+    }
+  },
+  "decision": "reachable-only-at-absolute-bounds",
+  "acceptance": {
+    "m1TaskCarrierAndReadoutFrozen": true,
+    "diagnosticIsOfflineOnly": true,
+    "developmentAndConfirmationSeedsDisjoint": true,
+    "developmentLearningRateScanComplete": true,
+    "confirmationControlsComplete": true,
+    "allFourRulesComplete": true,
+    "selectedLearningRateFromDevelopmentOnly": true,
+    "exactGradientOptimizerVerified": true,
+    "matchedSearchBudgets": true,
+    "actionReadoutRemainedFrozen": true,
+    "topologyAndConnectionBudgetPreserved": true,
+    "finiteOutputs": true,
+    "stabilityWithinBounds": true,
+    "optimizerEffective": true,
+    "taskSpecificityPassed": true,
+    "envelopeReachabilityPassed": false,
+    "absoluteReachabilityPassed": true,
+    "stagePassed": true,
+    "passed": true
+  },
+  "conclusions": [
+    "开发学习率扫描（B/C/D 行为 / 目标概率）为 0.010: 89.8% / 89.9% · 0.030: 96.2% / 96.5% · 0.080: 98.3% / 98.2%；冻结选择 0.080。",
+    "独立确认 B/C/D 行为：冻结 42.8%，范数包络 oracle 73.2%，绝对边界 oracle 97.3%，乱序目标 oracle 55.3%。",
+    "绝对边界 oracle 相对冻结行为 +54.43 pp [+53.52, +55.33]，相对乱序目标 +41.98 pp [+38.97, +45.00]。",
+    "M1-X 正式决策为 ReachableOnlyAtAbsoluteBounds。",
+    "同一 48 权重子空间只有放宽到载体绝对边界后才可达；当前稳态范数包络是独立瓶颈，在线信用仍未获验证。"
+  ]
+}

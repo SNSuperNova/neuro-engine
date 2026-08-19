@@ -54,6 +54,8 @@ M1-R 随后把“容量不足”拆成信息、形成、信用和读出四层。
 
 M1-F 已完成首个局部规则形成候选。奖励调制节点扰动只读取目标单元自己产生的微扰、本地资格迹和全局标量后果；开发集在 `[0.025, 0.05, 0.10, 0.20]` 中冻结选择 `0.20`。独立确认中候选 B/C/D 为 `48.3%`，比现有基线低 `7.03 pp`，相对相同扰动的随机后果仅 `+0.98 pp [-0.33, 2.30]`；目标概率形成只有 `+3.30 pp`，A 降至 `62.2%`。正式决策为 `ConsequenceIndependent`，候选淘汰。下一步先离线测量现有 48 权重可塑子空间的 oracle 可达上界，不继续追加启发式信用规则。
 
+M1-X 已完成固定可塑子空间的离线可达性诊断。精确梯度 oracle 只改同样 48 个循环权重，节点、输入、拓扑和 A 动作读出全部冻结。独立确认中，冻结权重 B/C/D 为 `42.8%`，原参考范数包络 oracle 为 `73.2%`，但最低新规则只有 `55.8%`；放宽到既有绝对权重边界后达到 `97.3%`，显著胜过乱序目标 `55.3%`。正式决策为 `ReachableOnlyAtAbsoluteBounds`：固定拓扑/读出具有表达能力，当前稳态范数包络才是更具体的限制；在线信用仍未通过。下一步 M1-XE 先定位一致可达所需的最小稳定范数包络。
+
 ## 运行
 
 ```powershell
@@ -79,6 +81,7 @@ cargo run --release --example structural_timescale_lab
 cargo run --release --example structural_group_lab
 cargo run --release --example representation_capacity_lab
 cargo run --release --example rule_formation_lab
+cargo run --release --example reachability_lab
 npm install
 npm run dev
 ```
@@ -111,6 +114,7 @@ src/structural_timescale.rs  M2C-T 同克隆多时长结构作用诊断
 src/structural_group.rs      M2C-G 等预算成组结构与单边加和诊断
 src/representation_capacity.rs M1-R 表征、信用和固定读出因果诊断
 src/rule_formation.rs        M1-F 奖励调制节点扰动与规则形成验收
+src/reachability.rs           M1-X 固定 48 权重离线可达性上界与正式判定
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘

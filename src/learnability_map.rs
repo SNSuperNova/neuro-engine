@@ -9,6 +9,7 @@ use crate::mechanism_m1::{
     M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
 };
 use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
+use crate::reachability::{M1XControl, M1XRuleResult, M1XSeedResult};
 use crate::representation_capacity::{RepresentationCapacitySeedResult, RepresentationRuleResult};
 use crate::rule_formation::{M1FControl, M1FRuleResult, M1FSeedResult};
 use crate::structural_diagnostic::{
@@ -42,6 +43,16 @@ pub(crate) struct RepresentationCapacitySeedProtocol {
     pub probe_evaluation_trials: usize,
     pub probe_ridge: f64,
     pub shuffled_label_repeats: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct M1XSeedProtocol {
+    pub training_trial_count: usize,
+    pub evaluation_trial_count: usize,
+    pub iterations: usize,
+    pub restart_count: usize,
+    pub restart_jitter: f64,
+    pub learning_rate: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -3865,6 +3876,545 @@ fn evaluate_multisymbol_rule_with_probability<M: AdjustmentMechanism>(
         correct as f64 / trial_count.max(1) as f64,
         target_probability_sum / trial_count.max(1) as f64,
     )
+}
+
+const M1X_VARIABLE_COUNT: usize = HIDDEN_COUNT * PLASTIC_RECURRENT_PER_UNIT;
+
+#[derive(Clone)]
+struct OracleForwardStep {
+    hidden_before: [f64; HIDDEN_COUNT],
+    raw_activity: [f64; HIDDEN_COUNT],
+    activity: [f64; HIDDEN_COUNT],
+    modulation: [f64; HIDDEN_COUNT],
+    resource_derivative_active: [bool; HIDDEN_COUNT],
+    loss_gradient: [f64; HIDDEN_COUNT],
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_m1x_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M1XSeedProtocol,
+    control: M1XControl,
+) -> M1XSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_585f_434f_4e54,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let mut rule_results = Vec::new();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let rule_seed =
+            seed ^ 0x4d31_585f_5255_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let mut initial = controller.clone();
+        initial.reset_state();
+        let topology_digest_before = initial.topology_digest();
+        let action_readout_digest_before = initial.action_readout_digest();
+        let (initial_behavior_accuracy, _, initial_target_probability, _) = evaluate_m1x_rule(
+            &initial,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let mut candidate = initial.clone();
+        let (initial_training_loss, final_training_loss, selected_restart) = match control {
+            M1XControl::FrozenWeights => {
+                let weights = m1x_recurrent_weights(&candidate);
+                let (loss, _) = m1x_loss_and_gradient(
+                    &candidate,
+                    rule,
+                    &weights,
+                    protocol.training_trial_count,
+                    rule_seed ^ 0x0054_5241_494e,
+                    false,
+                );
+                (loss, loss, 0)
+            }
+            M1XControl::NormEnvelopeOracle => optimize_m1x_oracle(
+                &mut candidate,
+                rule,
+                protocol,
+                rule_seed ^ 0x4e4f_524d,
+                true,
+                false,
+            ),
+            M1XControl::AbsoluteBoundOracle => optimize_m1x_oracle(
+                &mut candidate,
+                rule,
+                protocol,
+                rule_seed ^ 0x4142_534f,
+                false,
+                false,
+            ),
+            M1XControl::ShuffledTargetOracle => optimize_m1x_oracle(
+                &mut candidate,
+                rule,
+                protocol,
+                rule_seed ^ 0x5348_5546,
+                false,
+                true,
+            ),
+        };
+        candidate.reset_state();
+        let (final_behavior_accuracy, final_argmax_accuracy, final_target_probability, saturation) =
+            evaluate_m1x_rule(
+                &candidate,
+                rule,
+                protocol.evaluation_trial_count,
+                rule_seed ^ 0x0046_494e_414c,
+            );
+        let initial_weights = m1x_recurrent_weights(&initial);
+        let final_weights = m1x_recurrent_weights(&candidate);
+        let mean_relative_weight_drift = initial_weights
+            .iter()
+            .zip(&final_weights)
+            .map(|(before, after)| (after - before).abs() / before.abs().max(1e-6))
+            .sum::<f64>()
+            / M1X_VARIABLE_COUNT as f64;
+        let maximum_absolute_weight = final_weights
+            .iter()
+            .copied()
+            .map(f64::abs)
+            .fold(0.0, f64::max);
+        let action_readout_digest_after = candidate.action_readout_digest();
+        let topology_digest_after = candidate.topology_digest();
+        let finite = [
+            initial_behavior_accuracy,
+            initial_target_probability,
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            final_target_probability,
+            initial_training_loss,
+            final_training_loss,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            saturation,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && candidate.hidden.iter().all(|value| value.is_finite())
+            && candidate.resource.iter().all(|value| value.is_finite())
+            && final_weights.iter().all(|value| value.is_finite());
+        rule_results.push(M1XRuleResult {
+            rule,
+            initial_behavior_accuracy,
+            initial_target_probability,
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            final_target_probability,
+            initial_training_loss,
+            final_training_loss,
+            selected_restart,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            saturation_fraction: saturation,
+            action_readout_digest_before,
+            action_readout_digest_after,
+            topology_digest_before,
+            topology_digest_after,
+            adjustable_connection_count: M1X_VARIABLE_COUNT,
+            finite,
+        });
+    }
+    M1XSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        control,
+        learning_rate: protocol.learning_rate,
+        finite: rule_results.iter().all(|row| row.finite),
+        rule_results,
+    }
+}
+
+fn m1x_recurrent_weights<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+) -> [f64; M1X_VARIABLE_COUNT] {
+    std::array::from_fn(|index| {
+        let target = index / PLASTIC_RECURRENT_PER_UNIT;
+        let slot = index % PLASTIC_RECURRENT_PER_UNIT;
+        let source = controller.recurrent_slots[target][slot];
+        controller.recurrent_weights[target][source]
+    })
+}
+
+fn set_m1x_recurrent_weights<M: AdjustmentMechanism>(
+    controller: &mut MapController<M>,
+    weights: &[f64; M1X_VARIABLE_COUNT],
+) {
+    for target in 0..HIDDEN_COUNT {
+        for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+            let source = controller.recurrent_slots[target][slot];
+            controller.recurrent_weights[target][source] =
+                weights[target * PLASTIC_RECURRENT_PER_UNIT + slot];
+        }
+    }
+}
+
+fn optimize_m1x_oracle(
+    controller: &mut MapController<ReferenceAdjustmentMechanism>,
+    rule: M1Rule,
+    protocol: M1XSeedProtocol,
+    seed: u64,
+    norm_envelope: bool,
+    shuffled_targets: bool,
+) -> (f64, f64, usize) {
+    let base = m1x_recurrent_weights(controller);
+    let mut best_weights = base;
+    let mut best_initial_loss = f64::INFINITY;
+    let mut best_final_loss = f64::INFINITY;
+    let mut best_restart = 0;
+    for restart in 0..protocol.restart_count {
+        let mut weights = base;
+        if restart > 0 {
+            let mut rng =
+                Rng::new(seed ^ 0x0052_4553_5441_5254 ^ (restart as u64).wrapping_mul(SEED_STRIDE));
+            for weight in &mut weights {
+                *weight += rng.signed(protocol.restart_jitter * restart as f64);
+            }
+        }
+        project_m1x_weights(controller, &mut weights, norm_envelope);
+        let training_seed = seed ^ 0x4f50_5449_4d49_5a45;
+        let (initial_loss, _) = m1x_loss_and_gradient(
+            controller,
+            rule,
+            &weights,
+            protocol.training_trial_count,
+            training_seed,
+            shuffled_targets,
+        );
+        let mut first_moment = [0.0; M1X_VARIABLE_COUNT];
+        let mut second_moment = [0.0; M1X_VARIABLE_COUNT];
+        for iteration in 1..=protocol.iterations {
+            let (_, gradient) = m1x_loss_and_gradient(
+                controller,
+                rule,
+                &weights,
+                protocol.training_trial_count,
+                training_seed,
+                shuffled_targets,
+            );
+            let bias_one = 1.0 - 0.9_f64.powi(iteration as i32);
+            let bias_two = 1.0 - 0.999_f64.powi(iteration as i32);
+            for index in 0..M1X_VARIABLE_COUNT {
+                first_moment[index] = 0.9 * first_moment[index] + 0.1 * gradient[index];
+                second_moment[index] =
+                    0.999 * second_moment[index] + 0.001 * gradient[index].powi(2);
+                let mean = first_moment[index] / bias_one;
+                let variance = second_moment[index] / bias_two;
+                weights[index] -= protocol.learning_rate * mean / (variance.sqrt() + 1e-8);
+            }
+            project_m1x_weights(controller, &mut weights, norm_envelope);
+        }
+        let (final_loss, _) = m1x_loss_and_gradient(
+            controller,
+            rule,
+            &weights,
+            protocol.training_trial_count,
+            training_seed,
+            shuffled_targets,
+        );
+        if final_loss < best_final_loss {
+            best_weights = weights;
+            best_initial_loss = initial_loss;
+            best_final_loss = final_loss;
+            best_restart = restart;
+        }
+    }
+    set_m1x_recurrent_weights(controller, &best_weights);
+    (best_initial_loss, best_final_loss, best_restart)
+}
+
+fn project_m1x_weights(
+    controller: &MapController<ReferenceAdjustmentMechanism>,
+    weights: &mut [f64; M1X_VARIABLE_COUNT],
+    norm_envelope: bool,
+) {
+    for target in 0..HIDDEN_COUNT {
+        let offset = target * PLASTIC_RECURRENT_PER_UNIT;
+        if norm_envelope {
+            let norm = weights[offset].hypot(weights[offset + 1]);
+            let reference = controller.reference_recurrent_norms[target];
+            if norm > 1e-12 {
+                weights[offset] *= reference / norm;
+                weights[offset + 1] *= reference / norm;
+            } else {
+                weights[offset] = reference;
+                weights[offset + 1] = 0.0;
+            }
+        } else {
+            weights[offset] = weights[offset].clamp(
+                -controller.config.weight_limit,
+                controller.config.weight_limit,
+            );
+            weights[offset + 1] = weights[offset + 1].clamp(
+                -controller.config.weight_limit,
+                controller.config.weight_limit,
+            );
+        }
+    }
+}
+
+fn m1x_loss_and_gradient(
+    controller: &MapController<ReferenceAdjustmentMechanism>,
+    rule: M1Rule,
+    adjustable_weights: &[f64; M1X_VARIABLE_COUNT],
+    trial_count: usize,
+    seed: u64,
+    shuffled_targets: bool,
+) -> (f64, [f64; M1X_VARIABLE_COUNT]) {
+    let mut recurrent_weights = controller.recurrent_weights;
+    for target in 0..HIDDEN_COUNT {
+        for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+            let source = controller.recurrent_slots[target][slot];
+            recurrent_weights[target][source] =
+                adjustable_weights[target * PLASTIC_RECURRENT_PER_UNIT + slot];
+        }
+    }
+    let mut hidden = [0.0; HIDDEN_COUNT];
+    let mut resource = controller.resource;
+    let mut steps = Vec::with_capacity(
+        trial_count * (controller.config.cue_steps + controller.config.memory_delay_steps),
+    );
+    let mut total_loss = 0.0;
+    let total_steps = controller.config.cue_steps + controller.config.memory_delay_steps;
+    for episode in 0..trial_count {
+        let symbol = (episode + seed.count_ones() as usize) % 4;
+        let target_right = if shuffled_targets {
+            Rng::new(seed ^ 0x004c_4142_454c ^ (episode as u64).wrapping_mul(SEED_STRIDE)).unit()
+                >= 0.5
+        } else {
+            rule.target_right(symbol)
+        };
+        for step in 0..total_steps {
+            let hidden_before = hidden;
+            let resource_before = resource;
+            let sensors = symbol_sensors(
+                step,
+                total_steps,
+                step < controller.config.cue_steps,
+                symbol,
+            );
+            let raw_activity: [f64; HIDDEN_COUNT] = std::array::from_fn(|target| {
+                let input = controller.input_weights[target]
+                    .iter()
+                    .zip(sensors)
+                    .map(|(weight, value)| weight * value)
+                    .sum::<f64>();
+                let recurrent = recurrent_weights[target]
+                    .iter()
+                    .zip(hidden_before)
+                    .map(|(weight, value)| weight * value)
+                    .sum::<f64>();
+                (controller.excitability_gain[target]
+                    * (input + controller.config.hidden_leak * hidden_before[target] + recurrent))
+                    .tanh()
+            });
+            let mut modulation = [1.0; HIDDEN_COUNT];
+            let mut resource_derivative_active = [false; HIDDEN_COUNT];
+            match controller.adjustment_mechanism.resource {
+                ResourceMechanism::Disabled => {
+                    hidden = raw_activity;
+                    resource = [1.0; HIDDEN_COUNT];
+                }
+                ResourceMechanism::Continuous(config) => {
+                    for target in 0..HIDDEN_COUNT {
+                        modulation[target] = config.minimum_modulation
+                            + (1.0 - config.minimum_modulation) * resource_before[target];
+                        hidden[target] = raw_activity[target] * modulation[target];
+                        let proposed = resource_before[target] + config.supply_rate
+                            - config.maintenance_cost
+                            - config.activity_cost * hidden[target].abs();
+                        resource_derivative_active[target] = proposed > 0.0 && proposed < 1.0;
+                        resource[target] = proposed.clamp(0.0, 1.0);
+                    }
+                }
+            }
+            let mut loss_gradient = [0.0; HIDDEN_COUNT];
+            if step + 1 == total_steps {
+                let logits = controller.action_weights.map(|row| {
+                    row.iter()
+                        .zip(hidden)
+                        .map(|(weight, value)| weight * value)
+                        .sum::<f64>()
+                        / controller.config.softmax_temperature
+                });
+                let maximum = logits.into_iter().fold(f64::NEG_INFINITY, f64::max);
+                let exp = logits.map(|value| (value - maximum).exp());
+                let denominator = exp.iter().sum::<f64>();
+                let probabilities = exp.map(|value| value / denominator);
+                let target = usize::from(target_right);
+                total_loss -= probabilities[target].max(1e-12).ln();
+                for (unit, value) in loss_gradient.iter_mut().enumerate() {
+                    *value = (0..ACTION_COUNT)
+                        .map(|action| {
+                            (probabilities[action] - f64::from(action == target))
+                                * controller.action_weights[action][unit]
+                                / controller.config.softmax_temperature
+                        })
+                        .sum::<f64>();
+                }
+            }
+            steps.push(OracleForwardStep {
+                hidden_before,
+                raw_activity,
+                activity: hidden,
+                modulation,
+                resource_derivative_active,
+                loss_gradient,
+            });
+        }
+    }
+    let mut gradient = [0.0; M1X_VARIABLE_COUNT];
+    let mut hidden_adjoint = [0.0; HIDDEN_COUNT];
+    let mut resource_adjoint = [0.0; HIDDEN_COUNT];
+    for forward in steps.iter().rev() {
+        for (adjoint, loss) in hidden_adjoint.iter_mut().zip(forward.loss_gradient) {
+            *adjoint += loss;
+        }
+        let mut hidden_before_adjoint = [0.0; HIDDEN_COUNT];
+        let mut resource_before_adjoint = [0.0; HIDDEN_COUNT];
+        if let ResourceMechanism::Continuous(config) = controller.adjustment_mechanism.resource {
+            for unit in 0..HIDDEN_COUNT {
+                if forward.resource_derivative_active[unit] {
+                    resource_before_adjoint[unit] += resource_adjoint[unit];
+                    hidden_adjoint[unit] -= resource_adjoint[unit]
+                        * config.activity_cost
+                        * forward.activity[unit].signum();
+                }
+                resource_before_adjoint[unit] += hidden_adjoint[unit]
+                    * forward.raw_activity[unit]
+                    * (1.0 - config.minimum_modulation);
+            }
+        }
+        let raw_adjoint: [f64; HIDDEN_COUNT] =
+            std::array::from_fn(|unit| hidden_adjoint[unit] * forward.modulation[unit]);
+        for target in 0..HIDDEN_COUNT {
+            let drive_adjoint = raw_adjoint[target]
+                * (1.0 - forward.raw_activity[target].powi(2))
+                * controller.excitability_gain[target];
+            hidden_before_adjoint[target] += drive_adjoint * controller.config.hidden_leak;
+            for source in 0..HIDDEN_COUNT {
+                hidden_before_adjoint[source] += drive_adjoint * recurrent_weights[target][source];
+            }
+            for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+                let source = controller.recurrent_slots[target][slot];
+                gradient[target * PLASTIC_RECURRENT_PER_UNIT + slot] +=
+                    drive_adjoint * forward.hidden_before[source];
+            }
+        }
+        hidden_adjoint = hidden_before_adjoint;
+        resource_adjoint = resource_before_adjoint;
+    }
+    let scale = 1.0 / trial_count.max(1) as f64;
+    for value in &mut gradient {
+        *value *= scale;
+    }
+    (total_loss * scale, gradient)
+}
+
+fn evaluate_m1x_rule(
+    controller: &MapController<ReferenceAdjustmentMechanism>,
+    rule: M1Rule,
+    trial_count: usize,
+    seed: u64,
+) -> (f64, f64, f64, f64) {
+    let mut evaluation = controller.clone();
+    let mut correct = 0usize;
+    let mut argmax_correct = 0usize;
+    let mut target_probability_sum = 0.0;
+    let mut saturated = 0usize;
+    let mut activity_count = 0usize;
+    for episode in 0..trial_count {
+        let symbol = (episode + seed.count_ones() as usize) % 4;
+        let mut rng =
+            Rng::new(seed ^ 0x4d31_585f_4556_414c ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+        let trial = evaluation.symbol_trial(rule, symbol, &mut rng, 0.0, false, true);
+        let target = usize::from(trial.target_right);
+        correct += usize::from(trial.chosen_right == trial.target_right);
+        argmax_correct +=
+            usize::from(usize::from(trial.probabilities[1] > trial.probabilities[0]) == target);
+        target_probability_sum += trial.probabilities[target];
+        for step in &trial.activity {
+            saturated += step.iter().filter(|value| value.abs() >= 0.95).count();
+            activity_count += step.len();
+        }
+    }
+    (
+        correct as f64 / trial_count.max(1) as f64,
+        argmax_correct as f64 / trial_count.max(1) as f64,
+        target_probability_sum / trial_count.max(1) as f64,
+        saturated as f64 / activity_count.max(1) as f64,
+    )
+}
+
+pub(crate) fn verify_m1x_oracle_gradient(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+) -> bool {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4752_4144_4348_454b,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let weights = m1x_recurrent_weights(&controller);
+    let (_, gradient) = m1x_loss_and_gradient(
+        &controller,
+        M1Rule::B,
+        &weights,
+        8,
+        seed ^ 0x4752_4144_0101,
+        false,
+    );
+    let epsilon = 1e-6;
+    [0, 7, 23, 47].into_iter().all(|index| {
+        let mut left = weights;
+        let mut right = weights;
+        left[index] -= epsilon;
+        right[index] += epsilon;
+        let left_loss = m1x_loss_and_gradient(
+            &controller,
+            M1Rule::B,
+            &left,
+            8,
+            seed ^ 0x4752_4144_0101,
+            false,
+        )
+        .0;
+        let right_loss = m1x_loss_and_gradient(
+            &controller,
+            M1Rule::B,
+            &right,
+            8,
+            seed ^ 0x4752_4144_0101,
+            false,
+        )
+        .0;
+        let numerical = (right_loss - left_loss) / (2.0 * epsilon);
+        let denominator = numerical.abs().max(gradient[index].abs()).max(1e-6);
+        (numerical - gradient[index]).abs() / denominator < 2e-4
+    })
 }
 
 pub(crate) fn run_representation_capacity_seed(

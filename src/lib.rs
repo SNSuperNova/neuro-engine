@@ -19,6 +19,7 @@ pub mod mechanism_m1;
 pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
+pub mod reachability;
 pub mod representation_capacity;
 pub mod rule_formation;
 pub mod structural_diagnostic;
@@ -128,6 +129,11 @@ pub use network::{
     NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
     Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
     simulate_network, simulate_network_with_limits,
+};
+pub use reachability::{
+    M1X_LEARNING_RATE_COUNT, M1XAcceptanceReport, M1XConfig, M1XControl, M1XControlSummary,
+    M1XDecision, M1XLearningRateSummary, M1XPairedEffects, M1XPublishedResult, M1XResult,
+    M1XRuleResult, M1XSeedResult, run_m1x_experiment,
 };
 pub use representation_capacity::{
     RepresentationCapacityAcceptanceReport, RepresentationCapacityConfig,

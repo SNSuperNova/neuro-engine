@@ -2,6 +2,7 @@
 //! primitives for Neuro Engine.
 
 pub mod adaptive_mechanism;
+pub mod credit_decomposition;
 pub mod embodied;
 pub mod experiment;
 pub mod gate_a;
@@ -33,6 +34,13 @@ pub use adaptive_mechanism::{
     HomeostasisAdjustment, HomeostasisObservation, MechanismStateContract, PlasticityAdjustment,
     PlasticityObservation, REFERENCE_MECHANISM_ID, REFERENCE_SUBSTRATE_VERSION,
     ReferenceSubstrateManifest, VariableContract, reference_substrate_manifest,
+};
+pub use credit_decomposition::{
+    M1CD_CHECKPOINT_COUNT, M1CD_COMPONENT_COUNT, M1CD_CONTROL_COUNT, M1CDAcceptanceReport,
+    M1CDCheckpointResult, M1CDCheckpointSummary, M1CDComponent, M1CDComponentResult,
+    M1CDComponentSummary, M1CDConfig, M1CDControl, M1CDControlResult, M1CDControlSummary,
+    M1CDDecision, M1CDOnlineSummary, M1CDPairedEffects, M1CDPublishedResult, M1CDResult,
+    M1CDRuleResult, M1CDSeedResult, M1CDVectorMetrics, run_m1cd_experiment,
 };
 pub use embodied::{
     ACTION_COUNT, AdaptiveController, AgentAction, ArenaConfig, BehaviorFrame, BehaviorTrace,

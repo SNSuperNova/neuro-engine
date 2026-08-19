@@ -161,7 +161,7 @@ M1-XE 已用相同 oracle 完成统一参考范数扫描。开发与独立确认
 
 M1-NE 随后冻结 `1.5×`，用 `1.0×` 基线、`1.5×` 冻结、随机后果及 oracle 上界测试既有奖励局部调整。候选相对冻结与随机后果的 B/C/D 行为分别提高 `14.13 pp` 与 `10.85 pp`，说明存在后果特异信用；但最终行为只有 `59.0%`，最低新规则 `49.1%`，而 oracle 为 `88.1%`。正式决策为 `AmplitudeNecessaryButInsufficient`。
 
-下一步 M1-CD 不立即追加机制，而先在隔离克隆中分解实际局部更新与同状态 oracle 下降方向的余弦对齐、符号一致率、幅度比，以及资格迹、动作反馈、资源和内稳态的抵消。只有瓶颈可归因于一个在线可观测因子，才允许做一个最小修订。在此之前不进入 M3、Scale 0，不增加节点、总连接数、训练预算或可训练读出。正式记录见 [experiments/norm-enabled-sufficiency-v1.1.md](experiments/norm-enabled-sufficiency-v1.1.md)。
+M1-CD 随后完成隔离分解。真实后果 raw / applied / total 余弦为 `0.033 / 0.298 / 0.191`，total 生产性投影只有 `0.0142`。真实后果相对随机后果有 `+0.079` 余弦优势，但相对保留同数值多重集的置乱资格迹为 `-0.020 [-0.053, 0.013]`；内稳态抵消约 `17.6%`，没有达到主导门槛。正式决策为 `EligibilityUninformative`。这说明软边界提供了可行域几何投影，但现有资格的连接归属没有可靠边际作用信息。下一步只做 M1-ER 离线资格路由反事实，不写回在线轨迹。正式记录见 [experiments/credit-decomposition-v1.2.md](experiments/credit-decomposition-v1.2.md)。在此之前不进入 M3、Scale 0，不增加节点、总连接数、训练预算或可训练读出。
 
 ### 分支纪律
 

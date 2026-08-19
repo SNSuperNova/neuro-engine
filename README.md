@@ -56,6 +56,8 @@ M1-F 已完成首个局部规则形成候选。奖励调制节点扰动只读取
 
 M1-NE 已完成 `1.5×` 条件下的在线充分性因果测试。既有奖励局部规则在独立确认中达到 B/C/D 行为 `59.0%`、目标概率 `59.7%`、最低新规则 `49.1%`；它相对同初态冻结提升 `14.13 pp`，相对随机后果提升 `10.85 pp`，说明存在真实但不充分的后果信用。相同 `1.5×` 空间的 oracle 达到 `88.1%`。正式决策为 `AmplitudeNecessaryButInsufficient`：幅度空间不是当前唯一瓶颈，下一步只分解局部信用强度、噪声和方向对齐，不继续放大范数或增加节点。
 
+M1-CD 已完成该分解。真实后果 total 更新与 oracle 下降方向余弦为 `0.191`、符号一致率 `64.2%`，但生产性投影只有 `0.0142`；真实后果相对随机后果有余弦优势 `+0.079`，相对保持同数值分布的置乱资格迹却为 `-0.020 [-0.053, 0.013]`。软边界使 applied 余弦从 raw 的 `0.033` 提升到 `0.298`，随机/置乱对照也获得类似几何对齐；内稳态只抵消约 `17.6%`，不是主因。正式决策为 `EligibilityUninformative`：下一步先做不写回的资格路由反事实诊断，不能直接调高学习率、延长训练或扩节点。
+
 ## 运行
 
 ```powershell
@@ -84,6 +86,7 @@ cargo run --release --example rule_formation_lab
 cargo run --release --example reachability_lab
 cargo run --release --example reachability_envelope_lab
 cargo run --release --example norm_enabled_sufficiency_lab
+cargo run --release --example credit_decomposition_lab
 npm install
 npm run dev
 ```
@@ -119,6 +122,7 @@ src/rule_formation.rs        M1-F 奖励调制节点扰动与规则形成验收
 src/reachability.rs           M1-X 固定 48 权重离线可达性上界与正式判定
 src/reachability_envelope.rs  M1-XE 统一参考范数边界、独立确认与稳定窗口判定
 src/norm_enabled_sufficiency.rs M1-NE 1.5× 在线充分性、因果对照与信用缺口判定
+src/credit_decomposition.rs M1-CD 局部更新四段分解、配对资格对照与正式判定
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -163,6 +167,7 @@ experiments/                版本化结果与失败记录
 - [experiments/map0-v0.1.md](experiments/map0-v0.1.md)：稳定可学习性地图的正式负结果与机制边界；
 - [experiments/map1-v0.2.md](experiments/map1-v0.2.md)：双时间尺度内稳态的配对负结果；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
+- [experiments/credit-decomposition-v1.2.md](experiments/credit-decomposition-v1.2.md)：M1-CD 更新方向、有效幅度、资格归属与稳态抵消诊断。
 
 ## 原则
 

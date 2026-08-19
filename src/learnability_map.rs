@@ -5,6 +5,10 @@ use crate::adaptive_mechanism::{
     HomeostasisObservation, MechanismStateContract, PlasticityAdjustment, PlasticityObservation,
     REFERENCE_MECHANISM_ID,
 };
+use crate::credit_decomposition::{
+    M1CDCheckpointResult, M1CDComponent, M1CDComponentResult, M1CDControl, M1CDControlResult,
+    M1CDRuleResult, M1CDSeedResult, M1CDVectorMetrics,
+};
 use crate::mechanism_m1::{
     M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
 };
@@ -57,6 +61,17 @@ pub(crate) struct M1XSeedProtocol {
     pub restart_count: usize,
     pub restart_jitter: f64,
     pub learning_rate: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct M1CDSeedProtocol {
+    pub online_trial_count: usize,
+    pub evaluation_trial_count: usize,
+    pub exploration: f64,
+    pub norm_multiplier: f64,
+    pub checkpoints: [usize; 5],
+    pub diagnostic_trial_count: usize,
+    pub oracle_trial_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -4034,6 +4049,462 @@ pub(crate) fn run_m1ne_seed(
         norm_multiplier: control.norm_multiplier(),
         finite: rule_results.iter().all(|row| row.finite),
         rule_results,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum M1CDEligibilityMode {
+    Original,
+    Shuffled(usize),
+}
+
+#[derive(Clone, Copy)]
+struct M1CDUpdateVectors {
+    raw: [f64; M1X_VARIABLE_COUNT],
+    applied: [f64; M1X_VARIABLE_COUNT],
+    homeostasis: [f64; M1X_VARIABLE_COUNT],
+    total: [f64; M1X_VARIABLE_COUNT],
+}
+
+impl M1CDUpdateVectors {
+    fn zero() -> Self {
+        Self {
+            raw: [0.0; M1X_VARIABLE_COUNT],
+            applied: [0.0; M1X_VARIABLE_COUNT],
+            homeostasis: [0.0; M1X_VARIABLE_COUNT],
+            total: [0.0; M1X_VARIABLE_COUNT],
+        }
+    }
+
+    fn add(&mut self, other: Self) {
+        for index in 0..M1X_VARIABLE_COUNT {
+            self.raw[index] += other.raw[index];
+            self.applied[index] += other.applied[index];
+            self.homeostasis[index] += other.homeostasis[index];
+            self.total[index] += other.total[index];
+        }
+    }
+
+    fn scale(&mut self, scale: f64) {
+        for values in [
+            &mut self.raw,
+            &mut self.applied,
+            &mut self.homeostasis,
+            &mut self.total,
+        ] {
+            for value in values {
+                *value *= scale;
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_m1cd_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M1CDSeedProtocol,
+) -> M1CDSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_4344_434f_5245,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    set_reference_norm_multiplier(&mut controller, protocol.norm_multiplier);
+    controller.reset_state();
+    let mut rule_results = Vec::new();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let mut candidate = controller.clone();
+        candidate.reset_state();
+        let rule_seed =
+            seed ^ 0x4d31_4344_5255_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let (initial_behavior_accuracy, _, initial_target_probability, _) = evaluate_m1x_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let action_readout_digest_before = candidate.action_readout_digest();
+        let topology_digest_before = candidate.topology_digest();
+        let mut checkpoints = Vec::new();
+        for episode in 0..=protocol.online_trial_count {
+            if protocol.checkpoints.contains(&episode) {
+                checkpoints.push(m1cd_checkpoint(
+                    &candidate, rule, episode, rule_seed, protocol,
+                ));
+            }
+            if episode == protocol.online_trial_count {
+                break;
+            }
+            let symbol = (episode + rule_seed.count_ones() as usize) % 4;
+            let mut action_rng = Rng::new(
+                rule_seed ^ 0x4d31_4344_4143_544e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = candidate.symbol_trial(
+                rule,
+                symbol,
+                &mut action_rng,
+                protocol.exploration,
+                false,
+                false,
+            );
+            candidate.adapt_trial(
+                &trial,
+                Map0Control::Baseline,
+                false,
+                rule_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+        }
+        candidate.reset_state();
+        let (final_behavior_accuracy, _, final_target_probability, _) = evaluate_m1x_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x0046_494e_414c,
+        );
+        let action_readout_digest_after = candidate.action_readout_digest();
+        let topology_digest_after = candidate.topology_digest();
+        let finite = [
+            initial_behavior_accuracy,
+            final_behavior_accuracy,
+            initial_target_probability,
+            final_target_probability,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && checkpoints.iter().all(|row| row.finite)
+            && m1x_recurrent_weights(&candidate)
+                .iter()
+                .all(|value| value.is_finite());
+        rule_results.push(M1CDRuleResult {
+            rule,
+            initial_behavior_accuracy,
+            final_behavior_accuracy,
+            initial_target_probability,
+            final_target_probability,
+            checkpoints,
+            action_readout_digest_before,
+            action_readout_digest_after,
+            topology_digest_before,
+            topology_digest_after,
+            adjustable_connection_count: M1X_VARIABLE_COUNT,
+            finite,
+        });
+    }
+    M1CDSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        norm_multiplier: protocol.norm_multiplier,
+        finite: rule_results.iter().all(|row| row.finite),
+        rule_results,
+    }
+}
+
+fn m1cd_checkpoint(
+    controller: &MapController<ReferenceAdjustmentMechanism>,
+    rule: M1Rule,
+    checkpoint: usize,
+    rule_seed: u64,
+    protocol: M1CDSeedProtocol,
+) -> M1CDCheckpointResult {
+    let diagnostic_seed =
+        rule_seed ^ 0x4d31_4344_4449_4147 ^ (checkpoint as u64).wrapping_mul(SEED_STRIDE);
+    let weights = m1x_recurrent_weights(controller);
+    let (_, gradient) = m1x_loss_and_gradient(
+        controller,
+        rule,
+        &weights,
+        protocol.oracle_trial_count,
+        diagnostic_seed,
+        false,
+    );
+    let oracle_descent =
+        gradient.map(|value| -controller.parameters.internal_learning_rate * value);
+    let oracle_descent_norm = vector_norm(&oracle_descent);
+    let controls = M1CDControl::ALL
+        .into_iter()
+        .map(|control| {
+            m1cd_control_batch(
+                controller,
+                rule,
+                control,
+                diagnostic_seed,
+                protocol,
+                &oracle_descent,
+            )
+        })
+        .collect::<Vec<_>>();
+    M1CDCheckpointResult {
+        trial: checkpoint,
+        oracle_descent_norm,
+        finite: oracle_descent_norm.is_finite() && controls.iter().all(|row| row.finite),
+        controls,
+    }
+}
+
+fn m1cd_control_batch(
+    controller: &MapController<ReferenceAdjustmentMechanism>,
+    rule: M1Rule,
+    control: M1CDControl,
+    diagnostic_seed: u64,
+    protocol: M1CDSeedProtocol,
+    oracle_descent: &[f64; M1X_VARIABLE_COUNT],
+) -> M1CDControlResult {
+    let mut clone = controller.clone();
+    clone.reset_state();
+    let mut vectors = M1CDUpdateVectors::zero();
+    for episode in 0..protocol.diagnostic_trial_count {
+        let symbol = (episode + diagnostic_seed.count_ones() as usize) % 4;
+        let mut action_rng = Rng::new(
+            diagnostic_seed ^ 0x4143_5449_4f4e_0001 ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+        );
+        let trial = clone.symbol_trial(
+            rule,
+            symbol,
+            &mut action_rng,
+            protocol.exploration,
+            false,
+            false,
+        );
+        let random_reward = control == M1CDControl::RandomConsequence;
+        let eligibility = if control == M1CDControl::ShuffledEligibility {
+            M1CDEligibilityMode::Shuffled(
+                1 + ((diagnostic_seed as usize).wrapping_add(episode * 17)
+                    % (M1X_VARIABLE_COUNT - 1)),
+            )
+        } else {
+            M1CDEligibilityMode::Original
+        };
+        vectors.add(clone.m1cd_adapt_trial(
+            &trial,
+            random_reward,
+            diagnostic_seed ^ 0x5245_5741_5244_0001 ^ episode as u64,
+            eligibility,
+        ));
+    }
+    vectors.scale(1.0 / protocol.diagnostic_trial_count as f64);
+    let rows = [
+        (M1CDComponent::RawProposal, &vectors.raw),
+        (M1CDComponent::AppliedPlasticity, &vectors.applied),
+        (M1CDComponent::HomeostasisCorrection, &vectors.homeostasis),
+        (M1CDComponent::TotalUpdate, &vectors.total),
+    ];
+    let components = rows
+        .into_iter()
+        .map(|(component, values)| M1CDComponentResult {
+            component,
+            metrics: vector_metrics(values, oracle_descent),
+        })
+        .collect::<Vec<_>>();
+    let raw_norm = vector_norm(&vectors.raw);
+    let applied_norm = vector_norm(&vectors.applied);
+    let raw_to_applied_attenuation = if raw_norm > 1e-15 {
+        applied_norm / raw_norm
+    } else {
+        0.0
+    };
+    let raw_applied_cosine = vector_cosine(&vectors.raw, &vectors.applied);
+    let applied_projection = productive_projection(&vectors.applied, oracle_descent);
+    let total_projection = productive_projection(&vectors.total, oracle_descent);
+    let homeostasis_projection_loss = if applied_projection > 1e-15 {
+        ((applied_projection - total_projection) / applied_projection).clamp(-1.0, 1.0)
+    } else {
+        0.0
+    };
+    let finite = components.iter().all(|row| row.metrics.finite)
+        && [
+            raw_to_applied_attenuation,
+            raw_applied_cosine,
+            homeostasis_projection_loss,
+        ]
+        .into_iter()
+        .all(f64::is_finite);
+    M1CDControlResult {
+        control,
+        components,
+        raw_to_applied_attenuation,
+        raw_applied_cosine,
+        homeostasis_projection_loss,
+        finite,
+    }
+}
+
+impl MapController<ReferenceAdjustmentMechanism> {
+    fn m1cd_adapt_trial(
+        &mut self,
+        trial: &Trial,
+        random_reward: bool,
+        reward_seed: u64,
+        eligibility_mode: M1CDEligibilityMode,
+    ) -> M1CDUpdateVectors {
+        let before = m1x_recurrent_weights(self);
+        let rewarded_choice = if random_reward {
+            Rng::new(reward_seed).unit() >= 0.5
+        } else {
+            trial.target_right
+        };
+        let reward = if trial.chosen_right == rewarded_choice {
+            1.0
+        } else {
+            -1.0
+        };
+        self.baseline = self.config.reward_baseline_decay * self.baseline
+            + (1.0 - self.config.reward_baseline_decay) * reward;
+        let chosen = usize::from(trial.chosen_right);
+        let feedback: [f64; HIDDEN_COUNT] = std::array::from_fn(|hidden| {
+            (0..ACTION_COUNT)
+                .map(|action| {
+                    (f64::from(action == chosen) - trial.probabilities[action])
+                        * self.action_weights[action][hidden]
+                })
+                .sum::<f64>()
+        });
+        let flat_eligibility: [f64; M1X_VARIABLE_COUNT] = std::array::from_fn(|index| {
+            trial.recurrent_eligibility[index / PLASTIC_RECURRENT_PER_UNIT]
+                [index % PLASTIC_RECURRENT_PER_UNIT]
+        });
+        let eligibility_at = |index: usize| match eligibility_mode {
+            M1CDEligibilityMode::Original => flat_eligibility[index],
+            M1CDEligibilityMode::Shuffled(offset) => {
+                flat_eligibility[(index + offset) % M1X_VARIABLE_COUNT]
+            }
+        };
+        let mut raw = [0.0; M1X_VARIABLE_COUNT];
+        for (target, feedback_value) in feedback.into_iter().enumerate() {
+            for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+                let index = target * PLASTIC_RECURRENT_PER_UNIT + slot;
+                let source = self.recurrent_slots[target][slot];
+                let delta = self.parameters.internal_learning_rate
+                    * reward
+                    * feedback_value
+                    * eligibility_at(index);
+                raw[index] = delta;
+                let action = self
+                    .adjustment_mechanism
+                    .adjust_plasticity(PlasticityObservation {
+                        target_unit: target,
+                        source_unit: source,
+                        current_weight: self.recurrent_weights[target][source],
+                        proposed_delta: delta,
+                        reference_norm: self.reference_recurrent_norms[target],
+                        absolute_weight_limit: self.config.weight_limit,
+                        resource_level: self.resource[target],
+                    });
+                self.recurrent_weights[target][source] = if action.recurrent_weight.is_finite() {
+                    action
+                        .recurrent_weight
+                        .clamp(-self.config.weight_limit, self.config.weight_limit)
+                } else {
+                    self.recurrent_weights[target][source]
+                };
+                self.resource[target] = if action.resource_level.is_finite() {
+                    action.resource_level.clamp(0.0, 1.0)
+                } else {
+                    self.resource[target]
+                };
+            }
+        }
+        let after_plasticity = m1x_recurrent_weights(self);
+        if self.parameters.homeostasis_strength > 0.0 {
+            self.apply_homeostasis(trial, self.parameters.homeostasis_strength);
+        }
+        let after_homeostasis = m1x_recurrent_weights(self);
+        let applied = std::array::from_fn(|index| after_plasticity[index] - before[index]);
+        let homeostasis =
+            std::array::from_fn(|index| after_homeostasis[index] - after_plasticity[index]);
+        let total = std::array::from_fn(|index| after_homeostasis[index] - before[index]);
+        M1CDUpdateVectors {
+            raw,
+            applied,
+            homeostasis,
+            total,
+        }
+    }
+}
+
+fn vector_norm(values: &[f64; M1X_VARIABLE_COUNT]) -> f64 {
+    values.iter().map(|value| value * value).sum::<f64>().sqrt()
+}
+
+fn vector_cosine(left: &[f64; M1X_VARIABLE_COUNT], right: &[f64; M1X_VARIABLE_COUNT]) -> f64 {
+    let denominator = vector_norm(left) * vector_norm(right);
+    if denominator > 1e-15 {
+        left.iter().zip(right).map(|(a, b)| a * b).sum::<f64>() / denominator
+    } else {
+        0.0
+    }
+}
+
+fn productive_projection(
+    values: &[f64; M1X_VARIABLE_COUNT],
+    oracle_descent: &[f64; M1X_VARIABLE_COUNT],
+) -> f64 {
+    let denominator = oracle_descent
+        .iter()
+        .map(|value| value * value)
+        .sum::<f64>();
+    if denominator > 1e-30 {
+        values
+            .iter()
+            .zip(oracle_descent)
+            .map(|(value, oracle)| value * oracle)
+            .sum::<f64>()
+            / denominator
+    } else {
+        0.0
+    }
+}
+
+fn vector_metrics(
+    values: &[f64; M1X_VARIABLE_COUNT],
+    oracle_descent: &[f64; M1X_VARIABLE_COUNT],
+) -> M1CDVectorMetrics {
+    let update_norm = vector_norm(values);
+    let oracle_norm = vector_norm(oracle_descent);
+    let sign_denominator = oracle_descent
+        .iter()
+        .filter(|value| value.abs() > 1e-12)
+        .count();
+    let sign_matches = values
+        .iter()
+        .zip(oracle_descent)
+        .filter(|(_, oracle)| oracle.abs() > 1e-12)
+        .filter(|(value, oracle)| value.abs() > 1e-12 && value.signum() == oracle.signum())
+        .count();
+    let metrics = M1CDVectorMetrics {
+        cosine_alignment: vector_cosine(values, oracle_descent),
+        sign_agreement: sign_matches as f64 / sign_denominator.max(1) as f64,
+        norm_ratio: if oracle_norm > 1e-15 {
+            update_norm / oracle_norm
+        } else {
+            0.0
+        },
+        productive_projection: productive_projection(values, oracle_descent),
+        vector_norm: update_norm,
+        finite: false,
+    };
+    M1CDVectorMetrics {
+        finite: [
+            metrics.cosine_alignment,
+            metrics.sign_agreement,
+            metrics.norm_ratio,
+            metrics.productive_projection,
+            metrics.vector_norm,
+        ]
+        .into_iter()
+        .all(f64::is_finite),
+        ..metrics
     }
 }
 

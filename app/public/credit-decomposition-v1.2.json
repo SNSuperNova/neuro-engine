@@ -1,0 +1,1189 @@
+{
+  "version": "adaptive-mechanism/m1cd-v1.2-local-credit-decomposition",
+  "config": {
+    "m1neProtocol": {
+      "m1xeProtocol": {
+        "m1xProtocol": {
+          "m1Protocol": {
+            "map2Protocol": {
+              "map2bProtocol": {
+                "map2aProtocol": {
+                  "map1Protocol": {
+                    "seed": 5566818783092277505,
+                    "developmentConfigCount": 48,
+                    "developmentSeedCount": 8,
+                    "confirmationSeedCount": 12,
+                    "confirmationCandidateCount": 6,
+                    "recurrentGainRange": [
+                      0.1,
+                      0.45
+                    ],
+                    "internalLearningRateRange": [
+                      0.06,
+                      0.16
+                    ],
+                    "homeostasisStrengthRange": [
+                      0.25,
+                      1.0
+                    ],
+                    "explorationRateRange": [
+                      0.04,
+                      0.18
+                    ],
+                    "activityTarget": 0.35,
+                    "activityEmaRate": 0.05,
+                    "excitabilityAdjustmentRate": 0.02,
+                    "weightNormRelaxationRate": 0.03,
+                    "minimumExcitabilityGain": 0.65,
+                    "maximumExcitabilityGain": 1.35,
+                    "probeProtocol": {
+                      "seed": 5566818783092277505,
+                      "developmentConfigCount": 64,
+                      "developmentSeedCount": 8,
+                      "confirmationSeedCount": 12,
+                      "confirmationCandidateCount": 6,
+                      "pretrainingEpisodes": 320,
+                      "adaptationEpisodes": 240,
+                      "evaluationEpisodes": 80,
+                      "thresholdCheckInterval": 20,
+                      "cueSteps": 2,
+                      "memoryDelaySteps": 8,
+                      "rewardDelaySteps": 6,
+                      "eligibilityDecay": 0.88,
+                      "hiddenLeak": 0.8,
+                      "policyLearningRate": 0.055,
+                      "softmaxTemperature": 0.4,
+                      "rewardBaselineDecay": 0.92,
+                      "weightLimit": 2.5,
+                      "recurrentGainRange": [
+                        0.1,
+                        0.45
+                      ],
+                      "internalLearningRateRange": [
+                        0.06,
+                        0.16
+                      ],
+                      "homeostasisStrengthRange": [
+                        0.25,
+                        1.0
+                      ],
+                      "explorationRateRange": [
+                        0.04,
+                        0.18
+                      ],
+                      "thresholds": {
+                        "memoryAccuracy": 0.65,
+                        "delayedCreditAccuracy": 0.65,
+                        "reversalAccuracy": 0.7,
+                        "restorationAccuracy": 0.7,
+                        "repeatedReversalAccuracy": 0.7,
+                        "perturbationRecoveryAccuracy": 0.65,
+                        "minimumPerturbationDamageDrop": 0.15,
+                        "minimumPerturbationRecoveryGain": 0.1,
+                        "maximumSaturationFraction": 0.25,
+                        "maximumSynchronyFraction": 0.5,
+                        "maximumRelativeWeightDrift": 1.0,
+                        "minimumRegionFormationProbability": 0.5,
+                        "minimumRegionSize": 3,
+                        "minimumCausalProbabilityDrop": 0.15,
+                        "minimumCausalProbeScoreDrop": 0.1
+                      }
+                    }
+                  },
+                  "softBoundScale": 1.0,
+                  "minimumMeanWeightDriftReduction": 0.25,
+                  "maximumAccuracyDegradation": 0.02
+                },
+                "initialResource": 0.75,
+                "supplyRate": 0.007,
+                "maintenanceCost": 0.001,
+                "activityCost": 0.012,
+                "plasticityCost": 0.05,
+                "minimumModulation": 0.6,
+                "minimumNoSupplyResourceDrop": 0.2,
+                "minimumNoSupplyProbeScoreDrop": 0.1,
+                "maximumProbeScoreDegradation": 0.02,
+                "maximumWeightDriftIncrease": 0.05
+              },
+              "streamTrialCount": 720,
+              "minimumChangeGap": 30,
+              "changeProbability": 0.025,
+              "settlingWindow": 20,
+              "exploration": 0.12,
+              "minimumRuleChanges": 5,
+              "minimumOverallAccuracy": 0.6,
+              "minimumSettledAccuracy": 0.65,
+              "maximumRelativeWeightDrift": 1.0,
+              "minimumResourceLevel": 0.05,
+              "minimumFormationProbability": 0.5,
+              "minimumRegionSize": 3,
+              "maximumResetAdvantage": 0.05,
+              "minimumNoSupplyAccuracyDrop": 0.1,
+              "minimumFrozenAccuracyDrop": 0.1
+            },
+            "referenceParameterIds": [
+              0,
+              16,
+              20,
+              21,
+              29,
+              45
+            ],
+            "developmentSeedCount": 4,
+            "confirmationSeedCount": 8,
+            "phaseTrialCount": 240,
+            "evaluationTrialCount": 48,
+            "thresholdCheckInterval": 20,
+            "accuracyThreshold": 0.7,
+            "minimumRetainedAccuracy": 0.6,
+            "maximumRetentionDrop": 0.15,
+            "maximumRelativeWeightDrift": 1.0,
+            "minimumMeanResourceLevel": 0.2,
+            "minimumSingleRuleAccuracy": 0.7,
+            "minimumRetentionProbability": 0.5,
+            "minimumCausalAccuracyDrop": 0.05,
+            "maximumResetRetentionAdvantage": 0.05
+          },
+          "learningRates": [
+            0.01,
+            0.03,
+            0.08
+          ],
+          "oracleIterations": 120,
+          "oracleTrainingTrials": 32,
+          "oracleRestartCount": 3,
+          "restartJitter": 0.08,
+          "minimumNovelBehaviorAccuracy": 0.7,
+          "minimumNovelTargetProbability": 0.7,
+          "minimumSingleNovelAccuracy": 0.65,
+          "minimumOracleAdvantage": 0.1,
+          "minimumLossReduction": 0.1,
+          "maximumSaturationFraction": 0.25
+        },
+        "normMultipliers": [
+          1.0,
+          1.5,
+          2.0,
+          3.0,
+          4.0,
+          6.0,
+          8.0
+        ],
+        "oracleLearningRate": 0.08,
+        "minimumHistoryAccuracy": 0.75
+      },
+      "normMultiplier": 1.5,
+      "minimumHistoryAccuracy": 0.75,
+      "minimumNovelBehaviorAccuracy": 0.7,
+      "minimumNovelTargetProbability": 0.7,
+      "minimumSingleNovelAccuracy": 0.65,
+      "minimumCausalAdvantage": 0.05,
+      "maximumHistoryDegradation": 0.05,
+      "minimumMeanResourceLevel": 0.2,
+      "maximumSaturationFraction": 0.25
+    },
+    "checkpoints": [
+      0,
+      60,
+      120,
+      180,
+      240
+    ],
+    "diagnosticTrialCount": 16,
+    "oracleTrialCount": 16,
+    "minimumDirectionCosine": 0.1,
+    "minimumSignAgreement": 0.55,
+    "minimumControlAdvantage": 0.05,
+    "minimumProductiveProjection": 0.25,
+    "maximumHomeostasisProjectionLoss": 0.5
+  },
+  "frozenM1neArtifactSha256": "3f0bc32245290ae934580e43ab6262c747b9aaa5b0e51f27b68560ff71908dd3",
+  "mechanismContract": [
+    "live trajectory is the frozen M1-NE 1.5x true-consequence online rule",
+    "checkpoint controls run only in isolated clones and never write back",
+    "oracle descent uses exact target-aware gradient only as an offline measuring ruler",
+    "decomposition is raw proposal -> bounded/resource-applied plasticity -> homeostasis correction -> total update"
+  ],
+  "carrierParameters": [
+    {
+      "id": 0,
+      "recurrentGain": 0.275,
+      "internalLearningRate": 0.09333333333333332,
+      "homeostasisStrength": 0.4,
+      "explorationRate": 0.06
+    },
+    {
+      "id": 16,
+      "recurrentGain": 0.28593749999999996,
+      "internalLearningRate": 0.15259259259259259,
+      "homeostasisStrength": 0.64,
+      "explorationRate": 0.1057142857142857
+    },
+    {
+      "id": 20,
+      "recurrentGain": 0.3296875,
+      "internalLearningRate": 0.07851851851851852,
+      "homeostasisStrength": 0.52,
+      "explorationRate": 0.04857142857142857
+    },
+    {
+      "id": 21,
+      "recurrentGain": 0.2421875,
+      "internalLearningRate": 0.11185185185185184,
+      "homeostasisStrength": 0.67,
+      "explorationRate": 0.06857142857142857
+    },
+    {
+      "id": 29,
+      "recurrentGain": 0.2640625,
+      "internalLearningRate": 0.07234567901234568,
+      "homeostasisStrength": 0.28600000000000003,
+      "explorationRate": 0.09142857142857141
+    },
+    {
+      "id": 45,
+      "recurrentGain": 0.25859374999999996,
+      "internalLearningRate": 0.1019753086419753,
+      "homeostasisStrength": 0.526,
+      "explorationRate": 0.13714285714285712
+    }
+  ],
+  "developmentSummaries": [
+    {
+      "control": "true-consequence",
+      "independentRunCount": 24,
+      "components": [
+        {
+          "component": "raw-proposal",
+          "cosineAlignment": {
+            "mean": 0.09587920861052446,
+            "lower95": 0.059736725162622656,
+            "upper95": 0.13202169205842626
+          },
+          "signAgreement": {
+            "mean": 0.5288773148148148,
+            "lower95": 0.5093822963375692,
+            "upper95": 0.5483723332920605
+          },
+          "normRatio": {
+            "mean": 0.15275541928138747,
+            "lower95": 0.12637871173905016,
+            "upper95": 0.17913212682372479
+          },
+          "productiveProjection": {
+            "mean": -0.017314359179993705,
+            "lower95": -0.027461329715567327,
+            "upper95": -0.0071673886444200835
+          }
+        },
+        {
+          "component": "applied-plasticity",
+          "cosineAlignment": {
+            "mean": 0.21399950339979446,
+            "lower95": 0.1598689757658537,
+            "upper95": 0.26813003103373517
+          },
+          "signAgreement": {
+            "mean": 0.6129629629629629,
+            "lower95": 0.5793525216548642,
+            "upper95": 0.6465734042710617
+          },
+          "normRatio": {
+            "mean": 0.06323620292828407,
+            "lower95": 0.05259181162268335,
+            "upper95": 0.07388059423388478
+          },
+          "productiveProjection": {
+            "mean": 0.020487512880366408,
+            "lower95": 0.013850771363816693,
+            "upper95": 0.027124254396916122
+          }
+        },
+        {
+          "component": "homeostasis-correction",
+          "cosineAlignment": {
+            "mean": -0.17044282744668485,
+            "lower95": -0.22301256297997443,
+            "upper95": -0.11787309191339526
+          },
+          "signAgreement": {
+            "mean": 0.3979745370370371,
+            "lower95": 0.3561193546680288,
+            "upper95": 0.4398297194060454
+          },
+          "normRatio": {
+            "mean": 0.01800988097140994,
+            "lower95": 0.01523273767352077,
+            "upper95": 0.020787024269299112
+          },
+          "productiveProjection": {
+            "mean": -0.0024510906038693997,
+            "lower95": -0.003483867672755931,
+            "upper95": -0.0014183135349828684
+          }
+        },
+        {
+          "component": "total-update",
+          "cosineAlignment": {
+            "mean": 0.20627986910594742,
+            "lower95": 0.16455939390896995,
+            "upper95": 0.2480003443029249
+          },
+          "signAgreement": {
+            "mean": 0.6116319444444444,
+            "lower95": 0.5884978062978233,
+            "upper95": 0.6347660825910654
+          },
+          "normRatio": {
+            "mean": 0.05662292534480307,
+            "lower95": 0.04776418384580187,
+            "upper95": 0.06548166684380427
+          },
+          "productiveProjection": {
+            "mean": 0.018036422276497006,
+            "lower95": 0.011992352149392739,
+            "upper95": 0.024080492403601272
+          }
+        }
+      ],
+      "rawToAppliedAttenuation": {
+        "mean": 0.7555366788780372,
+        "lower95": 0.6994429830196264,
+        "upper95": 0.8116303747364481
+      },
+      "rawAppliedCosine": {
+        "mean": 0.10047132662720097,
+        "lower95": 0.042270787632323344,
+        "upper95": 0.1586718656220786
+      },
+      "homeostasisProjectionLoss": {
+        "mean": 0.12238218017064899,
+        "lower95": 0.06340235261275155,
+        "upper95": 0.18136200772854644
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "random-consequence",
+      "independentRunCount": 24,
+      "components": [
+        {
+          "component": "raw-proposal",
+          "cosineAlignment": {
+            "mean": -0.0012774707506347834,
+            "lower95": -0.03110741768838366,
+            "upper95": 0.028552476187114095
+          },
+          "signAgreement": {
+            "mean": 0.5075810185185186,
+            "lower95": 0.48467714931104416,
+            "upper95": 0.5304848877259929
+          },
+          "normRatio": {
+            "mean": 0.22142924590857918,
+            "lower95": 0.17559052536647946,
+            "upper95": 0.2672679664506789
+          },
+          "productiveProjection": {
+            "mean": 0.038332313295102775,
+            "lower95": 0.009238584841171436,
+            "upper95": 0.06742604174903412
+          }
+        },
+        {
+          "component": "applied-plasticity",
+          "cosineAlignment": {
+            "mean": 0.15376604836643074,
+            "lower95": 0.10716879909318067,
+            "upper95": 0.2003632976396808
+          },
+          "signAgreement": {
+            "mean": 0.6067708333333335,
+            "lower95": 0.5698712502356308,
+            "upper95": 0.6436704164310362
+          },
+          "normRatio": {
+            "mean": 0.11151102678034586,
+            "lower95": 0.08549175372935819,
+            "upper95": 0.13753029983133352
+          },
+          "productiveProjection": {
+            "mean": 0.041183954104143605,
+            "lower95": 0.02293727287182233,
+            "upper95": 0.05943063533646488
+          }
+        },
+        {
+          "component": "homeostasis-correction",
+          "cosineAlignment": {
+            "mean": -0.18466525333789627,
+            "lower95": -0.24016362830991325,
+            "upper95": -0.12916687836587928
+          },
+          "signAgreement": {
+            "mean": 0.3924768518518518,
+            "lower95": 0.35092008321370766,
+            "upper95": 0.434033620489996
+          },
+          "normRatio": {
+            "mean": 0.01870909685168626,
+            "lower95": 0.015735515682698847,
+            "upper95": 0.021682678020673675
+          },
+          "productiveProjection": {
+            "mean": -0.003195294868743275,
+            "lower95": -0.004607643694367563,
+            "upper95": -0.0017829460431189866
+          }
+        },
+        {
+          "component": "total-update",
+          "cosineAlignment": {
+            "mean": 0.12419989321065018,
+            "lower95": 0.07685025842905151,
+            "upper95": 0.17154952799224887
+          },
+          "signAgreement": {
+            "mean": 0.5824074074074074,
+            "lower95": 0.5541653718519687,
+            "upper95": 0.6106494429628461
+          },
+          "normRatio": {
+            "mean": 0.10760050054540421,
+            "lower95": 0.08231479707644475,
+            "upper95": 0.13288620401436366
+          },
+          "productiveProjection": {
+            "mean": 0.037988659235400325,
+            "lower95": 0.020407430863596362,
+            "upper95": 0.055569887607204285
+          }
+        }
+      ],
+      "rawToAppliedAttenuation": {
+        "mean": 0.6687900133026603,
+        "lower95": 0.6110727542353352,
+        "upper95": 0.7265072723699854
+      },
+      "rawAppliedCosine": {
+        "mean": 0.5824134798135777,
+        "lower95": 0.5146147332684889,
+        "upper95": 0.6502122263586665
+      },
+      "homeostasisProjectionLoss": {
+        "mean": 0.06166048778615609,
+        "lower95": 0.027606389323610515,
+        "upper95": 0.09571458624870166
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "shuffled-eligibility",
+      "independentRunCount": 24,
+      "components": [
+        {
+          "component": "raw-proposal",
+          "cosineAlignment": {
+            "mean": 0.05710565802155714,
+            "lower95": -0.00029367414601680353,
+            "upper95": 0.11450499018913109
+          },
+          "signAgreement": {
+            "mean": 0.5025462962962963,
+            "lower95": 0.46487356257406637,
+            "upper95": 0.5402190300185263
+          },
+          "normRatio": {
+            "mean": 0.11487778896041885,
+            "lower95": 0.09629504749107723,
+            "upper95": 0.13346053042976047
+          },
+          "productiveProjection": {
+            "mean": 0.017539551466788036,
+            "lower95": 0.003054530603714826,
+            "upper95": 0.032024572329861244
+          }
+        },
+        {
+          "component": "applied-plasticity",
+          "cosineAlignment": {
+            "mean": 0.1562262832095043,
+            "lower95": 0.11479152590347752,
+            "upper95": 0.19766104051553107
+          },
+          "signAgreement": {
+            "mean": 0.5842592592592591,
+            "lower95": 0.5462615078292691,
+            "upper95": 0.6222570106892492
+          },
+          "normRatio": {
+            "mean": 0.10308459354803702,
+            "lower95": 0.07784460488161221,
+            "upper95": 0.12832458221446183
+          },
+          "productiveProjection": {
+            "mean": 0.03781248731998909,
+            "lower95": 0.02376312964965656,
+            "upper95": 0.05186184499032162
+          }
+        },
+        {
+          "component": "homeostasis-correction",
+          "cosineAlignment": {
+            "mean": -0.17980597351447794,
+            "lower95": -0.24368186925086704,
+            "upper95": -0.11593007777808884
+          },
+          "signAgreement": {
+            "mean": 0.38871527777777776,
+            "lower95": 0.3419043902017259,
+            "upper95": 0.4355261653538296
+          },
+          "normRatio": {
+            "mean": 0.019163755880114267,
+            "lower95": 0.01599021384347573,
+            "upper95": 0.022337297916752805
+          },
+          "productiveProjection": {
+            "mean": -0.0031978186005654865,
+            "lower95": -0.004512393432076659,
+            "upper95": -0.0018832437690543137
+          }
+        },
+        {
+          "component": "total-update",
+          "cosineAlignment": {
+            "mean": 0.13704179611611264,
+            "lower95": 0.11164847419227783,
+            "upper95": 0.16243511803994745
+          },
+          "signAgreement": {
+            "mean": 0.5717592592592594,
+            "lower95": 0.5457595705123899,
+            "upper95": 0.5977589480061289
+          },
+          "normRatio": {
+            "mean": 0.094793541142553,
+            "lower95": 0.07142151761815659,
+            "upper95": 0.11816556466694943
+          },
+          "productiveProjection": {
+            "mean": 0.0346146687194236,
+            "lower95": 0.021194350062422915,
+            "upper95": 0.04803498737642428
+          }
+        }
+      ],
+      "rawToAppliedAttenuation": {
+        "mean": 1.303155701516886,
+        "lower95": 1.232348086539233,
+        "upper95": 1.373963316494539
+      },
+      "rawAppliedCosine": {
+        "mean": 0.3649263606063659,
+        "lower95": 0.29715324556033146,
+        "upper95": 0.43269947565240036
+      },
+      "homeostasisProjectionLoss": {
+        "mean": 0.10804877935996658,
+        "lower95": 0.05339772008201993,
+        "upper95": 0.16269983863791324
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "developmentOnlineSummary": {
+    "independentRunCount": 24,
+    "historyInitialBehavior": {
+      "mean": 0.8038194444444443,
+      "lower95": 0.7570605122797268,
+      "upper95": 0.8505783766091618
+    },
+    "historyFinalBehavior": {
+      "mean": 0.728298611111111,
+      "lower95": 0.6518084748847176,
+      "upper95": 0.8047887473375045
+    },
+    "novelInitialBehavior": {
+      "mean": 0.4380787037037037,
+      "lower95": 0.4226221310042973,
+      "upper95": 0.45353527640311014
+    },
+    "novelFinalBehavior": {
+      "mean": 0.5575810185185185,
+      "lower95": 0.5408610413863238,
+      "upper95": 0.5743009956507131
+    },
+    "novelInitialTargetProbability": {
+      "mean": 0.43739640684333664,
+      "lower95": 0.42275416887414397,
+      "upper95": 0.4520386448125293
+    },
+    "novelFinalTargetProbability": {
+      "mean": 0.55916304707872,
+      "lower95": 0.5432368815395121,
+      "upper95": 0.5750892126179279
+    }
+  },
+  "developmentEffects": {
+    "trueOverRandomTotalCosine": {
+      "mean": 0.08207997589529727,
+      "lower95": 0.04628359862050829,
+      "upper95": 0.11787635317008624
+    },
+    "trueOverRandomTotalProjection": {
+      "mean": -0.01995223695890332,
+      "lower95": -0.03239526441551114,
+      "upper95": -0.007509209502295498
+    },
+    "trueOverShuffledTotalCosine": {
+      "mean": 0.06923807298983477,
+      "lower95": 0.02998542433394564,
+      "upper95": 0.1084907216457239
+    },
+    "trueOverShuffledTotalProjection": {
+      "mean": -0.01657824644292659,
+      "lower95": -0.025193932915831132,
+      "upper95": -0.007962559970022046
+    }
+  },
+  "confirmationSummaries": [
+    {
+      "control": "true-consequence",
+      "independentRunCount": 48,
+      "components": [
+        {
+          "component": "raw-proposal",
+          "cosineAlignment": {
+            "mean": 0.033336289079292473,
+            "lower95": -0.00598187685536835,
+            "upper95": 0.07265445501395329
+          },
+          "signAgreement": {
+            "mean": 0.4972222222222222,
+            "lower95": 0.4731967441099213,
+            "upper95": 0.5212477003345231
+          },
+          "normRatio": {
+            "mean": 0.11146923958304966,
+            "lower95": 0.09744810930096298,
+            "upper95": 0.12549036986513634
+          },
+          "productiveProjection": {
+            "mean": 0.006594025431069296,
+            "lower95": -0.00171313341077699,
+            "upper95": 0.01490118427291558
+          }
+        },
+        {
+          "component": "applied-plasticity",
+          "cosineAlignment": {
+            "mean": 0.29834156955575963,
+            "lower95": 0.26675894685057233,
+            "upper95": 0.32992419226094694
+          },
+          "signAgreement": {
+            "mean": 0.7315682870370371,
+            "lower95": 0.7078618831413928,
+            "upper95": 0.7552746909326815
+          },
+          "normRatio": {
+            "mean": 0.04370083617285065,
+            "lower95": 0.03909087993354911,
+            "upper95": 0.04831079241215219
+          },
+          "productiveProjection": {
+            "mean": 0.016894312251392863,
+            "lower95": 0.013729020608561376,
+            "upper95": 0.02005960389422435
+          }
+        },
+        {
+          "component": "homeostasis-correction",
+          "cosineAlignment": {
+            "mean": -0.28911068949201607,
+            "lower95": -0.3325452659711584,
+            "upper95": -0.24567611301287373
+          },
+          "signAgreement": {
+            "mean": 0.28203125000000007,
+            "lower95": 0.24881223856253892,
+            "upper95": 0.3152502614374612
+          },
+          "normRatio": {
+            "mean": 0.013504555490163982,
+            "lower95": 0.011296945886102448,
+            "upper95": 0.015712165094225516
+          },
+          "productiveProjection": {
+            "mean": -0.002676990663171716,
+            "lower95": -0.003392705744523096,
+            "upper95": -0.001961275581820336
+          }
+        },
+        {
+          "component": "total-update",
+          "cosineAlignment": {
+            "mean": 0.19069678723463832,
+            "lower95": 0.16447909562660662,
+            "upper95": 0.21691447884267
+          },
+          "signAgreement": {
+            "mean": 0.6418113425925925,
+            "lower95": 0.6209092182982445,
+            "upper95": 0.6627134668869405
+          },
+          "normRatio": {
+            "mean": 0.03988678791418949,
+            "lower95": 0.03608310617673158,
+            "upper95": 0.0436904696516474
+          },
+          "productiveProjection": {
+            "mean": 0.014217321588221149,
+            "lower95": 0.011365510037405508,
+            "upper95": 0.01706913313903679
+          }
+        }
+      ],
+      "rawToAppliedAttenuation": {
+        "mean": 0.6842066514611038,
+        "lower95": 0.62953015912837,
+        "upper95": 0.7388831437938377
+      },
+      "rawAppliedCosine": {
+        "mean": 0.15767925997209492,
+        "lower95": 0.09991865662307689,
+        "upper95": 0.21543986332111295
+      },
+      "homeostasisProjectionLoss": {
+        "mean": 0.17625608794727135,
+        "lower95": 0.13336153043590912,
+        "upper95": 0.21915064545863358
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "random-consequence",
+      "independentRunCount": 48,
+      "components": [
+        {
+          "component": "raw-proposal",
+          "cosineAlignment": {
+            "mean": -0.00988481794796319,
+            "lower95": -0.04424828154057546,
+            "upper95": 0.024478645644649077
+          },
+          "signAgreement": {
+            "mean": 0.46869212962962964,
+            "lower95": 0.4507012951549883,
+            "upper95": 0.486682964104271
+          },
+          "normRatio": {
+            "mean": 0.17087498702493498,
+            "lower95": 0.14411226958217066,
+            "upper95": 0.1976377044676993
+          },
+          "productiveProjection": {
+            "mean": 0.004430093199422614,
+            "lower95": -0.002706090812092626,
+            "upper95": 0.011566277210937854
+          }
+        },
+        {
+          "component": "applied-plasticity",
+          "cosineAlignment": {
+            "mean": 0.1602222555584491,
+            "lower95": 0.13820057463893518,
+            "upper95": 0.18224393647796303
+          },
+          "signAgreement": {
+            "mean": 0.6497974537037036,
+            "lower95": 0.6239956015986002,
+            "upper95": 0.6755993058088069
+          },
+          "normRatio": {
+            "mean": 0.08335854158264273,
+            "lower95": 0.07232235780444493,
+            "upper95": 0.09439472536084054
+          },
+          "productiveProjection": {
+            "mean": 0.017003133797119735,
+            "lower95": 0.012252133772717045,
+            "upper95": 0.021754133821522425
+          }
+        },
+        {
+          "component": "homeostasis-correction",
+          "cosineAlignment": {
+            "mean": -0.2796273133221684,
+            "lower95": -0.318939064969486,
+            "upper95": -0.24031556167485082
+          },
+          "signAgreement": {
+            "mean": 0.2725983796296296,
+            "lower95": 0.23961750786126174,
+            "upper95": 0.3055792513979974
+          },
+          "normRatio": {
+            "mean": 0.013439234097833583,
+            "lower95": 0.011205410477907646,
+            "upper95": 0.01567305771775952
+          },
+          "productiveProjection": {
+            "mean": -0.0025085547575215755,
+            "lower95": -0.0032078358969464846,
+            "upper95": -0.0018092736180966664
+          }
+        },
+        {
+          "component": "total-update",
+          "cosineAlignment": {
+            "mean": 0.11205514010156647,
+            "lower95": 0.090266005324062,
+            "upper95": 0.13384427487907097
+          },
+          "signAgreement": {
+            "mean": 0.6028935185185187,
+            "lower95": 0.5829413361233504,
+            "upper95": 0.622845700913687
+          },
+          "normRatio": {
+            "mean": 0.08220143228156898,
+            "lower95": 0.07125125958242265,
+            "upper95": 0.09315160498071531
+          },
+          "productiveProjection": {
+            "mean": 0.01449457903959816,
+            "lower95": 0.010031645208990397,
+            "upper95": 0.018957512870205924
+          }
+        }
+      ],
+      "rawToAppliedAttenuation": {
+        "mean": 0.6210740561330866,
+        "lower95": 0.574117513000182,
+        "upper95": 0.6680305992659913
+      },
+      "rawAppliedCosine": {
+        "mean": 0.6713863963066605,
+        "lower95": 0.6344068771506017,
+        "upper95": 0.7083659154627193
+      },
+      "homeostasisProjectionLoss": {
+        "mean": 0.09749540598058648,
+        "lower95": 0.07130401449204773,
+        "upper95": 0.12368679746912523
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "shuffled-eligibility",
+      "independentRunCount": 48,
+      "components": [
+        {
+          "component": "raw-proposal",
+          "cosineAlignment": {
+            "mean": 0.023421975251991776,
+            "lower95": -0.017013311901472313,
+            "upper95": 0.06385726240545586
+          },
+          "signAgreement": {
+            "mean": 0.5309027777777778,
+            "lower95": 0.501260369470591,
+            "upper95": 0.5605451860849646
+          },
+          "normRatio": {
+            "mean": 0.08621500229642755,
+            "lower95": 0.07719262987497459,
+            "upper95": 0.0952373747178805
+          },
+          "productiveProjection": {
+            "mean": -0.00007602840025628158,
+            "lower95": -0.004553057940762437,
+            "upper95": 0.004401001140249873
+          }
+        },
+        {
+          "component": "applied-plasticity",
+          "cosineAlignment": {
+            "mean": 0.2652864848128504,
+            "lower95": 0.23401908081145378,
+            "upper95": 0.296553888814247
+          },
+          "signAgreement": {
+            "mean": 0.7262731481481483,
+            "lower95": 0.6957513617977663,
+            "upper95": 0.7567949344985302
+          },
+          "normRatio": {
+            "mean": 0.05869916600342016,
+            "lower95": 0.05118775745310943,
+            "upper95": 0.06621057455373089
+          },
+          "productiveProjection": {
+            "mean": 0.016595931530411265,
+            "lower95": 0.013199521837713923,
+            "upper95": 0.019992341223108605
+          }
+        },
+        {
+          "component": "homeostasis-correction",
+          "cosineAlignment": {
+            "mean": -0.3043820770338411,
+            "lower95": -0.34585374329901153,
+            "upper95": -0.2629104107686707
+          },
+          "signAgreement": {
+            "mean": 0.27042824074074084,
+            "lower95": 0.23885064205521322,
+            "upper95": 0.30200583942626846
+          },
+          "normRatio": {
+            "mean": 0.01375314290180957,
+            "lower95": 0.011480395885310208,
+            "upper95": 0.01602588991830893
+          },
+          "productiveProjection": {
+            "mean": -0.003040154482481906,
+            "lower95": -0.0037955882994530014,
+            "upper95": -0.002284720665510811
+          }
+        },
+        {
+          "component": "total-update",
+          "cosineAlignment": {
+            "mean": 0.21076758926138184,
+            "lower95": 0.18163882763035288,
+            "upper95": 0.2398963508924108
+          },
+          "signAgreement": {
+            "mean": 0.6788483796296297,
+            "lower95": 0.6519585408754984,
+            "upper95": 0.705738218383761
+          },
+          "normRatio": {
+            "mean": 0.05227994737633646,
+            "lower95": 0.04602243326777759,
+            "upper95": 0.05853746148489533
+          },
+          "productiveProjection": {
+            "mean": 0.01355577704792936,
+            "lower95": 0.010702208944030761,
+            "upper95": 0.01640934515182796
+          }
+        }
+      ],
+      "rawToAppliedAttenuation": {
+        "mean": 1.1772119637321052,
+        "lower95": 1.0624551326655725,
+        "upper95": 1.291968794798638
+      },
+      "rawAppliedCosine": {
+        "mean": 0.3361394143846767,
+        "lower95": 0.30229750599614164,
+        "upper95": 0.3699813227732118
+      },
+      "homeostasisProjectionLoss": {
+        "mean": 0.16518591027284807,
+        "lower95": 0.13429187280817328,
+        "upper95": 0.19607994773752285
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "confirmationOnlineSummary": {
+    "independentRunCount": 48,
+    "historyInitialBehavior": {
+      "mean": 0.8033854166666666,
+      "lower95": 0.7756635287485232,
+      "upper95": 0.8311073045848101
+    },
+    "historyFinalBehavior": {
+      "mean": 0.8333333333333331,
+      "lower95": 0.7855601773910678,
+      "upper95": 0.8811064892755985
+    },
+    "novelInitialBehavior": {
+      "mean": 0.4390914351851853,
+      "lower95": 0.4280355018372225,
+      "upper95": 0.4501473685331481
+    },
+    "novelFinalBehavior": {
+      "mean": 0.5781250000000001,
+      "lower95": 0.5552015443647254,
+      "upper95": 0.6010484556352749
+    },
+    "novelInitialTargetProbability": {
+      "mean": 0.4380633215005291,
+      "lower95": 0.42814389601540886,
+      "upper95": 0.4479827469856494
+    },
+    "novelFinalTargetProbability": {
+      "mean": 0.5829757882540217,
+      "lower95": 0.5620859769688622,
+      "upper95": 0.6038655995391813
+    }
+  },
+  "confirmationCheckpointSummaries": [
+    {
+      "trial": 0,
+      "trueTotalCosine": {
+        "mean": 0.5827047063859349,
+        "lower95": 0.5387172005643719,
+        "upper95": 0.6266922122074978
+      },
+      "trueTotalProductiveProjection": {
+        "mean": 0.043585548491603676,
+        "lower95": 0.033231180043997874,
+        "upper95": 0.05393991693920948
+      },
+      "trueAppliedProductiveProjection": {
+        "mean": 0.04674263562816169,
+        "lower95": 0.03521012115907861,
+        "upper95": 0.058275150097244766
+      },
+      "trueHomeostasisProjectionLoss": {
+        "mean": 0.06831026315112204,
+        "lower95": 0.061014290284217634,
+        "upper95": 0.07560623601802645
+      }
+    },
+    {
+      "trial": 60,
+      "trueTotalCosine": {
+        "mean": 0.10326574557077807,
+        "lower95": 0.0351410087837299,
+        "upper95": 0.17139048235782622
+      },
+      "trueTotalProductiveProjection": {
+        "mean": 0.00820076621572592,
+        "lower95": 0.0025718511172895427,
+        "upper95": 0.013829681314162297
+      },
+      "trueAppliedProductiveProjection": {
+        "mean": 0.011373286895182853,
+        "lower95": 0.005830146375220448,
+        "upper95": 0.016916427415145256
+      },
+      "trueHomeostasisProjectionLoss": {
+        "mean": 0.2392013342848186,
+        "lower95": 0.17674143277776638,
+        "upper95": 0.3016612357918708
+      }
+    },
+    {
+      "trial": 120,
+      "trueTotalCosine": {
+        "mean": 0.13244198853770034,
+        "lower95": 0.07078778092702623,
+        "upper95": 0.19409619614837445
+      },
+      "trueTotalProductiveProjection": {
+        "mean": 0.008909106227046456,
+        "lower95": 0.004638164563290315,
+        "upper95": 0.013180047890802599
+      },
+      "trueAppliedProductiveProjection": {
+        "mean": 0.011777230280651743,
+        "lower95": 0.007390810108920958,
+        "upper95": 0.01616365045238253
+      },
+      "trueHomeostasisProjectionLoss": {
+        "mean": 0.18768045495561148,
+        "lower95": 0.11427010323159889,
+        "upper95": 0.26109080667962403
+      }
+    },
+    {
+      "trial": 180,
+      "trueTotalCosine": {
+        "mean": 0.041751279981199235,
+        "lower95": -0.02910206476739023,
+        "upper95": 0.1126046247297887
+      },
+      "trueTotalProductiveProjection": {
+        "mean": 0.006767610254276684,
+        "lower95": 0.00013813157610816258,
+        "upper95": 0.013397088932445206
+      },
+      "trueAppliedProductiveProjection": {
+        "mean": 0.008684070634132337,
+        "lower95": 0.0024705743803934525,
+        "upper95": 0.014897566887871222
+      },
+      "trueHomeostasisProjectionLoss": {
+        "mean": 0.1153838361092258,
+        "lower95": 0.0410399786392599,
+        "upper95": 0.1897276935791917
+      }
+    },
+    {
+      "trial": 240,
+      "trueTotalCosine": {
+        "mean": 0.09332021569757916,
+        "lower95": 0.010247785257085473,
+        "upper95": 0.17639264613807284
+      },
+      "trueTotalProductiveProjection": {
+        "mean": 0.0036235767524529765,
+        "lower95": 0.00009557299467192332,
+        "upper95": 0.00715158051023403
+      },
+      "trueAppliedProductiveProjection": {
+        "mean": 0.005894337818835685,
+        "lower95": 0.0031519199857041017,
+        "upper95": 0.00863675565196727
+      },
+      "trueHomeostasisProjectionLoss": {
+        "mean": 0.2707045512355791,
+        "lower95": 0.19774776010439693,
+        "upper95": 0.3436613423667613
+      }
+    }
+  ],
+  "confirmationEffects": {
+    "trueOverRandomTotalCosine": {
+      "mean": 0.07864164713307184,
+      "lower95": 0.048822625582973844,
+      "upper95": 0.10846066868316984
+    },
+    "trueOverRandomTotalProjection": {
+      "mean": -0.0002772574513770145,
+      "lower95": -0.00473130353191802,
+      "upper95": 0.004176788629163992
+    },
+    "trueOverShuffledTotalCosine": {
+      "mean": -0.020070802026743547,
+      "lower95": -0.053186257659358124,
+      "upper95": 0.013044653605871027
+    },
+    "trueOverShuffledTotalProjection": {
+      "mean": 0.000661544540291787,
+      "lower95": -0.0017432781935598357,
+      "upper95": 0.0030663672741434098
+    }
+  },
+  "decision": "eligibility-uninformative",
+  "acceptance": {
+    "m1neArtifactAndConditionFrozen": true,
+    "noOnlineRuleChangeOrSelection": true,
+    "developmentAndConfirmationSeedsDisjoint": true,
+    "checkpointsComplete": true,
+    "controlsPairedFromIdenticalState": true,
+    "oracleUsedOnlyAsOfflineRuler": true,
+    "shuffledEligibilityPreservesMultiset": true,
+    "actionReadoutRemainedFrozen": true,
+    "topologyAndConnectionBudgetPreserved": true,
+    "exactGradientOracleVerified": true,
+    "finiteOutputs": true,
+    "stagePassed": true,
+    "passed": true
+  },
+  "conclusions": [
+    "真实后果的 raw / applied / total 方向余弦为 0.033 / 0.298 / 0.191，total 符号一致率 64.2%。",
+    "真实后果相对随机后果 / 置乱资格迹的 total 余弦优势为 +0.079 / -0.020；投影优势为 -0.000 / +0.001。",
+    "软边界/资源保留 raw 幅度的 68.4%，稳态造成的生产性投影损失为 17.6%。",
+    "M1-CD 正式决策为 EligibilityUninformative。",
+    "真实资格迹没有可靠胜过保留同一数值分布的置乱资格迹；瓶颈在时间/连接归因。"
+  ]
+}

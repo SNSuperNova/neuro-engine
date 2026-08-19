@@ -19,6 +19,7 @@ pub mod mechanism_m1;
 pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
+pub mod structural_diagnostic;
 
 pub use adaptive_mechanism::{
     ActivityAdjustment, ActivityObservation, AdjustableVariable, AdjustmentMechanism,
@@ -123,4 +124,10 @@ pub use network::{
     NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
     Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
     simulate_network, simulate_network_with_limits,
+};
+pub use structural_diagnostic::{
+    StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,
+    StructuralDiagnosticAcceptanceReport, StructuralDiagnosticConfig, StructuralDiagnosticDecision,
+    StructuralDiagnosticPhaseSummary, StructuralDiagnosticResult, StructuralDiagnosticSeedResult,
+    StructuralDiagnosticSummary, run_structural_diagnostic,
 };

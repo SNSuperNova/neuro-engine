@@ -9,6 +9,10 @@ use crate::mechanism_m1::{
     M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
 };
 use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
+use crate::structural_diagnostic::{
+    StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,
+    StructuralDiagnosticSeedProtocol, StructuralDiagnosticSeedResult,
+};
 
 use crate::{EmbodiedError, GATE_B_SENSOR_COUNT, HIDDEN_COUNT};
 
@@ -1124,6 +1128,40 @@ impl<M: AdjustmentMechanism> MapController<M> {
         self.recurrent_weights[target][source] = transferred_weight;
         self.recurrent_slots[target][slot] = source;
         state.rewire_count += 1;
+        true
+    }
+
+    fn structural_candidates(&self, target: usize) -> Vec<usize> {
+        let current = self.recurrent_slots[target];
+        (0..HIDDEN_COUNT)
+            .filter(|source| {
+                *source != target
+                    && !current.contains(source)
+                    && self.recurrent_weights[target][*source] == 0.0
+            })
+            .collect()
+    }
+
+    fn weakest_structural_slot(&self, target: usize, scores: &[f64; HIDDEN_COUNT]) -> usize {
+        let current = self.recurrent_slots[target];
+        if scores[current[0]] <= scores[current[1]] {
+            0
+        } else {
+            1
+        }
+    }
+
+    fn rewire_specific(&mut self, target: usize, slot: usize, source: usize) -> bool {
+        if slot >= PLASTIC_RECURRENT_PER_UNIT
+            || !self.structural_candidates(target).contains(&source)
+        {
+            return false;
+        }
+        let old_source = self.recurrent_slots[target][slot];
+        let transferred_weight = self.recurrent_weights[target][old_source];
+        self.recurrent_weights[target][old_source] = 0.0;
+        self.recurrent_weights[target][source] = transferred_weight;
+        self.recurrent_slots[target][slot] = source;
         true
     }
 
@@ -2328,6 +2366,348 @@ fn run_m2c_single_rules<M: AdjustmentMechanism>(
         maximum_absolute_weight,
         rewire_count,
         finite,
+    }
+}
+
+pub(crate) fn run_structural_diagnostic_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: StructuralDiagnosticSeedProtocol,
+) -> StructuralDiagnosticSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d32_4443_4f4e_5452,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let topology_before = controller.topology_digest();
+    let readout_before = controller.action_readout_digest();
+    let mut structure = StructuralEvidenceState::new();
+    let mut checkpoints = Vec::new();
+    let mut global_episode = 0usize;
+    for (phase_index, rule) in M1Rule::SEQUENCE.into_iter().enumerate() {
+        let phase_seed =
+            seed ^ 0x4d32_4443_5048_4153 ^ (phase_index as u64).wrapping_mul(SEED_STRIDE);
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + phase_seed.count_ones() as usize) % 4;
+            let structural_target =
+                (global_episode / protocol.structural_parameters.rewiring_interval) % HIDDEN_COUNT;
+            let mut rng = Rng::new(
+                phase_seed ^ 0x4d32_4443_4143_544e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = controller.structural_symbol_trial(
+                rule,
+                symbol,
+                &mut rng,
+                protocol.exploration,
+                structural_target,
+            );
+            let (target, evidence) = controller.structural_evidence(&trial);
+            structure.observe(
+                target,
+                evidence,
+                protocol.structural_parameters.evidence_decay,
+            );
+            controller.adapt_trial(
+                &trial,
+                Map0Control::Baseline,
+                false,
+                phase_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            global_episode += 1;
+            if protocol.checkpoint_global_trials.contains(&global_episode) {
+                checkpoints.push(evaluate_structural_checkpoint(
+                    &controller,
+                    &structure,
+                    seed,
+                    global_episode,
+                    phase_index,
+                    rule,
+                    target,
+                    protocol,
+                ));
+            }
+        }
+    }
+    let count = checkpoints.len().max(1) as f64;
+    let mean = |f: fn(&StructuralCheckpointDiagnostic) -> f64| {
+        checkpoints.iter().map(f).sum::<f64>() / count
+    };
+    let mean_spearman_correlation = mean(|row| row.spearman_correlation);
+    let mean_shuffled_spearman_correlation = mean(|row| row.mean_shuffled_spearman_correlation);
+    let mean_selected_benefit = mean(|row| row.selected_benefit);
+    let mean_random_benefit = mean(|row| row.random_mean_benefit);
+    let mean_oracle_benefit = mean(|row| row.oracle_benefit);
+    let mean_selected_regret = mean(|row| row.selected_regret);
+    let top_quartile_hit_rate = checkpoints
+        .iter()
+        .filter(|row| row.selected_is_top_quartile)
+        .count() as f64
+        / count;
+    let finite = checkpoints.iter().all(|checkpoint| {
+        [
+            checkpoint.no_swap_post_horizon_accuracy,
+            checkpoint.spearman_correlation,
+            checkpoint.mean_shuffled_spearman_correlation,
+            checkpoint.selected_benefit,
+            checkpoint.random_mean_benefit,
+            checkpoint.oracle_benefit,
+            checkpoint.selected_regret,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && checkpoint.candidates.iter().all(|candidate| {
+                [
+                    candidate.evidence_score,
+                    candidate.post_horizon_accuracy,
+                    candidate.benefit_over_no_swap,
+                    candidate.evidence_rank,
+                    candidate.benefit_rank,
+                ]
+                .into_iter()
+                .all(f64::is_finite)
+            })
+    });
+    StructuralDiagnosticSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        checkpoints,
+        mean_spearman_correlation,
+        mean_shuffled_spearman_correlation,
+        mean_correlation_advantage: mean_spearman_correlation - mean_shuffled_spearman_correlation,
+        mean_selected_benefit,
+        mean_random_benefit,
+        mean_selected_benefit_advantage: mean_selected_benefit - mean_random_benefit,
+        mean_oracle_benefit,
+        mean_selected_regret,
+        top_quartile_hit_rate,
+        topology_digest_before: topology_before,
+        topology_digest_after: controller.topology_digest(),
+        action_readout_digest_before: readout_before,
+        action_readout_digest_after: controller.action_readout_digest(),
+        finite,
+    }
+}
+
+fn evaluate_structural_checkpoint<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    structure: &StructuralEvidenceState,
+    seed: u64,
+    global_trial: usize,
+    phase_index: usize,
+    rule: M1Rule,
+    target: usize,
+    protocol: StructuralDiagnosticSeedProtocol,
+) -> StructuralCheckpointDiagnostic {
+    let scores = structure.scores[target];
+    let replaced_slot = controller.weakest_structural_slot(target, &scores);
+    let replaced_source_unit = controller.recurrent_slots[target][replaced_slot];
+    let candidate_sources = controller.structural_candidates(target);
+    let horizon_seed = seed ^ 0x4d32_4448_4f52_495a ^ global_trial as u64;
+    let no_swap_post_horizon_accuracy = diagnostic_forward_accuracy(
+        controller,
+        rule,
+        protocol.forward_training_trials,
+        protocol.evaluation_trial_count,
+        protocol.exploration,
+        horizon_seed,
+    );
+    let mut candidates = candidate_sources
+        .iter()
+        .map(|source| {
+            let mut swapped = controller.clone();
+            assert!(swapped.rewire_specific(target, replaced_slot, *source));
+            let accuracy = diagnostic_forward_accuracy(
+                &swapped,
+                rule,
+                protocol.forward_training_trials,
+                protocol.evaluation_trial_count,
+                protocol.exploration,
+                horizon_seed,
+            );
+            StructuralCandidateCounterfactual {
+                source_unit: *source,
+                evidence_score: scores[*source],
+                post_horizon_accuracy: accuracy,
+                benefit_over_no_swap: accuracy - no_swap_post_horizon_accuracy,
+                evidence_rank: 0.0,
+                benefit_rank: 0.0,
+            }
+        })
+        .collect::<Vec<_>>();
+    let evidence_values = candidates
+        .iter()
+        .map(|candidate| candidate.evidence_score)
+        .collect::<Vec<_>>();
+    let benefit_values = candidates
+        .iter()
+        .map(|candidate| candidate.benefit_over_no_swap)
+        .collect::<Vec<_>>();
+    let evidence_ranks = rank_values(&evidence_values);
+    let benefit_ranks = rank_values(&benefit_values);
+    for (index, candidate) in candidates.iter_mut().enumerate() {
+        candidate.evidence_rank = evidence_ranks[index];
+        candidate.benefit_rank = benefit_ranks[index];
+    }
+    let spearman_correlation = pearson(&evidence_ranks, &benefit_ranks);
+    let mut shuffled_sum = 0.0;
+    for shuffle in 0..protocol.shuffled_ranking_count {
+        let mut shuffled = evidence_values.clone();
+        let mut rng = Rng::new(
+            seed ^ 0x4d32_4453_4855_4646
+                ^ global_trial as u64
+                ^ (shuffle as u64).wrapping_mul(SEED_STRIDE),
+        );
+        for index in (1..shuffled.len()).rev() {
+            let swap = (rng.next_u64() as usize) % (index + 1);
+            shuffled.swap(index, swap);
+        }
+        shuffled_sum += pearson(&rank_values(&shuffled), &benefit_ranks);
+    }
+    let selected_index = candidates
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| {
+            left.evidence_score
+                .total_cmp(&right.evidence_score)
+                .then_with(|| right.source_unit.cmp(&left.source_unit))
+        })
+        .map(|(index, _)| index)
+        .expect("17 structural candidates");
+    let oracle_index = candidates
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| {
+            left.benefit_over_no_swap
+                .total_cmp(&right.benefit_over_no_swap)
+                .then_with(|| right.source_unit.cmp(&left.source_unit))
+        })
+        .map(|(index, _)| index)
+        .expect("17 structural candidates");
+    let mut benefit_order = (0..candidates.len()).collect::<Vec<_>>();
+    benefit_order.sort_by(|left, right| {
+        candidates[*right]
+            .benefit_over_no_swap
+            .total_cmp(&candidates[*left].benefit_over_no_swap)
+            .then_with(|| {
+                candidates[*left]
+                    .source_unit
+                    .cmp(&candidates[*right].source_unit)
+            })
+    });
+    let random_mean_benefit =
+        benefit_values.iter().sum::<f64>() / benefit_values.len().max(1) as f64;
+    let selected_benefit = candidates[selected_index].benefit_over_no_swap;
+    let oracle_benefit = candidates[oracle_index].benefit_over_no_swap;
+    let top_quartile_count = candidates.len().div_ceil(4);
+    StructuralCheckpointDiagnostic {
+        global_trial,
+        phase_index,
+        rule,
+        target_unit: target,
+        replaced_slot,
+        replaced_source_unit,
+        candidate_count: candidates.len(),
+        no_swap_post_horizon_accuracy,
+        selected_source_unit: candidates[selected_index].source_unit,
+        selected_benefit,
+        random_mean_benefit,
+        oracle_source_unit: candidates[oracle_index].source_unit,
+        oracle_benefit,
+        selected_regret: oracle_benefit - selected_benefit,
+        selected_is_top_quartile: benefit_order[..top_quartile_count].contains(&selected_index),
+        candidates,
+        spearman_correlation,
+        mean_shuffled_spearman_correlation: shuffled_sum / protocol.shuffled_ranking_count as f64,
+    }
+}
+
+fn diagnostic_forward_accuracy<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    rule: M1Rule,
+    training_trials: usize,
+    evaluation_trials: usize,
+    exploration: f64,
+    seed: u64,
+) -> f64 {
+    let mut forward = controller.clone();
+    for episode in 0..training_trials {
+        let symbol = (episode + seed.count_ones() as usize) % 4;
+        let mut rng =
+            Rng::new(seed ^ 0x4d32_4446_5744_5452 ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+        let trial = forward.symbol_trial(rule, symbol, &mut rng, exploration, false, false);
+        forward.adapt_trial(
+            &trial,
+            Map0Control::Baseline,
+            false,
+            seed ^ 0x5245_5741_5244 ^ episode as u64,
+            0,
+        );
+    }
+    evaluate_multisymbol_rule(
+        &forward,
+        rule,
+        evaluation_trials,
+        seed ^ 0x4d32_4445_5641_4c01,
+    )
+}
+
+fn rank_values(values: &[f64]) -> Vec<f64> {
+    let mut order = (0..values.len()).collect::<Vec<_>>();
+    order.sort_by(|left, right| {
+        values[*left]
+            .total_cmp(&values[*right])
+            .then_with(|| left.cmp(right))
+    });
+    let mut ranks = vec![0.0; values.len()];
+    let mut start = 0;
+    while start < order.len() {
+        let mut end = start + 1;
+        while end < order.len() && values[order[end]] == values[order[start]] {
+            end += 1;
+        }
+        let average_rank = ((start + 1 + end) as f64) / 2.0;
+        for index in &order[start..end] {
+            ranks[*index] = average_rank;
+        }
+        start = end;
+    }
+    ranks
+}
+
+fn pearson(left: &[f64], right: &[f64]) -> f64 {
+    let count = left.len().min(right.len());
+    if count == 0 {
+        return 0.0;
+    }
+    let left_mean = left.iter().take(count).sum::<f64>() / count as f64;
+    let right_mean = right.iter().take(count).sum::<f64>() / count as f64;
+    let mut covariance = 0.0;
+    let mut left_variance = 0.0;
+    let mut right_variance = 0.0;
+    for index in 0..count {
+        let left_delta = left[index] - left_mean;
+        let right_delta = right[index] - right_mean;
+        covariance += left_delta * right_delta;
+        left_variance += left_delta.powi(2);
+        right_variance += right_delta.powi(2);
+    }
+    let denominator = (left_variance * right_variance).sqrt();
+    if denominator <= 1e-12 {
+        0.0
+    } else {
+        (covariance / denominator).clamp(-1.0, 1.0)
     }
 }
 

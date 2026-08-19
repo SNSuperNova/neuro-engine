@@ -41,7 +41,7 @@
 
 只有 Map 2A～2C 形成连续稳定区域后才执行。冻结全部机制、参数范围、任务和种子生成规则，扫描 `12、24、48、96、192` 节点，禁止按规模重新调参。
 
-Map 2A～2C 已于 `learnability-map/v0.5-continuous-stream` 完成并通过串行冻结条件：2A 的软边界降低漂移，2B 的持续供能形成可干预资源约束，2C 在无状态重置连续流中确认 6 点稳定区域。因此 Scale 0 的前置条件已经满足；正式数值和边界见 [MAP_2.md](MAP_2.md)。
+Map 2A～2C 已于 `learnability-map/v0.5-continuous-stream` 完成并通过串行冻结条件：2A 的软边界降低漂移，2B 的持续供能形成可干预资源约束，2C 在无状态重置连续流中确认 6 点稳定区域。机制上的原 Scale 0 前置条件已经满足；但根据 [ADR 0006](decisions/0006-dynamic-adjustment-mechanisms.md)，Scale 0 的研究优先级后移，先验证当前调整机制能否保留多种规则并迁移到至少一种未见条件。
 
 规模结果分为：
 

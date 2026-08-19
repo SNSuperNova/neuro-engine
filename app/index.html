@@ -8,7 +8,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate C</small></div></div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate D</small></div></div>
     <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
@@ -123,6 +123,29 @@
           <div id="gate-c-events" class="credit-events"></div>
           <input id="gate-c-range" type="range" min="0" max="1" value="0" aria-label="Gate C 时间轨迹">
           <p id="gate-c-trace-note"></p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="gate-d card">
+      <div class="section-head"><div><span class="eyebrow">GATE D · RECURRENT DYNAMICS</span><h2>结构化循环是否延长记忆</h2></div><span id="gate-d-protocol"></span></div>
+      <p class="audit-intro">置乱循环保留结构化循环的全部权重、稀疏度、正负边和谱，只破坏它与线索投影的对应。主比较不是“有连接 vs 无连接”。</p>
+      <div id="gate-d-acceptance" class="acceptance-grid gate-d-acceptance"></div>
+      <div class="gate-d-layout">
+        <div>
+          <canvas id="gate-d-boundary" aria-label="Gate D 三种控制器随无信息延迟变化的正确率"></canvas>
+          <div id="gate-d-comparison" class="gate-b-comparison gate-d-comparison"></div>
+          <div id="gate-d-effects" class="gate-b-effects gate-d-effects"></div>
+        </div>
+        <aside class="dynamics-observer">
+          <label>延迟 8 代表轨迹 <select id="gate-d-trace-select"></select></label>
+          <div class="dynamics-readout"><span id="gate-d-phase">—</span><strong id="gate-d-cue">—</strong></div>
+          <div id="gate-d-hidden" class="hidden-grid dynamics-hidden"></div>
+          <div id="gate-d-events" class="credit-events dynamics-events"></div>
+          <input id="gate-d-range" type="range" min="0" max="1" value="0" aria-label="Gate D 时间轨迹">
+          <p id="gate-d-trace-note"></p>
+          <h3>结构化循环稳定性</h3>
+          <div id="gate-d-stability" class="stability-list"></div>
         </aside>
       </div>
     </section>

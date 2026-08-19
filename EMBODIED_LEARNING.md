@@ -29,9 +29,9 @@
 
 v1 不宣称模拟真实生命、意识或完整生物神经元。它只建立第一个可以从外部行为直接验证的感知—学习—动作闭环。
 
-当前学习算法的公式、与 Reservoir Computing/策略梯度/三因素规则的关系，以及尚未证明的能力，集中记录在 [LEARNING.md](LEARNING.md)。下一阶段不会默认增加生物复杂度，而会依照 [ROADMAP.md](ROADMAP.md) 验证跨单元循环动力学。
+当前学习算法的公式、与 Reservoir Computing/策略梯度/三因素规则的关系，以及尚未证明的能力，集中记录在 [LEARNING.md](LEARNING.md)。下一阶段不会默认增加规模，而会依照 [ROADMAP.md](ROADMAP.md) 比较连续与脉冲状态的功能和成本。
 
-Gate A 已完成奖励与感觉辅助审计，结果见 [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)。Gate B 已完成状态必要性与鲁棒性边界，结果见 [experiments/gate-b-v1.2.md](experiments/gate-b-v1.2.md) 和 [experiments/gate-b-robustness-v1.2b.md](experiments/gate-b-robustness-v1.2b.md)。Gate C 也已证明资格迹在受控延迟能量任务中的功能，见 [experiments/gate-c-v1.3.md](experiments/gate-c-v1.3.md)。下一阶段只进入 Gate D 的内部循环连接实验。
+Gate A 已完成奖励与感觉辅助审计；Gate B 已完成状态必要性与鲁棒性边界；Gate C 已证明资格迹在受控延迟能量任务中的功能。Gate D 也已证明结构化固定稀疏循环可以在等权重置乱控制下延长可靠记忆，结果见 [experiments/gate-d-v1.4.md](experiments/gate-d-v1.4.md)。下一阶段只进入 Gate E 的连续状态与脉冲状态等预算比较。
 
 ## 验收标准
 

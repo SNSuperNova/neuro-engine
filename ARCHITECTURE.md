@@ -89,6 +89,18 @@ real energy after forced delay ───────────────┘�
 
 `examples/gate_c_lab.rs` 输出完整 4×4 因子矩阵、逐种子结果、配对效应、训练曲线、代表时间轨迹与验收项到 `app/public/gate-c-v1.3.json`。随机线索对照使用相同预算和时间结构，只破坏线索与目标的关系。
 
+`gate_d.rs` 在 Gate B 延迟线索接口上增加固定稀疏跨单元矩阵。每个状态单元接收 6 条非自身边；结构化矩阵按左右线索投影偏好设置同组正边、异组负边，然后缩放到谱半径 0.15。状态同步更新，只读取上一时刻的完整隐藏向量。
+
+```text
+                           ┌── sparse recurrent matrix ──┐
+                           ▼                              │
+sense [12] ──► fixed projection ──► state [24] ──► action [4]
+                                          │              │
+                                          └─ stability   └─ 96 trainable weights
+```
+
+`no-recurrence` 将跨单元矩阵置零；`shuffled-recurrence` 对结构化矩阵做隐藏身份相似变换，保留全部权重、稀疏度、正负边和谱但破坏其与输入投影的对应。三者只训练相同 96 条状态到动作连接。`examples/gate_d_lab.rs` 输出 `app/public/gate-d-v1.4.json`，其中同时保存延迟扫描、配对效应、稳定性指标、预算摘要和代表轨迹。
+
 ## 5. Web 与桌面
 
 `app/` 使用原生 TypeScript、DOM 和 Canvas 2D，不再依赖 Three.js。主界面展示：
@@ -101,6 +113,7 @@ real energy after forced delay ───────────────┘�
 - Gate B 的线索写入、无信息延迟、岔路选择、内部状态和配对证据。
 - Gate B 的延迟、线索带宽和持续干扰边界曲线；
 - Gate C 的资格迹 × 能量延迟矩阵、因果效应与能量到账时间轨迹。
+- Gate D 的三控制器记忆边界、等权重因果比较和状态稳定性指标。
 
 Tauri 只是同一 Web 应用的桌面壳。核心 crate 不依赖浏览器、Tauri 或 UI 类型。
 

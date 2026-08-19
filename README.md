@@ -28,6 +28,8 @@ Gate B 使用早期线索消失后的 T 型岔路证明了连续状态的功能�
 
 Gate C 隔离了延迟信用分配：当前线索在岔路可见，分支动作之后等待 8 步才获得真实能量。无状态控制器使用资格迹 0.88 时达到 `99.3% [98.7%, 99.9%]`，关闭资格迹时为 `47.0% [41.3%, 52.6%]`，配对增益 `52.3 [46.5, 58.1]` 个百分点；随机线索对照保持机会水平。该结果证明资格迹在受控任务中有用，不代表一般长期学习已经解决。
 
+Gate D 加入 144 条固定稀疏跨单元连接。在 8 步无信息延迟中，与线索投影对齐的结构化循环达到 `80.6% [70.4%, 90.9%]`，拥有相同权重集合、连接数、正负边和谱半径的置乱循环为 `56.2% [49.7%, 62.6%]`，配对增益 `24.5 [14.3, 34.6]` 个百分点；可靠记忆边界从 4 步延长到 8 步。结构是设计者固定的，不宣称系统已经自行形成脑区。
+
 ## 运行
 
 ```powershell
@@ -37,6 +39,7 @@ cargo run --release --example gate_a_lab
 cargo run --release --example gate_b_lab
 cargo run --release --example gate_b_robustness_lab
 cargo run --release --example gate_c_lab
+cargo run --release --example gate_d_lab
 npm install
 npm run dev
 ```
@@ -55,6 +58,7 @@ npm run tauri dev
 src/embodied.rs             二维世界、主体、控制器、可塑性与实验
 src/gate_b.rs               延迟线索环境、等预算控制器和配对统计
 src/gate_c.rs               延迟能量环境、资格迹矩阵和因果对照
+src/gate_d.rs               稀疏循环动力学、置乱控制和稳定性审计
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -73,11 +77,13 @@ experiments/                版本化结果与失败记录
 - [GATE_B.md](GATE_B.md)：已完成的延迟线索任务和防泄漏验收冻结规格；
 - [GATE_B_ROBUSTNESS.md](GATE_B_ROBUSTNESS.md)：已完成的状态延迟、线索带宽与持续干扰边界扫描；
 - [GATE_C.md](GATE_C.md)：已完成的资格迹 × 延迟能量冻结规格；
+- [GATE_D.md](GATE_D.md)：已完成的稀疏内部循环、等权重置乱与稳定性冻结规格；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
 - [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)：奖励塑形与方向感觉的多种子审计；
 - [experiments/gate-b-v1.2.md](experiments/gate-b-v1.2.md)：连续状态必要性的多种子配对实验；
 - [experiments/gate-b-robustness-v1.2b.md](experiments/gate-b-robustness-v1.2b.md)：固定状态机制的能力边界；
 - [experiments/gate-c-v1.3.md](experiments/gate-c-v1.3.md)：资格迹解决受控延迟信用分配的 4×4 实验；
+- [experiments/gate-d-v1.4.md](experiments/gate-d-v1.4.md)：结构化循环延长可靠记忆的多种子实验；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

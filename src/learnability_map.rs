@@ -10,6 +10,7 @@ use crate::mechanism_m1::{
 };
 use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
 use crate::reachability::{M1XControl, M1XRuleResult, M1XSeedResult};
+use crate::reachability_envelope::{M1XEBoundKind, M1XESeedResult};
 use crate::representation_capacity::{RepresentationCapacitySeedResult, RepresentationRuleResult};
 use crate::rule_formation::{M1FControl, M1FRuleResult, M1FSeedResult};
 use crate::structural_diagnostic::{
@@ -3880,6 +3881,12 @@ fn evaluate_multisymbol_rule_with_probability<M: AdjustmentMechanism>(
 
 const M1X_VARIABLE_COUNT: usize = HIDDEN_COUNT * PLASTIC_RECURRENT_PER_UNIT;
 
+#[derive(Clone, Copy)]
+enum M1XWeightConstraint {
+    ReferenceNorm(f64),
+    AbsoluteBound,
+}
+
 #[derive(Clone)]
 struct OracleForwardStep {
     hidden_before: [f64; HIDDEN_COUNT],
@@ -3946,7 +3953,7 @@ pub(crate) fn run_m1x_seed(
                 rule,
                 protocol,
                 rule_seed ^ 0x4e4f_524d,
-                true,
+                M1XWeightConstraint::ReferenceNorm(1.0),
                 false,
             ),
             M1XControl::AbsoluteBoundOracle => optimize_m1x_oracle(
@@ -3954,7 +3961,7 @@ pub(crate) fn run_m1x_seed(
                 rule,
                 protocol,
                 rule_seed ^ 0x4142_534f,
-                false,
+                M1XWeightConstraint::AbsoluteBound,
                 false,
             ),
             M1XControl::ShuffledTargetOracle => optimize_m1x_oracle(
@@ -3962,7 +3969,7 @@ pub(crate) fn run_m1x_seed(
                 rule,
                 protocol,
                 rule_seed ^ 0x5348_5546,
-                false,
+                M1XWeightConstraint::AbsoluteBound,
                 true,
             ),
         };
@@ -4037,6 +4044,131 @@ pub(crate) fn run_m1x_seed(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_m1xe_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M1XSeedProtocol,
+    bound_kind: M1XEBoundKind,
+    norm_multiplier: Option<f64>,
+) -> M1XESeedResult {
+    let constraint = match (bound_kind, norm_multiplier) {
+        (M1XEBoundKind::ReferenceMultiplier, Some(multiplier)) => {
+            M1XWeightConstraint::ReferenceNorm(multiplier)
+        }
+        (M1XEBoundKind::AbsoluteBound, None) => M1XWeightConstraint::AbsoluteBound,
+        _ => panic!("M1-XE bound kind and multiplier must agree"),
+    };
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_5845_434f_4e54,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let mut rule_results = Vec::new();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let rule_seed =
+            seed ^ 0x4d31_5845_5255_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let mut initial = controller.clone();
+        initial.reset_state();
+        let topology_digest_before = initial.topology_digest();
+        let action_readout_digest_before = initial.action_readout_digest();
+        let (initial_behavior_accuracy, _, initial_target_probability, _) = evaluate_m1x_rule(
+            &initial,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let mut candidate = initial.clone();
+        let (initial_training_loss, final_training_loss, selected_restart) = optimize_m1x_oracle(
+            &mut candidate,
+            rule,
+            protocol,
+            rule_seed ^ 0x4d31_5845_4f50_5449,
+            constraint,
+            false,
+        );
+        candidate.reset_state();
+        let (final_behavior_accuracy, final_argmax_accuracy, final_target_probability, saturation) =
+            evaluate_m1x_rule(
+                &candidate,
+                rule,
+                protocol.evaluation_trial_count,
+                rule_seed ^ 0x0046_494e_414c,
+            );
+        let initial_weights = m1x_recurrent_weights(&initial);
+        let final_weights = m1x_recurrent_weights(&candidate);
+        let mean_relative_weight_drift = initial_weights
+            .iter()
+            .zip(&final_weights)
+            .map(|(before, after)| (after - before).abs() / before.abs().max(1e-6))
+            .sum::<f64>()
+            / M1X_VARIABLE_COUNT as f64;
+        let maximum_absolute_weight = final_weights
+            .iter()
+            .copied()
+            .map(f64::abs)
+            .fold(0.0, f64::max);
+        let action_readout_digest_after = candidate.action_readout_digest();
+        let topology_digest_after = candidate.topology_digest();
+        let finite = [
+            initial_behavior_accuracy,
+            initial_target_probability,
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            final_target_probability,
+            initial_training_loss,
+            final_training_loss,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            saturation,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && candidate.hidden.iter().all(|value| value.is_finite())
+            && candidate.resource.iter().all(|value| value.is_finite())
+            && final_weights.iter().all(|value| value.is_finite());
+        rule_results.push(M1XRuleResult {
+            rule,
+            initial_behavior_accuracy,
+            initial_target_probability,
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            final_target_probability,
+            initial_training_loss,
+            final_training_loss,
+            selected_restart,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            saturation_fraction: saturation,
+            action_readout_digest_before,
+            action_readout_digest_after,
+            topology_digest_before,
+            topology_digest_after,
+            adjustable_connection_count: M1X_VARIABLE_COUNT,
+            finite,
+        });
+    }
+    M1XESeedResult {
+        parameter_id: parameters.id,
+        seed,
+        bound_kind,
+        norm_multiplier,
+        finite: rule_results.iter().all(|row| row.finite),
+        rule_results,
+    }
+}
+
 fn m1x_recurrent_weights<M: AdjustmentMechanism>(
     controller: &MapController<M>,
 ) -> [f64; M1X_VARIABLE_COUNT] {
@@ -4066,7 +4198,7 @@ fn optimize_m1x_oracle(
     rule: M1Rule,
     protocol: M1XSeedProtocol,
     seed: u64,
-    norm_envelope: bool,
+    constraint: M1XWeightConstraint,
     shuffled_targets: bool,
 ) -> (f64, f64, usize) {
     let base = m1x_recurrent_weights(controller);
@@ -4083,7 +4215,7 @@ fn optimize_m1x_oracle(
                 *weight += rng.signed(protocol.restart_jitter * restart as f64);
             }
         }
-        project_m1x_weights(controller, &mut weights, norm_envelope);
+        project_m1x_weights(controller, &mut weights, constraint);
         let training_seed = seed ^ 0x4f50_5449_4d49_5a45;
         let (initial_loss, _) = m1x_loss_and_gradient(
             controller,
@@ -4114,7 +4246,7 @@ fn optimize_m1x_oracle(
                 let variance = second_moment[index] / bias_two;
                 weights[index] -= protocol.learning_rate * mean / (variance.sqrt() + 1e-8);
             }
-            project_m1x_weights(controller, &mut weights, norm_envelope);
+            project_m1x_weights(controller, &mut weights, constraint);
         }
         let (final_loss, _) = m1x_loss_and_gradient(
             controller,
@@ -4138,13 +4270,13 @@ fn optimize_m1x_oracle(
 fn project_m1x_weights(
     controller: &MapController<ReferenceAdjustmentMechanism>,
     weights: &mut [f64; M1X_VARIABLE_COUNT],
-    norm_envelope: bool,
+    constraint: M1XWeightConstraint,
 ) {
     for target in 0..HIDDEN_COUNT {
         let offset = target * PLASTIC_RECURRENT_PER_UNIT;
-        if norm_envelope {
+        if let M1XWeightConstraint::ReferenceNorm(multiplier) = constraint {
             let norm = weights[offset].hypot(weights[offset + 1]);
-            let reference = controller.reference_recurrent_norms[target];
+            let reference = controller.reference_recurrent_norms[target] * multiplier;
             if norm > 1e-12 {
                 weights[offset] *= reference / norm;
                 weights[offset + 1] *= reference / norm;

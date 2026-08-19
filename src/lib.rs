@@ -20,6 +20,7 @@ pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
 pub mod reachability;
+pub mod reachability_envelope;
 pub mod representation_capacity;
 pub mod rule_formation;
 pub mod structural_diagnostic;
@@ -134,6 +135,11 @@ pub use reachability::{
     M1X_LEARNING_RATE_COUNT, M1XAcceptanceReport, M1XConfig, M1XControl, M1XControlSummary,
     M1XDecision, M1XLearningRateSummary, M1XPairedEffects, M1XPublishedResult, M1XResult,
     M1XRuleResult, M1XSeedResult, run_m1x_experiment,
+};
+pub use reachability_envelope::{
+    M1XE_MULTIPLIER_COUNT, M1XEAcceptanceReport, M1XEBoundKind, M1XEConfig, M1XEDecision,
+    M1XEFrozenArtifact, M1XEPublishedResult, M1XEResult, M1XEScaleComparison, M1XEScaleSummary,
+    M1XESeedResult, run_m1xe_experiment,
 };
 pub use representation_capacity::{
     RepresentationCapacityAcceptanceReport, RepresentationCapacityConfig,

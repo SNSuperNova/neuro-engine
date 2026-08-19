@@ -1,0 +1,1171 @@
+{
+  "version": "adaptive-mechanism/m1xe-v1.0-uniform-norm-boundary",
+  "config": {
+    "m1xProtocol": {
+      "m1Protocol": {
+        "map2Protocol": {
+          "map2bProtocol": {
+            "map2aProtocol": {
+              "map1Protocol": {
+                "seed": 5566818783092277505,
+                "developmentConfigCount": 48,
+                "developmentSeedCount": 8,
+                "confirmationSeedCount": 12,
+                "confirmationCandidateCount": 6,
+                "recurrentGainRange": [
+                  0.1,
+                  0.45
+                ],
+                "internalLearningRateRange": [
+                  0.06,
+                  0.16
+                ],
+                "homeostasisStrengthRange": [
+                  0.25,
+                  1.0
+                ],
+                "explorationRateRange": [
+                  0.04,
+                  0.18
+                ],
+                "activityTarget": 0.35,
+                "activityEmaRate": 0.05,
+                "excitabilityAdjustmentRate": 0.02,
+                "weightNormRelaxationRate": 0.03,
+                "minimumExcitabilityGain": 0.65,
+                "maximumExcitabilityGain": 1.35,
+                "probeProtocol": {
+                  "seed": 5566818783092277505,
+                  "developmentConfigCount": 64,
+                  "developmentSeedCount": 8,
+                  "confirmationSeedCount": 12,
+                  "confirmationCandidateCount": 6,
+                  "pretrainingEpisodes": 320,
+                  "adaptationEpisodes": 240,
+                  "evaluationEpisodes": 80,
+                  "thresholdCheckInterval": 20,
+                  "cueSteps": 2,
+                  "memoryDelaySteps": 8,
+                  "rewardDelaySteps": 6,
+                  "eligibilityDecay": 0.88,
+                  "hiddenLeak": 0.8,
+                  "policyLearningRate": 0.055,
+                  "softmaxTemperature": 0.4,
+                  "rewardBaselineDecay": 0.92,
+                  "weightLimit": 2.5,
+                  "recurrentGainRange": [
+                    0.1,
+                    0.45
+                  ],
+                  "internalLearningRateRange": [
+                    0.06,
+                    0.16
+                  ],
+                  "homeostasisStrengthRange": [
+                    0.25,
+                    1.0
+                  ],
+                  "explorationRateRange": [
+                    0.04,
+                    0.18
+                  ],
+                  "thresholds": {
+                    "memoryAccuracy": 0.65,
+                    "delayedCreditAccuracy": 0.65,
+                    "reversalAccuracy": 0.7,
+                    "restorationAccuracy": 0.7,
+                    "repeatedReversalAccuracy": 0.7,
+                    "perturbationRecoveryAccuracy": 0.65,
+                    "minimumPerturbationDamageDrop": 0.15,
+                    "minimumPerturbationRecoveryGain": 0.1,
+                    "maximumSaturationFraction": 0.25,
+                    "maximumSynchronyFraction": 0.5,
+                    "maximumRelativeWeightDrift": 1.0,
+                    "minimumRegionFormationProbability": 0.5,
+                    "minimumRegionSize": 3,
+                    "minimumCausalProbabilityDrop": 0.15,
+                    "minimumCausalProbeScoreDrop": 0.1
+                  }
+                }
+              },
+              "softBoundScale": 1.0,
+              "minimumMeanWeightDriftReduction": 0.25,
+              "maximumAccuracyDegradation": 0.02
+            },
+            "initialResource": 0.75,
+            "supplyRate": 0.007,
+            "maintenanceCost": 0.001,
+            "activityCost": 0.012,
+            "plasticityCost": 0.05,
+            "minimumModulation": 0.6,
+            "minimumNoSupplyResourceDrop": 0.2,
+            "minimumNoSupplyProbeScoreDrop": 0.1,
+            "maximumProbeScoreDegradation": 0.02,
+            "maximumWeightDriftIncrease": 0.05
+          },
+          "streamTrialCount": 720,
+          "minimumChangeGap": 30,
+          "changeProbability": 0.025,
+          "settlingWindow": 20,
+          "exploration": 0.12,
+          "minimumRuleChanges": 5,
+          "minimumOverallAccuracy": 0.6,
+          "minimumSettledAccuracy": 0.65,
+          "maximumRelativeWeightDrift": 1.0,
+          "minimumResourceLevel": 0.05,
+          "minimumFormationProbability": 0.5,
+          "minimumRegionSize": 3,
+          "maximumResetAdvantage": 0.05,
+          "minimumNoSupplyAccuracyDrop": 0.1,
+          "minimumFrozenAccuracyDrop": 0.1
+        },
+        "referenceParameterIds": [
+          0,
+          16,
+          20,
+          21,
+          29,
+          45
+        ],
+        "developmentSeedCount": 4,
+        "confirmationSeedCount": 8,
+        "phaseTrialCount": 240,
+        "evaluationTrialCount": 48,
+        "thresholdCheckInterval": 20,
+        "accuracyThreshold": 0.7,
+        "minimumRetainedAccuracy": 0.6,
+        "maximumRetentionDrop": 0.15,
+        "maximumRelativeWeightDrift": 1.0,
+        "minimumMeanResourceLevel": 0.2,
+        "minimumSingleRuleAccuracy": 0.7,
+        "minimumRetentionProbability": 0.5,
+        "minimumCausalAccuracyDrop": 0.05,
+        "maximumResetRetentionAdvantage": 0.05
+      },
+      "learningRates": [
+        0.01,
+        0.03,
+        0.08
+      ],
+      "oracleIterations": 120,
+      "oracleTrainingTrials": 32,
+      "oracleRestartCount": 3,
+      "restartJitter": 0.08,
+      "minimumNovelBehaviorAccuracy": 0.7,
+      "minimumNovelTargetProbability": 0.7,
+      "minimumSingleNovelAccuracy": 0.65,
+      "minimumOracleAdvantage": 0.1,
+      "minimumLossReduction": 0.1,
+      "maximumSaturationFraction": 0.25
+    },
+    "normMultipliers": [
+      1.0,
+      1.5,
+      2.0,
+      3.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "oracleLearningRate": 0.08,
+    "minimumHistoryAccuracy": 0.75
+  },
+  "frozenM1xArtifact": {
+    "file": "app/public/reachability-v0.9.json",
+    "sha256": "f146cebae0db2b02b8c7edb6e8add84132dc3625a1c63e6ee9a484ce36523d4e"
+  },
+  "diagnosticContract": [
+    "M1-X task, carrier, exact gradient, Adam settings, 0.08 learning rate, training and evaluation budgets, restart count, and absolute weight bound are frozen",
+    "each reference-multiplier oracle changes only the same 48 recurrent values and projects every target pair to one shared multiple of that target's original reference norm",
+    "development selects the first preregistered multiplier meeting every capability and stability threshold; confirmation reruns the complete ordered curve on disjoint seeds",
+    "the absolute-bound oracle is rerun as a positive reachability anchor; it cannot be selected as the uniform boundary",
+    "target labels, gradients, optimizer moments, restarts, and selected weights remain offline diagnostic privileges and are never exposed to an online mechanism"
+  ],
+  "carrierParameters": [
+    {
+      "id": 0,
+      "recurrentGain": 0.275,
+      "internalLearningRate": 0.09333333333333332,
+      "homeostasisStrength": 0.4,
+      "explorationRate": 0.06
+    },
+    {
+      "id": 16,
+      "recurrentGain": 0.28593749999999996,
+      "internalLearningRate": 0.15259259259259259,
+      "homeostasisStrength": 0.64,
+      "explorationRate": 0.1057142857142857
+    },
+    {
+      "id": 20,
+      "recurrentGain": 0.3296875,
+      "internalLearningRate": 0.07851851851851852,
+      "homeostasisStrength": 0.52,
+      "explorationRate": 0.04857142857142857
+    },
+    {
+      "id": 21,
+      "recurrentGain": 0.2421875,
+      "internalLearningRate": 0.11185185185185184,
+      "homeostasisStrength": 0.67,
+      "explorationRate": 0.06857142857142857
+    },
+    {
+      "id": 29,
+      "recurrentGain": 0.2640625,
+      "internalLearningRate": 0.07234567901234568,
+      "homeostasisStrength": 0.28600000000000003,
+      "explorationRate": 0.09142857142857141
+    },
+    {
+      "id": 45,
+      "recurrentGain": 0.25859374999999996,
+      "internalLearningRate": 0.1019753086419753,
+      "homeostasisStrength": 0.526,
+      "explorationRate": 0.13714285714285712
+    }
+  ],
+  "developmentSummaries": [
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 1.0,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.921875,
+        "lower95": 0.8850683307296384,
+        "upper95": 0.9586816692703616
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.7682291666666669,
+        "lower95": 0.732697810055166,
+        "upper95": 0.8037605232781677
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.8596643518518517,
+        "lower95": 0.8058462483176584,
+        "upper95": 0.9134824553860451
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.7676052236178671,
+        "lower95": 0.7312697307361895,
+        "upper95": 0.8039407164995447
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.6180555555555557,
+        "lower95": 0.581793179597943,
+        "upper95": 0.6543179315131684
+      },
+      "meanTrainingLossReduction": {
+        "mean": 6.60854347513472,
+        "lower95": 5.967476661736637,
+        "upper95": 7.2496102885328035
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 1.3049262452395272,
+        "lower95": 1.2165123758930005,
+        "upper95": 1.3933401145860538
+      },
+      "meanSaturationFraction": {
+        "mean": 0.02537374614197531,
+        "lower95": 0.023049996313500368,
+        "upper95": 0.02769749597045025
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": false
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 1.5,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9973958333333334,
+        "lower95": 0.9945799805277082,
+        "upper95": 1.0002116861389585
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.8857060185185185,
+        "lower95": 0.8625767167350091,
+        "upper95": 0.9088353203020278
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9198495370370372,
+        "lower95": 0.8886090259567965,
+        "upper95": 0.9510900481172779
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.8886156334749562,
+        "lower95": 0.8650788892509886,
+        "upper95": 0.9121523776989238
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.681423611111111,
+        "lower95": 0.614000694861631,
+        "upper95": 0.7488465273605911
+      },
+      "meanTrainingLossReduction": {
+        "mean": 8.929787783099753,
+        "lower95": 7.967844441663291,
+        "upper95": 9.891731124536216
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 1.650955125727508,
+        "lower95": 1.5740803028195145,
+        "upper95": 1.7278299486355013
+      },
+      "meanSaturationFraction": {
+        "mean": 0.0249071662808642,
+        "lower95": 0.02234421332671457,
+        "upper95": 0.027470119235013832
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 2.0,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.970486111111111,
+        "lower95": 0.9368826271529697,
+        "upper95": 1.0040895950692525
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9244791666666666,
+        "lower95": 0.9011859918723456,
+        "upper95": 0.9477723414609877
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9273726851851852,
+        "lower95": 0.8964019163380567,
+        "upper95": 0.9583434540323138
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9199163637418671,
+        "lower95": 0.89739562871603,
+        "upper95": 0.9424370987677043
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.7881944444444443,
+        "lower95": 0.7213028276873508,
+        "upper95": 0.8550860612015379
+      },
+      "meanTrainingLossReduction": {
+        "mean": 10.221302768450515,
+        "lower95": 8.989207846174036,
+        "upper95": 11.453397690726995
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 2.069061360466043,
+        "lower95": 1.9821050917445355,
+        "upper95": 2.1560176291875504
+      },
+      "meanSaturationFraction": {
+        "mean": 0.021336082175925922,
+        "lower95": 0.018805821122823394,
+        "upper95": 0.02386634322902845
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 3.0,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9930555555555557,
+        "lower95": 0.9839691609407438,
+        "upper95": 1.0021419501703674
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9380787037037038,
+        "lower95": 0.9171599849822107,
+        "upper95": 0.9589974224251969
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9401041666666669,
+        "lower95": 0.9101264246715703,
+        "upper95": 0.9700819086617634
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9257521320953693,
+        "lower95": 0.9024486823650563,
+        "upper95": 0.9490555818256824
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.8376736111111108,
+        "lower95": 0.7809302039242367,
+        "upper95": 0.8944170182979849
+      },
+      "meanTrainingLossReduction": {
+        "mean": 12.13447345726633,
+        "lower95": 10.971867610203923,
+        "upper95": 13.297079304328737
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 2.9096254386661062,
+        "lower95": 2.8172169442653825,
+        "upper95": 3.00203393306683
+      },
+      "meanSaturationFraction": {
+        "mean": 0.010047743055555556,
+        "lower95": 0.008257035813555367,
+        "upper95": 0.011838450297555746
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 4.0,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9444444444444445,
+        "lower95": 0.9007753028476073,
+        "upper95": 0.9881135860412817
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9010416666666669,
+        "lower95": 0.8800855453530975,
+        "upper95": 0.9219977879802362
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9389467592592592,
+        "lower95": 0.9137080362489188,
+        "upper95": 0.9641854822695995
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.8910091248761374,
+        "lower95": 0.8719888891349032,
+        "upper95": 0.9100293606173715
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.7578125,
+        "lower95": 0.7017204913245354,
+        "upper95": 0.8139045086754646
+      },
+      "meanTrainingLossReduction": {
+        "mean": 12.065848629485197,
+        "lower95": 10.936892077791054,
+        "upper95": 13.19480518117934
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 3.6793813857882793,
+        "lower95": 3.6189119429066317,
+        "upper95": 3.739850828669927
+      },
+      "meanSaturationFraction": {
+        "mean": 0.006567081404320988,
+        "lower95": 0.005171861832070565,
+        "upper95": 0.00796230097657141
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 6.0,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9201388888888887,
+        "lower95": 0.8625140142757373,
+        "upper95": 0.9777637635020402
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.8356481481481483,
+        "lower95": 0.8009013828018062,
+        "upper95": 0.8703949134944903
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9062500000000001,
+        "lower95": 0.8732741084989375,
+        "upper95": 0.9392258915010627
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.8215286090337693,
+        "lower95": 0.7886586905315989,
+        "upper95": 0.8543985275359398
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.7065972222222224,
+        "lower95": 0.6626350922414043,
+        "upper95": 0.7505593522030406
+      },
+      "meanTrainingLossReduction": {
+        "mean": 12.993232038705953,
+        "lower95": 11.799735771606052,
+        "upper95": 14.186728305805854
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 5.409100520741847,
+        "lower95": 5.328747078051793,
+        "upper95": 5.4894539634319015
+      },
+      "meanSaturationFraction": {
+        "mean": 0.004651331018518519,
+        "lower95": 0.0039451922451555,
+        "upper95": 0.005357469791881538
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 8.0,
+      "runCount": 24,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.7786458333333334,
+        "lower95": 0.7111184634480402,
+        "upper95": 0.8461732032186265
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.7743055555555555,
+        "lower95": 0.7241008980248979,
+        "upper95": 0.8245102130862131
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.8466435185185185,
+        "lower95": 0.8023492784583998,
+        "upper95": 0.8909377585786372
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.7631507338818803,
+        "lower95": 0.7140744501321219,
+        "upper95": 0.8122270176316386
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.657986111111111,
+        "lower95": 0.6033063847446603,
+        "upper95": 0.7126658374775618
+      },
+      "meanTrainingLossReduction": {
+        "mean": 12.681257122203897,
+        "lower95": 11.506326275612814,
+        "upper95": 13.85618796879498
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 6.948860911047341,
+        "lower95": 6.868796352812606,
+        "upper95": 7.028925469282076
+      },
+      "meanSaturationFraction": {
+        "mean": 0.008332127700617285,
+        "lower95": 0.007477705224466724,
+        "upper95": 0.009186550176767845
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": false
+    }
+  ],
+  "selectedDevelopmentMultiplier": 1.5,
+  "confirmationSummaries": [
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 1.0,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.8940972222222223,
+        "lower95": 0.8470908569561719,
+        "upper95": 0.9411035874882727
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.7233796296296299,
+        "lower95": 0.7037531992771718,
+        "upper95": 0.7430060599820879
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.7717013888888888,
+        "lower95": 0.7386788237753993,
+        "upper95": 0.8047239540023784
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.7294657080680486,
+        "lower95": 0.7133434299872287,
+        "upper95": 0.7455879861488685
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.5394965277777778,
+        "lower95": 0.5196585866712039,
+        "upper95": 0.5593344688843517
+      },
+      "meanTrainingLossReduction": {
+        "mean": 4.214272237661344,
+        "lower95": 3.7673232732563484,
+        "upper95": 4.66122120206634
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 1.2840850235668797,
+        "lower95": 1.228514810759363,
+        "upper95": 1.3396552363743963
+      },
+      "meanSaturationFraction": {
+        "mean": 0.026903694058641976,
+        "lower95": 0.025278188514798093,
+        "upper95": 0.028529199602485858
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": false
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 1.5,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.990017361111111,
+        "lower95": 0.9840625,
+        "upper95": 0.9959722222222221
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.8543113425925924,
+        "lower95": 0.8346382882497168,
+        "upper95": 0.8739843969354681
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9253472222222227,
+        "lower95": 0.9034948348203595,
+        "upper95": 0.9471996096240858
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.859137441137808,
+        "lower95": 0.8409086190923749,
+        "upper95": 0.8773662631832411
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.7083333333333335,
+        "lower95": 0.6744870383310413,
+        "upper95": 0.7421796283356257
+      },
+      "meanTrainingLossReduction": {
+        "mean": 5.75585521286562,
+        "lower95": 5.209646945190358,
+        "upper95": 6.302063480540881
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 1.676939324701782,
+        "lower95": 1.613825764844257,
+        "upper95": 1.740052884559307
+      },
+      "meanSaturationFraction": {
+        "mean": 0.025436439043209882,
+        "lower95": 0.02362832835650978,
+        "upper95": 0.027244549729909983
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 2.0,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9969618055555555,
+        "lower95": 0.9945333841372889,
+        "upper95": 0.9993902269738221
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9189814814814815,
+        "lower95": 0.9034152276905111,
+        "upper95": 0.9345477352724519
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9576099537037042,
+        "lower95": 0.9388044397616391,
+        "upper95": 0.9764154676457693
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9168775309466725,
+        "lower95": 0.9025859157735754,
+        "upper95": 0.9311691461197695
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.8025173611111112,
+        "lower95": 0.7608421995244796,
+        "upper95": 0.8441925226977427
+      },
+      "meanTrainingLossReduction": {
+        "mean": 7.027295741833078,
+        "lower95": 6.362794117674261,
+        "upper95": 7.691797365991896
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 1.9580358705216971,
+        "lower95": 1.8816536229121403,
+        "upper95": 2.0344181181312537
+      },
+      "meanSaturationFraction": {
+        "mean": 0.023134283371913585,
+        "lower95": 0.021199197093976642,
+        "upper95": 0.02506936964985053
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 3.0,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.96875,
+        "lower95": 0.9390935770368232,
+        "upper95": 0.9984064229631768
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9198495370370371,
+        "lower95": 0.9021150474419681,
+        "upper95": 0.937584026632106
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9661458333333335,
+        "lower95": 0.9533582956654721,
+        "upper95": 0.9789333710011948
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9216395704860473,
+        "lower95": 0.9073225008226015,
+        "upper95": 0.9359566401494931
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.8268229166666665,
+        "lower95": 0.7931922598594977,
+        "upper95": 0.8604535734738353
+      },
+      "meanTrainingLossReduction": {
+        "mean": 8.183118728635973,
+        "lower95": 7.386246608307549,
+        "upper95": 8.979990848964398
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 2.826183547254177,
+        "lower95": 2.770636309110754,
+        "upper95": 2.8817307853976
+      },
+      "meanSaturationFraction": {
+        "mean": 0.013352985146604941,
+        "lower95": 0.011835934542004125,
+        "upper95": 0.014870035751205758
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 4.0,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9327256944444443,
+        "lower95": 0.8960651043378767,
+        "upper95": 0.969386284551012
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.8912037037037036,
+        "lower95": 0.8725600483654296,
+        "upper95": 0.9098473590419777
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9633969907407409,
+        "lower95": 0.9524793340171703,
+        "upper95": 0.9743146474643115
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.8993699823248263,
+        "lower95": 0.8830899265037606,
+        "upper95": 0.9156500381458921
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.7703993055555557,
+        "lower95": 0.7384979622256187,
+        "upper95": 0.8023006488854927
+      },
+      "meanTrainingLossReduction": {
+        "mean": 8.88986790566853,
+        "lower95": 7.990236814346723,
+        "upper95": 9.789498996990336
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 3.728672212168655,
+        "lower95": 3.6666798109640255,
+        "upper95": 3.7906646133732846
+      },
+      "meanSaturationFraction": {
+        "mean": 0.00736159336419753,
+        "lower95": 0.006291940652276351,
+        "upper95": 0.00843124607611871
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 6.0,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.8289930555555557,
+        "lower95": 0.7787179433922572,
+        "upper95": 0.8792681677188542
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.7899305555555558,
+        "lower95": 0.7613931696460629,
+        "upper95": 0.8184679414650488
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.8735532407407408,
+        "lower95": 0.8459834322375513,
+        "upper95": 0.9011230492439303
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.8023256910039872,
+        "lower95": 0.7737492001480817,
+        "upper95": 0.8309021818598927
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.6397569444444445,
+        "lower95": 0.6070441932941145,
+        "upper95": 0.6724696955947745
+      },
+      "meanTrainingLossReduction": {
+        "mean": 8.983336979062662,
+        "lower95": 8.118660624584841,
+        "upper95": 9.848013333540482
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 5.341504229585756,
+        "lower95": 5.285360651623935,
+        "upper95": 5.397647807547577
+      },
+      "meanSaturationFraction": {
+        "mean": 0.005508535879629629,
+        "lower95": 0.00473380223009083,
+        "upper95": 0.006283269529168428
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": false
+    },
+    {
+      "boundKind": "reference-multiplier",
+      "normMultiplier": 8.0,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.7573784722222222,
+        "lower95": 0.7053332291198986,
+        "upper95": 0.8094237153245458
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.6780960648148149,
+        "lower95": 0.6469262389227454,
+        "upper95": 0.7092658907068844
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.7750289351851851,
+        "lower95": 0.746736509134362,
+        "upper95": 0.8033213612360083
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.6895376031975592,
+        "lower95": 0.6578219796643994,
+        "upper95": 0.721253226730719
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.5750868055555555,
+        "lower95": 0.5428570143105689,
+        "upper95": 0.6073165968005421
+      },
+      "meanTrainingLossReduction": {
+        "mean": 8.99314441641482,
+        "lower95": 8.135576027273915,
+        "upper95": 9.850712805555725
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 6.8758518223835905,
+        "lower95": 6.832426033879298,
+        "upper95": 6.919277610887883
+      },
+      "meanSaturationFraction": {
+        "mean": 0.00979335455246914,
+        "lower95": 0.008742121714173698,
+        "upper95": 0.010844587390764583
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": false
+    },
+    {
+      "boundKind": "absolute-bound",
+      "normMultiplier": null,
+      "runCount": 48,
+      "meanHistoryBehaviorAccuracy": {
+        "mean": 0.9696180555555555,
+        "lower95": 0.944145534302145,
+        "upper95": 0.995090576808966
+      },
+      "meanNovelBehaviorAccuracy": {
+        "mean": 0.9681712962962964,
+        "lower95": 0.9548293164206497,
+        "upper95": 0.9815132761719431
+      },
+      "meanNovelArgmaxAccuracy": {
+        "mean": 0.9806134259259262,
+        "lower95": 0.9701708066981886,
+        "upper95": 0.9910560451536637
+      },
+      "meanNovelTargetProbability": {
+        "mean": 0.9649209657276036,
+        "lower95": 0.952323315443119,
+        "upper95": 0.9775186160120881
+      },
+      "meanMinimumNovelAccuracy": {
+        "mean": 0.9162326388888888,
+        "lower95": 0.8797286233548692,
+        "upper95": 0.9527366544229084
+      },
+      "meanTrainingLossReduction": {
+        "mean": 4.814637642950407,
+        "lower95": 4.353978343214585,
+        "upper95": 5.275296942686229
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 4.630401451433091,
+        "lower95": 4.398126125611316,
+        "upper95": 4.862676777254865
+      },
+      "meanSaturationFraction": {
+        "mean": 0.011224440586419755,
+        "lower95": 0.010117673331417708,
+        "upper95": 0.012331207841421802
+      },
+      "finiteFraction": 1.0,
+      "capabilityPassed": true
+    }
+  ],
+  "confirmedMinimumMultiplier": 1.5,
+  "passingConfirmationMultipliers": [
+    1.5,
+    2.0,
+    3.0,
+    4.0
+  ],
+  "confirmationComparisons": [
+    {
+      "normMultiplier": 1.0,
+      "novelBehaviorChangeFromOneX": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "saturationChangeFromOneX": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      }
+    },
+    {
+      "normMultiplier": 1.5,
+      "novelBehaviorChangeFromOneX": {
+        "mean": 0.13093171296296297,
+        "lower95": 0.11388653000305934,
+        "upper95": 0.14797689592286659
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": 0.12967173306975951,
+        "lower95": 0.11428044691932898,
+        "upper95": 0.14506301922019005
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.16883680555555555,
+        "lower95": 0.1445440331709632,
+        "upper95": 0.1931295779401479
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": 0.09592013888888885,
+        "lower95": 0.05433818644613409,
+        "upper95": 0.13750209133164362
+      },
+      "saturationChangeFromOneX": {
+        "mean": -0.0014672550154320983,
+        "lower95": -0.002178361701666267,
+        "upper95": -0.0007561483291979297
+      }
+    },
+    {
+      "normMultiplier": 2.0,
+      "novelBehaviorChangeFromOneX": {
+        "mean": 0.1956018518518519,
+        "lower95": 0.17814564003531336,
+        "upper95": 0.21305806366839042
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": 0.18741182287862382,
+        "lower95": 0.17376863317327498,
+        "upper95": 0.20105501258397265
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.26302083333333337,
+        "lower95": 0.2268394457840814,
+        "upper95": 0.2992022208825853
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": 0.10286458333333331,
+        "lower95": 0.05746467828980665,
+        "upper95": 0.14826448837686
+      },
+      "saturationChangeFromOneX": {
+        "mean": -0.0037694106867283955,
+        "lower95": -0.0046945325475548135,
+        "upper95": -0.002844288825901977
+      }
+    },
+    {
+      "normMultiplier": 3.0,
+      "novelBehaviorChangeFromOneX": {
+        "mean": 0.1964699074074074,
+        "lower95": 0.17040674520152368,
+        "upper95": 0.22253306961329114
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": 0.19217386241799847,
+        "lower95": 0.1695015689464903,
+        "upper95": 0.21484615588950665
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.28732638888888884,
+        "lower95": 0.2481378249059706,
+        "upper95": 0.32651495287180704
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": 0.07465277777777778,
+        "lower95": 0.0387748124067313,
+        "upper95": 0.11053074314882425
+      },
+      "saturationChangeFromOneX": {
+        "mean": -0.013550708912037033,
+        "lower95": -0.014860804557354581,
+        "upper95": -0.012240613266719484
+      }
+    },
+    {
+      "normMultiplier": 4.0,
+      "novelBehaviorChangeFromOneX": {
+        "mean": 0.1678240740740741,
+        "lower95": 0.13861593166559635,
+        "upper95": 0.19703221648255184
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": 0.1699042742567776,
+        "lower95": 0.14588172602205965,
+        "upper95": 0.19392682249149554
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.23090277777777776,
+        "lower95": 0.19590069491684844,
+        "upper95": 0.2659048606387071
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": 0.03862847222222221,
+        "lower95": 0.008947397738380648,
+        "upper95": 0.06830954670606378
+      },
+      "saturationChangeFromOneX": {
+        "mean": -0.019542100694444446,
+        "lower95": -0.020962905727120756,
+        "upper95": -0.018121295661768136
+      }
+    },
+    {
+      "normMultiplier": 6.0,
+      "novelBehaviorChangeFromOneX": {
+        "mean": 0.06655092592592592,
+        "lower95": 0.030800601111941737,
+        "upper95": 0.10230125073991009
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": 0.07285998293593897,
+        "lower95": 0.0396732929801612,
+        "upper95": 0.10604667289171674
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.10026041666666663,
+        "lower95": 0.06555897794368729,
+        "upper95": 0.13496185538964597
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": -0.0651041666666667,
+        "lower95": -0.09843612978308171,
+        "upper95": -0.03177220355025169
+      },
+      "saturationChangeFromOneX": {
+        "mean": -0.021395158179012344,
+        "lower95": -0.023067172655489878,
+        "upper95": -0.01972314370253481
+      }
+    },
+    {
+      "normMultiplier": 8.0,
+      "novelBehaviorChangeFromOneX": {
+        "mean": -0.04528356481481479,
+        "lower95": -0.08596778368205807,
+        "upper95": -0.004599345947571519
+      },
+      "targetProbabilityChangeFromOneX": {
+        "mean": -0.03992810487048929,
+        "lower95": -0.07820334637012635,
+        "upper95": -0.0016528633708522214
+      },
+      "minimumNovelAccuracyChangeFromOneX": {
+        "mean": 0.03559027777777778,
+        "lower95": -0.0029325472948256368,
+        "upper95": 0.0741131028503812
+      },
+      "historyAccuracyChangeFromOneX": {
+        "mean": -0.13671875000000003,
+        "lower95": -0.1811061887821303,
+        "upper95": -0.09233131121786975
+      },
+      "saturationChangeFromOneX": {
+        "mean": -0.017110339506172835,
+        "lower95": -0.01898312252960329,
+        "upper95": -0.015237556482742382
+      }
+    }
+  ],
+  "decision": "uniform-envelope-boundary-confirmed",
+  "acceptance": {
+    "m1xArtifactAndOptimizerFrozen": true,
+    "diagnosticIsOfflineOnly": true,
+    "developmentAndConfirmationSeedsDisjoint": true,
+    "developmentScaleScanComplete": true,
+    "confirmationScaleScanComplete": true,
+    "absoluteAnchorComplete": true,
+    "allFourRulesComplete": true,
+    "selectedMultiplierFromDevelopmentOnly": true,
+    "exactGradientOptimizerVerified": true,
+    "actionReadoutRemainedFrozen": true,
+    "topologyAndConnectionBudgetPreserved": true,
+    "finiteOutputs": true,
+    "stabilityWithinBounds": true,
+    "absoluteAnchorPassed": true,
+    "uniformBoundaryFound": true,
+    "developmentBoundaryConfirmed": true,
+    "stagePassed": true,
+    "passed": true
+  },
+  "conclusions": [
+    "开发统一范数曲线（B/C/D 行为 / 目标概率 / 最低新规则）为 1.0×: 76.8% / 76.8% / 61.8% · 1.5×: 88.6% / 88.9% / 68.1% ✓ · 2.0×: 92.4% / 92.0% / 78.8% ✓ · 3.0×: 93.8% / 92.6% / 83.8% ✓ · 4.0×: 90.1% / 89.1% / 75.8% ✓ · 6.0×: 83.6% / 82.2% / 70.7% ✓ · 8.0×: 77.4% / 76.3% / 65.8%；选择边界为 1.5×。",
+    "独立确认统一范数曲线为 1.0×: 72.3% / 72.9% / 53.9% · 1.5×: 85.4% / 85.9% / 70.8% ✓ · 2.0×: 91.9% / 91.7% / 80.3% ✓ · 3.0×: 92.0% / 92.2% / 82.7% ✓ · 4.0×: 89.1% / 89.9% / 77.0% ✓ · 6.0×: 79.0% / 80.2% / 64.0% · 8.0×: 67.8% / 69.0% / 57.5%；确认最小边界为 1.5×。",
+    "绝对边界 anchor 的 B/C/D 行为为 96.8%，目标概率 96.5%，最低新规则 91.6%。",
+    "M1-XE 正式决策为 UniformEnvelopeBoundaryConfirmed。",
+    "开发与独立确认一致定位到 1.5× 的统一参考范数边界；下一步应在冻结该边界的条件下因果测试现有局部信用能否利用这项自由度，oracle 仍不证明在线方向信用。"
+  ]
+}

@@ -1,0 +1,1249 @@
+{
+  "version": "adaptive-mechanism/m2c-group-v0.6-balanced-bundle",
+  "config": {
+    "m2cProtocol": {
+      "m1Protocol": {
+        "map2Protocol": {
+          "map2bProtocol": {
+            "map2aProtocol": {
+              "map1Protocol": {
+                "seed": 5566818783092277505,
+                "developmentConfigCount": 48,
+                "developmentSeedCount": 8,
+                "confirmationSeedCount": 12,
+                "confirmationCandidateCount": 6,
+                "recurrentGainRange": [
+                  0.1,
+                  0.45
+                ],
+                "internalLearningRateRange": [
+                  0.06,
+                  0.16
+                ],
+                "homeostasisStrengthRange": [
+                  0.25,
+                  1.0
+                ],
+                "explorationRateRange": [
+                  0.04,
+                  0.18
+                ],
+                "activityTarget": 0.35,
+                "activityEmaRate": 0.05,
+                "excitabilityAdjustmentRate": 0.02,
+                "weightNormRelaxationRate": 0.03,
+                "minimumExcitabilityGain": 0.65,
+                "maximumExcitabilityGain": 1.35,
+                "probeProtocol": {
+                  "seed": 5566818783092277505,
+                  "developmentConfigCount": 64,
+                  "developmentSeedCount": 8,
+                  "confirmationSeedCount": 12,
+                  "confirmationCandidateCount": 6,
+                  "pretrainingEpisodes": 320,
+                  "adaptationEpisodes": 240,
+                  "evaluationEpisodes": 80,
+                  "thresholdCheckInterval": 20,
+                  "cueSteps": 2,
+                  "memoryDelaySteps": 8,
+                  "rewardDelaySteps": 6,
+                  "eligibilityDecay": 0.88,
+                  "hiddenLeak": 0.8,
+                  "policyLearningRate": 0.055,
+                  "softmaxTemperature": 0.4,
+                  "rewardBaselineDecay": 0.92,
+                  "weightLimit": 2.5,
+                  "recurrentGainRange": [
+                    0.1,
+                    0.45
+                  ],
+                  "internalLearningRateRange": [
+                    0.06,
+                    0.16
+                  ],
+                  "homeostasisStrengthRange": [
+                    0.25,
+                    1.0
+                  ],
+                  "explorationRateRange": [
+                    0.04,
+                    0.18
+                  ],
+                  "thresholds": {
+                    "memoryAccuracy": 0.65,
+                    "delayedCreditAccuracy": 0.65,
+                    "reversalAccuracy": 0.7,
+                    "restorationAccuracy": 0.7,
+                    "repeatedReversalAccuracy": 0.7,
+                    "perturbationRecoveryAccuracy": 0.65,
+                    "minimumPerturbationDamageDrop": 0.15,
+                    "minimumPerturbationRecoveryGain": 0.1,
+                    "maximumSaturationFraction": 0.25,
+                    "maximumSynchronyFraction": 0.5,
+                    "maximumRelativeWeightDrift": 1.0,
+                    "minimumRegionFormationProbability": 0.5,
+                    "minimumRegionSize": 3,
+                    "minimumCausalProbabilityDrop": 0.15,
+                    "minimumCausalProbeScoreDrop": 0.1
+                  }
+                }
+              },
+              "softBoundScale": 1.0,
+              "minimumMeanWeightDriftReduction": 0.25,
+              "maximumAccuracyDegradation": 0.02
+            },
+            "initialResource": 0.75,
+            "supplyRate": 0.007,
+            "maintenanceCost": 0.001,
+            "activityCost": 0.012,
+            "plasticityCost": 0.05,
+            "minimumModulation": 0.6,
+            "minimumNoSupplyResourceDrop": 0.2,
+            "minimumNoSupplyProbeScoreDrop": 0.1,
+            "maximumProbeScoreDegradation": 0.02,
+            "maximumWeightDriftIncrease": 0.05
+          },
+          "streamTrialCount": 720,
+          "minimumChangeGap": 30,
+          "changeProbability": 0.025,
+          "settlingWindow": 20,
+          "exploration": 0.12,
+          "minimumRuleChanges": 5,
+          "minimumOverallAccuracy": 0.6,
+          "minimumSettledAccuracy": 0.65,
+          "maximumRelativeWeightDrift": 1.0,
+          "minimumResourceLevel": 0.05,
+          "minimumFormationProbability": 0.5,
+          "minimumRegionSize": 3,
+          "maximumResetAdvantage": 0.05,
+          "minimumNoSupplyAccuracyDrop": 0.1,
+          "minimumFrozenAccuracyDrop": 0.1
+        },
+        "referenceParameterIds": [
+          0,
+          16,
+          20,
+          21,
+          29,
+          45
+        ],
+        "developmentSeedCount": 4,
+        "confirmationSeedCount": 8,
+        "phaseTrialCount": 240,
+        "evaluationTrialCount": 48,
+        "thresholdCheckInterval": 20,
+        "accuracyThreshold": 0.7,
+        "minimumRetainedAccuracy": 0.6,
+        "maximumRetentionDrop": 0.15,
+        "maximumRelativeWeightDrift": 1.0,
+        "minimumMeanResourceLevel": 0.2,
+        "minimumSingleRuleAccuracy": 0.7,
+        "minimumRetentionProbability": 0.5,
+        "minimumCausalAccuracyDrop": 0.05,
+        "maximumResetRetentionAdvantage": 0.05
+      },
+      "candidateRewiringIntervals": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "candidateEvidenceDecays": [
+        0.8,
+        0.95
+      ],
+      "minimumAccuracyImprovement": 0.05,
+      "minimumSingleRuleAccuracy": 0.7,
+      "minimumNovelRuleAccuracy": 0.7,
+      "minimumRetainedAccuracy": 0.6,
+      "maximumRetentionDrop": 0.15,
+      "minimumMeanResourceLevel": 0.2,
+      "maximumRelativeWeightDrift": 1.0
+    },
+    "structuralParameters": {
+      "id": 3,
+      "rewiringInterval": 64,
+      "evidenceDecay": 0.8
+    },
+    "checkpointGlobalTrials": [
+      64,
+      128,
+      192,
+      256,
+      320,
+      384,
+      448,
+      512,
+      576,
+      640,
+      704,
+      768,
+      832,
+      896,
+      960,
+      1024,
+      1088,
+      1152
+    ],
+    "groupSizes": [
+      1,
+      2,
+      4
+    ],
+    "bundleBudget": 17,
+    "forwardTrainingTrials": 32,
+    "evaluationTrialCount": 48,
+    "shuffledRankingCount": 16,
+    "minimumOracleBenefit": 0.02,
+    "minimumOracleAdvantageOverSingle": 0.005,
+    "minimumSelectedBenefitAdvantage": 0.01
+  },
+  "causalContract": [
+    "the v0.4 controller population, checkpoints, scheduled target, local evidence, 32-trial horizon, and random stream are reused",
+    "a two-edge bundle replaces both adjustable slots of the scheduled target; a four-edge bundle does the same for the scheduled and immediately preceding target; every edge inherits its replaced weight and total connectivity is unchanged",
+    "each scale receives exactly 17 balanced bundles; every target dimension uses each of its 17 legal sources exactly once, and the local-evidence-selected bundle is included",
+    "every bundle is paired with its constituent one-edge counterfactuals so additive contribution and group interaction remain distinguishable",
+    "task accuracy is used only by the offline evaluator; the live stream never receives a topology write"
+  ],
+  "carrierParameters": [
+    {
+      "id": 0,
+      "recurrentGain": 0.275,
+      "internalLearningRate": 0.09333333333333332,
+      "homeostasisStrength": 0.4,
+      "explorationRate": 0.06
+    },
+    {
+      "id": 16,
+      "recurrentGain": 0.28593749999999996,
+      "internalLearningRate": 0.15259259259259259,
+      "homeostasisStrength": 0.64,
+      "explorationRate": 0.1057142857142857
+    },
+    {
+      "id": 20,
+      "recurrentGain": 0.3296875,
+      "internalLearningRate": 0.07851851851851852,
+      "homeostasisStrength": 0.52,
+      "explorationRate": 0.04857142857142857
+    },
+    {
+      "id": 21,
+      "recurrentGain": 0.2421875,
+      "internalLearningRate": 0.11185185185185184,
+      "homeostasisStrength": 0.67,
+      "explorationRate": 0.06857142857142857
+    },
+    {
+      "id": 29,
+      "recurrentGain": 0.2640625,
+      "internalLearningRate": 0.07234567901234568,
+      "homeostasisStrength": 0.28600000000000003,
+      "explorationRate": 0.09142857142857141
+    },
+    {
+      "id": 45,
+      "recurrentGain": 0.25859374999999996,
+      "internalLearningRate": 0.1019753086419753,
+      "homeostasisStrength": 0.526,
+      "explorationRate": 0.13714285714285712
+    }
+  ],
+  "developmentSummaries": [
+    {
+      "edgeCount": 1,
+      "seedRunCount": 24,
+      "checkpointCount": 432,
+      "bundleEvaluationCount": 7344,
+      "componentControlEvaluationCount": 7344,
+      "meanSpearmanCorrelation": {
+        "mean": 0.05059133360021656,
+        "lower95": 0.024171946315535684,
+        "upper95": 0.07701072088489744
+      },
+      "meanShuffledSpearmanCorrelation": {
+        "mean": -0.0008759463714267448,
+        "lower95": -0.004832933942469162,
+        "upper95": 0.003081041199615672
+      },
+      "meanCorrelationAdvantage": {
+        "mean": 0.05146727997164329,
+        "lower95": 0.02502297600646672,
+        "upper95": 0.07791158393681986
+      },
+      "meanSelectedBenefit": {
+        "mean": 0.0005304783950617278,
+        "lower95": -0.0018027847445413105,
+        "upper95": 0.002863741534664766
+      },
+      "meanRandomBenefit": {
+        "mean": 0.000019857480029048,
+        "lower95": -0.0011872710679649658,
+        "upper95": 0.001226986028023062
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0005106209150326798,
+        "lower95": -0.0010358173434409784,
+        "upper95": 0.002057059173506338
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.012731481481481476,
+        "lower95": 0.01020625205873545,
+        "upper95": 0.015256710904227502
+      },
+      "meanSelectedRegret": {
+        "mean": 0.01220100308641975,
+        "lower95": 0.008898387793542356,
+        "upper95": 0.015503618379297144
+      },
+      "meanTopQuartileHitRate": {
+        "mean": 0.4027777777777779,
+        "lower95": 0.3558558377507979,
+        "upper95": 0.4496997178047579
+      },
+      "meanInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "meanSelectedInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "edgeCount": 2,
+      "seedRunCount": 24,
+      "checkpointCount": 432,
+      "bundleEvaluationCount": 7344,
+      "componentControlEvaluationCount": 14688,
+      "meanSpearmanCorrelation": {
+        "mean": 0.06591478907806178,
+        "lower95": 0.032452505192273676,
+        "upper95": 0.09937707296384989
+      },
+      "meanShuffledSpearmanCorrelation": {
+        "mean": -0.00048195729153529507,
+        "lower95": -0.0042284579533223045,
+        "upper95": 0.0032645433702517142
+      },
+      "meanCorrelationAdvantage": {
+        "mean": 0.06639674636959708,
+        "lower95": 0.0323518012643607,
+        "upper95": 0.10044169147483346
+      },
+      "meanSelectedBenefit": {
+        "mean": 0.004050925925925924,
+        "lower95": 0.0017056238075410742,
+        "upper95": 0.006396228044310774
+      },
+      "meanRandomBenefit": {
+        "mean": -0.00040282316630355975,
+        "lower95": -0.0020581535391695736,
+        "upper95": 0.001252507206562454
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0044537490922294835,
+        "lower95": 0.0019533359512850894,
+        "upper95": 0.006954162233173878
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.016541280864197528,
+        "lower95": 0.013511008120692187,
+        "upper95": 0.01957155360770287
+      },
+      "meanSelectedRegret": {
+        "mean": 0.0124903549382716,
+        "lower95": 0.009708714860873366,
+        "upper95": 0.015271995015669834
+      },
+      "meanTopQuartileHitRate": {
+        "mean": 0.4351851851851853,
+        "lower95": 0.39287709666317105,
+        "upper95": 0.4774932737071995
+      },
+      "meanInteractionOverAdditive": {
+        "mean": 0.0017644789397240383,
+        "lower95": 0.00023663621903443526,
+        "upper95": 0.0032923216604136413
+      },
+      "meanSelectedInteractionOverAdditive": {
+        "mean": 0.002025462962962963,
+        "lower95": -0.001139553693612147,
+        "upper95": 0.005190479619538073
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.007137345679012343,
+        "lower95": 0.004197051897068432,
+        "upper95": 0.010077639460956253
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "edgeCount": 4,
+      "seedRunCount": 24,
+      "checkpointCount": 432,
+      "bundleEvaluationCount": 7344,
+      "componentControlEvaluationCount": 29376,
+      "meanSpearmanCorrelation": {
+        "mean": 0.08309810561365542,
+        "lower95": 0.057113631419453824,
+        "upper95": 0.10908257980785702
+      },
+      "meanShuffledSpearmanCorrelation": {
+        "mean": -0.0010153368030814583,
+        "lower95": -0.00567133881575947,
+        "upper95": 0.003640665209596553
+      },
+      "meanCorrelationAdvantage": {
+        "mean": 0.08411344241673689,
+        "lower95": 0.059911166431497555,
+        "upper95": 0.10831571840197624
+      },
+      "meanSelectedBenefit": {
+        "mean": 0.003954475308641974,
+        "lower95": -0.00019381395292077195,
+        "upper95": 0.008102764570204719
+      },
+      "meanRandomBenefit": {
+        "mean": 0.0010864878358750893,
+        "lower95": -0.0017938041696007314,
+        "upper95": 0.00396677984135091
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0028679874727668853,
+        "lower95": -0.0005100550356205908,
+        "upper95": 0.006246029981154361
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.026620370370370367,
+        "lower95": 0.02220623209997764,
+        "upper95": 0.031034508640763094
+      },
+      "meanSelectedRegret": {
+        "mean": 0.022665895061728388,
+        "lower95": 0.017584305214241456,
+        "upper95": 0.02774748490921532
+      },
+      "meanTopQuartileHitRate": {
+        "mean": 0.42129629629629645,
+        "lower95": 0.36768007847794537,
+        "upper95": 0.4749125141146475
+      },
+      "meanInteractionOverAdditive": {
+        "mean": 0.0023573665577342065,
+        "lower95": -0.0005244743403379905,
+        "upper95": 0.005239207455806404
+      },
+      "meanSelectedInteractionOverAdditive": {
+        "mean": -0.0004340277777777761,
+        "lower95": -0.005465646090451421,
+        "upper95": 0.004597590534895868
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.011911651234567897,
+        "lower95": 0.007697447472511082,
+        "upper95": 0.016125854996624712
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "confirmationSummaries": [
+    {
+      "edgeCount": 1,
+      "seedRunCount": 48,
+      "checkpointCount": 864,
+      "bundleEvaluationCount": 14688,
+      "componentControlEvaluationCount": 14688,
+      "meanSpearmanCorrelation": {
+        "mean": 0.04564097587940386,
+        "lower95": 0.029250532200992968,
+        "upper95": 0.06203141955781476
+      },
+      "meanShuffledSpearmanCorrelation": {
+        "mean": 0.0020824778303832783,
+        "lower95": -0.00037930699207226444,
+        "upper95": 0.0045442626528388215
+      },
+      "meanCorrelationAdvantage": {
+        "mean": 0.043558498049020594,
+        "lower95": 0.026746925061845356,
+        "upper95": 0.060370071036195835
+      },
+      "meanSelectedBenefit": {
+        "mean": 0.0007716049382716033,
+        "lower95": -0.001535137591941365,
+        "upper95": 0.0030783474684845714
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0011928671931735674,
+        "lower95": -0.002505005298270634,
+        "upper95": 0.00011927091192349948
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.001964472131445171,
+        "lower95": 0.0006174157630036089,
+        "upper95": 0.003311528499886733
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.01384066358024691,
+        "lower95": 0.011569172260504334,
+        "upper95": 0.016112154899989486
+      },
+      "meanSelectedRegret": {
+        "mean": 0.013069058641975308,
+        "lower95": 0.010365639484557097,
+        "upper95": 0.015772477799393517
+      },
+      "meanTopQuartileHitRate": {
+        "mean": 0.2974537037037037,
+        "lower95": 0.2525893316497292,
+        "upper95": 0.34231807575767825
+      },
+      "meanInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "meanSelectedInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "edgeCount": 2,
+      "seedRunCount": 48,
+      "checkpointCount": 864,
+      "bundleEvaluationCount": 14688,
+      "componentControlEvaluationCount": 29376,
+      "meanSpearmanCorrelation": {
+        "mean": 0.05992223532895785,
+        "lower95": 0.041849022216555495,
+        "upper95": 0.07799544844136021
+      },
+      "meanShuffledSpearmanCorrelation": {
+        "mean": -0.000039405890775525776,
+        "lower95": -0.002963251820072863,
+        "upper95": 0.002884440038521812
+      },
+      "meanCorrelationAdvantage": {
+        "mean": 0.0599616412197334,
+        "lower95": 0.04165501352913285,
+        "upper95": 0.07826826891033395
+      },
+      "meanSelectedBenefit": {
+        "mean": 0.0016155478395061711,
+        "lower95": -0.00047476600817928575,
+        "upper95": 0.003705861687191628
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0008950049927378372,
+        "lower95": -0.002136280520041792,
+        "upper95": 0.0003462705345661179
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0025105528322440077,
+        "lower95": 0.0009598819221783429,
+        "upper95": 0.004061223742309673
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.018012152777777773,
+        "lower95": 0.014922122986570047,
+        "upper95": 0.021102182568985498
+      },
+      "meanSelectedRegret": {
+        "mean": 0.01639660493827161,
+        "lower95": 0.013206737270596512,
+        "upper95": 0.019586472605946703
+      },
+      "meanTopQuartileHitRate": {
+        "mean": 0.3055555555555555,
+        "lower95": 0.2601658827506296,
+        "upper95": 0.3509452283604815
+      },
+      "meanInteractionOverAdditive": {
+        "mean": 0.0003290668119099503,
+        "lower95": -0.0004696159787239376,
+        "upper95": 0.0011277496025438381
+      },
+      "meanSelectedInteractionOverAdditive": {
+        "mean": -0.001446759259259258,
+        "lower95": -0.0029578474792706024,
+        "upper95": 0.00006432896075208618
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.007040895061728398,
+        "lower95": 0.005243873515330779,
+        "upper95": 0.008837916608126016
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "edgeCount": 4,
+      "seedRunCount": 48,
+      "checkpointCount": 864,
+      "bundleEvaluationCount": 14688,
+      "componentControlEvaluationCount": 58752,
+      "meanSpearmanCorrelation": {
+        "mean": 0.06859212749430177,
+        "lower95": 0.05236504210902755,
+        "upper95": 0.08481921287957599
+      },
+      "meanShuffledSpearmanCorrelation": {
+        "mean": -0.003061414123958245,
+        "lower95": -0.006287826781170661,
+        "upper95": 0.00016499853325417126
+      },
+      "meanCorrelationAdvantage": {
+        "mean": 0.07165354161826003,
+        "lower95": 0.05607247341711791,
+        "upper95": 0.08723460981940215
+      },
+      "meanSelectedBenefit": {
+        "mean": 0.0005063657407407403,
+        "lower95": -0.0030912126928389558,
+        "upper95": 0.0041039441743204366
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0029403254357298486,
+        "lower95": -0.004886272582517316,
+        "upper95": -0.000994378288942381
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0034466911764705886,
+        "lower95": 0.000688170946152407,
+        "upper95": 0.00620521140678877
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.025462962962962955,
+        "lower95": 0.021409188025756413,
+        "upper95": 0.029516737900169496
+      },
+      "meanSelectedRegret": {
+        "mean": 0.024956597222222224,
+        "lower95": 0.020773815950859958,
+        "upper95": 0.02913937849358449
+      },
+      "meanTopQuartileHitRate": {
+        "mean": 0.3298611111111111,
+        "lower95": 0.29269586377997076,
+        "upper95": 0.36702635844225145
+      },
+      "meanInteractionOverAdditive": {
+        "mean": -0.00021843228031953298,
+        "lower95": -0.002064283671967406,
+        "upper95": 0.00162741911132834
+      },
+      "meanSelectedInteractionOverAdditive": {
+        "mean": -0.0029658564814814786,
+        "lower95": -0.0061100396620341274,
+        "upper95": 0.00017832669907117023
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.009452160493827159,
+        "lower95": 0.006188069793075802,
+        "upper95": 0.012716251194578516
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "confirmationPhaseSummaries": [
+    {
+      "edgeCount": 1,
+      "phaseIndex": 0,
+      "rule": "a",
+      "seedRunCount": 48,
+      "checkpointCount": 144,
+      "meanSelectedBenefit": {
+        "mean": -0.0036168981481481525,
+        "lower95": -0.011506456019215846,
+        "upper95": 0.004272659722919542
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0032764842047930307,
+        "lower95": -0.007305258448698695,
+        "upper95": 0.0007522900391126338
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.02170138888888888,
+        "lower95": 0.014026725965206715,
+        "upper95": 0.029376051812571045
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": -0.00034041394335512115,
+        "lower95": -0.005003160171998934,
+        "upper95": 0.004322332285288692
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      }
+    },
+    {
+      "edgeCount": 1,
+      "phaseIndex": 1,
+      "rule": "b",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": 0.0006510416666666652,
+        "lower95": -0.00222645531775454,
+        "upper95": 0.0035285386510878706
+      },
+      "meanRandomBenefit": {
+        "mean": 0.0006127450980392135,
+        "lower95": -0.0022823825387974536,
+        "upper95": 0.0035078727348758806
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.015950520833333332,
+        "lower95": 0.010535401521782206,
+        "upper95": 0.021365640144884457
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.00003829656862745193,
+        "lower95": -0.0019037009257032384,
+        "upper95": 0.0019802940629581422
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      }
+    },
+    {
+      "edgeCount": 1,
+      "phaseIndex": 2,
+      "rule": "c",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.001410590277777777,
+        "lower95": -0.0033976706557098933,
+        "upper95": 0.0005764901001543391
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0014871834150326797,
+        "lower95": -0.003041553810009246,
+        "upper95": 0.00006718697994388657
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.006293402777777776,
+        "lower95": 0.003959553035468572,
+        "upper95": 0.00862725252008698
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.00007659313725490227,
+        "lower95": -0.0012029353516826936,
+        "upper95": 0.0013561216261924983
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      }
+    },
+    {
+      "edgeCount": 1,
+      "phaseIndex": 3,
+      "rule": "d",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.0007595486111111119,
+        "lower95": -0.003133261161477748,
+        "upper95": 0.001614163939255524
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0020361008986928115,
+        "lower95": -0.0039422837167443735,
+        "upper95": -0.00012991808064124967
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.005316840277777775,
+        "lower95": 0.0029922867209792015,
+        "upper95": 0.007641393834576349
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0012765522875816998,
+        "lower95": -0.0009715090140448941,
+        "upper95": 0.0035246135892082935
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      }
+    },
+    {
+      "edgeCount": 1,
+      "phaseIndex": 4,
+      "rule": "a",
+      "seedRunCount": 48,
+      "checkpointCount": 144,
+      "meanSelectedBenefit": {
+        "mean": 0.010271990740740738,
+        "lower95": 0.0018585737092966046,
+        "upper95": 0.018685407772184873
+      },
+      "meanRandomBenefit": {
+        "mean": -4.991847502485343e-18,
+        "lower95": -0.004768359123520732,
+        "upper95": 0.004768359123520721
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.0245949074074074,
+        "lower95": 0.01792391746958408,
+        "upper95": 0.03126589734523072
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.010271990740740745,
+        "lower95": 0.00563425735380503,
+        "upper95": 0.014909724127676459
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      }
+    },
+    {
+      "edgeCount": 2,
+      "phaseIndex": 0,
+      "rule": "a",
+      "seedRunCount": 48,
+      "checkpointCount": 144,
+      "meanSelectedBenefit": {
+        "mean": 0.002748842592592588,
+        "lower95": -0.004232304211132782,
+        "upper95": 0.009729989396317957
+      },
+      "meanRandomBenefit": {
+        "mean": 0.0005531726579520685,
+        "lower95": -0.0026985287519147977,
+        "upper95": 0.0038048740678189347
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.03269675925925925,
+        "lower95": 0.022420609041193307,
+        "upper95": 0.0429729094773252
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.00219566993464052,
+        "lower95": -0.0029142831874059993,
+        "upper95": 0.007305623056687039
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.011863425925925925,
+        "lower95": 0.004336418406730716,
+        "upper95": 0.019390433445121133
+      }
+    },
+    {
+      "edgeCount": 2,
+      "phaseIndex": 1,
+      "rule": "b",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.002495659722222225,
+        "lower95": -0.0069315365125573285,
+        "upper95": 0.001940217068112878
+      },
+      "meanRandomBenefit": {
+        "mean": -0.003995608660130721,
+        "lower95": -0.008099294284029508,
+        "upper95": 0.0001080769637680657
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.01486545138888889,
+        "lower95": 0.009834300773710756,
+        "upper95": 0.019896602004067024
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0014999489379084966,
+        "lower95": -0.0008132141921134177,
+        "upper95": 0.003813112067930411
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.003797743055555559,
+        "lower95": 0.0004166695117411119,
+        "upper95": 0.007178816599370006
+      }
+    },
+    {
+      "edgeCount": 2,
+      "phaseIndex": 2,
+      "rule": "c",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.0027126736111111114,
+        "lower95": -0.005362255365242728,
+        "upper95": -0.00006309185697949467
+      },
+      "meanRandomBenefit": {
+        "mean": -0.001927593954248365,
+        "lower95": -0.0040045201014143675,
+        "upper95": 0.00014933219291763723
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.00954861111111111,
+        "lower95": 0.0059351565841612225,
+        "upper95": 0.013162065638060997
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": -0.0007850796568627458,
+        "lower95": -0.0021441333557115903,
+        "upper95": 0.0005739740419860987
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.005425347222222221,
+        "lower95": 0.0028830868959796962,
+        "upper95": 0.007967607548464746
+      }
+    },
+    {
+      "edgeCount": 2,
+      "phaseIndex": 3,
+      "rule": "d",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.0011935763888888888,
+        "lower95": -0.004266910868233859,
+        "upper95": 0.0018797580904560808
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0009637969771241835,
+        "lower95": -0.0033443007065564593,
+        "upper95": 0.0014167067523080923
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.007486979166666664,
+        "lower95": 0.004510356751221958,
+        "upper95": 0.01046360158211137
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": -0.0002297794117647053,
+        "lower95": -0.0021583871132911225,
+        "upper95": 0.0016988282897617117
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.005533854166666669,
+        "lower95": 0.002580601081656517,
+        "upper95": 0.00848710725167682
+      }
+    },
+    {
+      "edgeCount": 2,
+      "phaseIndex": 4,
+      "rule": "a",
+      "seedRunCount": 48,
+      "checkpointCount": 144,
+      "meanSelectedBenefit": {
+        "mean": 0.015480324074074068,
+        "lower95": 0.0064433741372716576,
+        "upper95": 0.02451727401087648
+      },
+      "meanRandomBenefit": {
+        "mean": 0.003259463507625269,
+        "lower95": -0.000992026381715352,
+        "upper95": 0.00751095339696589
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.03284143518518517,
+        "lower95": 0.024372080768413698,
+        "upper95": 0.04131078960195664
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0122208605664488,
+        "lower95": 0.004765777199747347,
+        "upper95": 0.019675943933150253
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.010706018518518523,
+        "lower95": 0.004560428200560556,
+        "upper95": 0.01685160883647649
+      }
+    },
+    {
+      "edgeCount": 4,
+      "phaseIndex": 0,
+      "rule": "a",
+      "seedRunCount": 48,
+      "checkpointCount": 144,
+      "meanSelectedBenefit": {
+        "mean": -0.0037615740740740756,
+        "lower95": -0.019971960427543203,
+        "upper95": 0.01244881227939505
+      },
+      "meanRandomBenefit": {
+        "mean": 0.0014212282135076248,
+        "lower95": -0.005936064193531236,
+        "upper95": 0.008778520620546485
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.05034722222222221,
+        "lower95": 0.03767013599194764,
+        "upper95": 0.06302430845249678
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": -0.005182802287581698,
+        "lower95": -0.016801824888507903,
+        "upper95": 0.006436220313344506
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.012297453703703701,
+        "lower95": 0.0006765950301504519,
+        "upper95": 0.023918312377256952
+      }
+    },
+    {
+      "edgeCount": 4,
+      "phaseIndex": 1,
+      "rule": "b",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.008355034722222225,
+        "lower95": -0.01459701619313268,
+        "upper95": -0.002113053251311771
+      },
+      "meanRandomBenefit": {
+        "mean": -0.011450674019607844,
+        "lower95": -0.018516985142470185,
+        "upper95": -0.004384362896745503
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.02007378472222222,
+        "lower95": 0.013359410100056441,
+        "upper95": 0.026788159344388
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0030956392973856208,
+        "lower95": -0.000262975634889391,
+        "upper95": 0.006454254229660632
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.0066189236111111145,
+        "lower95": 0.0006492938568426285,
+        "upper95": 0.0125885533653796
+      }
+    },
+    {
+      "edgeCount": 4,
+      "phaseIndex": 2,
+      "rule": "c",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.0020616319444444428,
+        "lower95": -0.0053876083507547615,
+        "upper95": 0.001264344461865876
+      },
+      "meanRandomBenefit": {
+        "mean": -0.002782883986928103,
+        "lower95": -0.005919361441673444,
+        "upper95": 0.0003535934678172382
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.014322916666666664,
+        "lower95": 0.009351705791264108,
+        "upper95": 0.01929412754206922
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0007212520424836602,
+        "lower95": -0.002517647159929695,
+        "upper95": 0.003960151244897015
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.012695312499999995,
+        "lower95": 0.008086641759827453,
+        "upper95": 0.017303983240172537
+      }
+    },
+    {
+      "edgeCount": 4,
+      "phaseIndex": 3,
+      "rule": "d",
+      "seedRunCount": 48,
+      "checkpointCount": 192,
+      "meanSelectedBenefit": {
+        "mean": -0.001519097222222222,
+        "lower95": -0.005302719388884082,
+        "upper95": 0.0022645249444396376
+      },
+      "meanRandomBenefit": {
+        "mean": -0.0017552593954248358,
+        "lower95": -0.005218765852524571,
+        "upper95": 0.0017082470616748998
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.009765624999999997,
+        "lower95": 0.005460430094331907,
+        "upper95": 0.014070819905668086
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0002361621732026139,
+        "lower95": -0.0025220253376187743,
+        "upper95": 0.0029943496840240023
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.007052951388888891,
+        "lower95": 0.0020263935103860767,
+        "upper95": 0.012079509267391705
+      }
+    },
+    {
+      "edgeCount": 4,
+      "phaseIndex": 4,
+      "rule": "a",
+      "seedRunCount": 48,
+      "checkpointCount": 144,
+      "meanSelectedBenefit": {
+        "mean": 0.022714120370370364,
+        "lower95": 0.010652877679894812,
+        "upper95": 0.034775363060845915
+      },
+      "meanRandomBenefit": {
+        "mean": 0.0022552423747276644,
+        "lower95": -0.0029381833802070907,
+        "upper95": 0.00744866812966242
+      },
+      "meanBudgetedOracleBenefit": {
+        "mean": 0.04354745370370369,
+        "lower95": 0.033882589481513785,
+        "upper95": 0.0532123179258936
+      },
+      "meanSelectedBenefitAdvantage": {
+        "mean": 0.0204588779956427,
+        "lower95": 0.009506969238376316,
+        "upper95": 0.031410786752909085
+      },
+      "meanOracleInteractionOverAdditive": {
+        "mean": 0.009259259259259267,
+        "lower95": 0.0013142747326770829,
+        "upper95": 0.017204243785841452
+      }
+    }
+  ],
+  "confirmationComparisons": [
+    {
+      "edgeCount": 2,
+      "oracleAdvantageOverSingle": {
+        "mean": 0.004171489197530865,
+        "lower95": 0.002732720061201675,
+        "upper95": 0.005610258333860056
+      },
+      "selectedAdvantageOverSingle": {
+        "mean": 0.0008439429012345673,
+        "lower95": -0.0003899902684048051,
+        "upper95": 0.0020778760708739397
+      },
+      "randomMeanChangeFromSingle": {
+        "mean": 0.0002978622004357305,
+        "lower95": -0.000674202047959019,
+        "upper95": 0.00126992644883048
+      },
+      "oracleInteractionOverAdditive": {
+        "mean": 0.007040895061728398,
+        "lower95": 0.005243873515330779,
+        "upper95": 0.008837916608126016
+      }
+    },
+    {
+      "edgeCount": 4,
+      "oracleAdvantageOverSingle": {
+        "mean": 0.01162229938271605,
+        "lower95": 0.009076181831047291,
+        "upper95": 0.01416841693438481
+      },
+      "selectedAdvantageOverSingle": {
+        "mean": -0.000265239197530863,
+        "lower95": -0.002678220097517072,
+        "upper95": 0.0021477417024553464
+      },
+      "randomMeanChangeFromSingle": {
+        "mean": -0.0017474582425562803,
+        "lower95": -0.0032470362696946174,
+        "upper95": -0.00024788021541794327
+      },
+      "oracleInteractionOverAdditive": {
+        "mean": 0.009452160493827159,
+        "lower95": 0.006188069793075802,
+        "upper95": 0.012716251194578516
+      }
+    }
+  ],
+  "confirmationCapabilityContrast": {
+    "edgeCount": 4,
+    "meanHistoryPhaseOracleBenefit": {
+      "mean": 0.046947337962962965,
+      "lower95": 0.03847063889372557,
+      "upper95": 0.05542403703220036
+    },
+    "meanNovelRuleOracleBenefit": {
+      "mean": 0.014720775462962958,
+      "lower95": 0.011192133668285404,
+      "upper95": 0.01824941725764051
+    },
+    "historyAdvantageOverNovelRules": {
+      "mean": 0.032226562499999986,
+      "lower95": 0.02378934324101463,
+      "upper95": 0.04066378175898534
+    }
+  },
+  "selectedGroupSize": 4,
+  "decision": "history-dominated-grouped-effect",
+  "acceptance": {
+    "priorM2cAndDiagnosticsFrozen": true,
+    "diagnosticIsOfflineOnly": true,
+    "topologyUnchangedInMainStream": true,
+    "actionReadoutRemainedFrozen": true,
+    "developmentAndConfirmationSeedsDisjoint": true,
+    "developmentRunsComplete": true,
+    "confirmationRunsComplete": true,
+    "allCheckpointsComplete": true,
+    "groupSizesAndSearchBudgetFrozen": true,
+    "equalBundleBudgetAcrossGroupSizes": true,
+    "balancedCandidateMarginalsComplete": true,
+    "groupedTargetEvidenceCoverageSufficient": true,
+    "componentControlsComplete": true,
+    "cloneConnectionBudgetPreserved": true,
+    "pairedHorizonAndRandomnessFrozen": true,
+    "singleEdgeScaleReplicatesV04": true,
+    "finiteOutputs": true,
+    "usefulGroupedSwapsExist": true,
+    "usefulGroupBeatsSingle": true,
+    "groupedEvidenceSelectionUseful": false,
+    "novelRuleGroupedSwapsUseful": false,
+    "groupedEffectHistoryDominated": true,
+    "stagePassed": true,
+    "passed": true
+  },
+  "conclusions": [
+    "独立确认对每个规模使用相同的 17 个 bundle 搜索预算；budgeted oracle 为：1 边 +1.38 pp · 2 边 +1.80 pp · 4 边 +2.55 pp。",
+    "最强成组规模为 4 边；相对单边 oracle 的配对优势是 +1.16 pp [+0.91, +1.42]。",
+    "4 边证据首选收益 +0.05 pp，随机 bundle 均值 -0.29 pp，差 +0.34 pp。",
+    "4 边 oracle 相对对应单边加和的交互项为 +0.95 pp [+0.62, +1.27]。",
+    "已有 A 阶段的 oracle 为 +4.69 pp，新规则 B/C/D 为 +1.47 pp；历史阶段优势 +3.22 pp [+2.38, +4.07]。",
+    "M2C-G 正式决策为 HistoryDominatedGroupedEffect。",
+    "成组 oracle 的总体收益主要来自已有 A 与回归阶段，没有形成一般新规则容量；固定预算结构重分配不能进入在线机制。"
+  ]
+}

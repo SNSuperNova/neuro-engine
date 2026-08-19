@@ -137,7 +137,9 @@ M2 不预先把所有生物机制加入系统，而根据 M1 的主要失败类�
 
 M2C-T 离线时间尺度诊断也已完成，正式记录见 [experiments/structural-timescale-v0.5.md](experiments/structural-timescale-v0.5.md)。它逐项复现 v0.4 的 32 试次反事实，并沿同一累计轨迹比较 `[0, 32, 128, 256]`。oracle 收益分别为 `+0.62 / +1.38 / +1.40 / +1.24 pp`；32 → 256 的配对变化为 `-0.15 pp [-0.36, +0.07]`。长窗口没有揭示延迟结构收益，正式决策为 `SingleEdgeFreedomInsufficient`。
 
-在设计第二个在线结构规则前，只允许继续做离线固定预算成组诊断：在相同冻结检查点、受限组合搜索预算和等预算随机对照下比较 `1 / 2 / 4` 条边替换。先证明成组 oracle 具有实用作用，再讨论组合信用；不增加节点、总连接数或在线机制。
+M2C-G 固定预算成组诊断也已完成，正式记录见 [experiments/structural-group-v0.6.md](experiments/structural-group-v0.6.md)。在每种规模相同的 17-bundle 搜索预算下，1/2/4 边 budgeted oracle 为 `+1.38 / +1.80 / +2.55 pp`；4 边相对单边为 `+1.16 pp [0.91, 1.42]`，并有 `+0.95 pp` 正组合交互。但已有 A 阶段 oracle 为 `+4.69 pp`，B/C/D 新规则平均只有 `+1.47 pp`。正式决策为 `HistoryDominatedGroupedEffect`。
+
+M2C 固定预算结构重分配分支到此关闭：不设计在线成组重连，也不继续只为 A 回归优化组合信用。下一步必须回到 M1 的新规则表示容量不足，另行预注册容量因果诊断；在此之前不进入 M3 或 Scale 0，不增加节点或总连接数。
 
 ### 分支纪律
 

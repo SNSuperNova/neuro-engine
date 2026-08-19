@@ -13,6 +13,10 @@ use crate::structural_diagnostic::{
     StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,
     StructuralDiagnosticSeedProtocol, StructuralDiagnosticSeedResult,
 };
+use crate::structural_group::{
+    StructuralGroupCandidate, StructuralGroupCheckpoint, StructuralGroupCheckpointScale,
+    StructuralGroupSeedMetrics, StructuralGroupSeedProtocol, StructuralGroupSeedResult,
+};
 use crate::structural_timescale::{
     STRUCTURAL_TIMESCALE_HORIZON_COUNT, StructuralTimescaleCandidate,
     StructuralTimescaleCheckpoint, StructuralTimescaleCheckpointMetrics,
@@ -2972,6 +2976,502 @@ fn diagnostic_forward_accuracies<M: AdjustmentMechanism>(
             seed ^ 0x4d32_4445_5641_4c01,
         )
     })
+}
+
+pub(crate) fn run_structural_group_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: StructuralGroupSeedProtocol,
+) -> StructuralGroupSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d32_4443_4f4e_5452,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let topology_before = controller.topology_digest();
+    let readout_before = controller.action_readout_digest();
+    let mut structure = StructuralEvidenceState::new();
+    let mut checkpoints = Vec::new();
+    let mut global_episode = 0usize;
+    for (phase_index, rule) in M1Rule::SEQUENCE.into_iter().enumerate() {
+        let phase_seed =
+            seed ^ 0x4d32_4443_5048_4153 ^ (phase_index as u64).wrapping_mul(SEED_STRIDE);
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + phase_seed.count_ones() as usize) % 4;
+            let structural_target =
+                (global_episode / protocol.structural_parameters.rewiring_interval) % HIDDEN_COUNT;
+            let mut rng = Rng::new(
+                phase_seed ^ 0x4d32_4443_4143_544e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = controller.structural_symbol_trial(
+                rule,
+                symbol,
+                &mut rng,
+                protocol.exploration,
+                structural_target,
+            );
+            let (target, evidence) = controller.structural_evidence(&trial);
+            structure.observe(
+                target,
+                evidence,
+                protocol.structural_parameters.evidence_decay,
+            );
+            controller.adapt_trial(
+                &trial,
+                Map0Control::Baseline,
+                false,
+                phase_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            global_episode += 1;
+            if protocol.checkpoint_global_trials.contains(&global_episode) {
+                checkpoints.push(evaluate_structural_group_checkpoint(
+                    &controller,
+                    &structure,
+                    seed,
+                    global_episode,
+                    phase_index,
+                    rule,
+                    target,
+                    protocol,
+                ));
+            }
+        }
+    }
+    let group_metrics = protocol
+        .group_sizes
+        .into_iter()
+        .enumerate()
+        .map(|(scale_index, edge_count)| {
+            let count = checkpoints.len().max(1) as f64;
+            let mean = |f: fn(&StructuralGroupCheckpointScale) -> f64| {
+                checkpoints
+                    .iter()
+                    .map(|checkpoint| f(&checkpoint.scales[scale_index]))
+                    .sum::<f64>()
+                    / count
+            };
+            let mean_spearman_correlation = mean(|row| row.spearman_correlation);
+            let mean_shuffled_spearman_correlation =
+                mean(|row| row.mean_shuffled_spearman_correlation);
+            let mean_selected_benefit = mean(|row| row.selected_benefit);
+            let mean_random_benefit = mean(|row| row.random_mean_benefit);
+            StructuralGroupSeedMetrics {
+                edge_count,
+                mean_spearman_correlation,
+                mean_shuffled_spearman_correlation,
+                mean_correlation_advantage: mean_spearman_correlation
+                    - mean_shuffled_spearman_correlation,
+                mean_selected_benefit,
+                mean_random_benefit,
+                mean_selected_benefit_advantage: mean_selected_benefit - mean_random_benefit,
+                mean_budgeted_oracle_benefit: mean(|row| row.budgeted_oracle_benefit),
+                mean_selected_regret: mean(|row| row.selected_regret),
+                mean_top_quartile_hit_rate: mean(|row| f64::from(row.selected_is_top_quartile)),
+                mean_interaction_over_additive: mean(|row| row.mean_interaction_over_additive),
+                mean_selected_interaction_over_additive: mean(|row| {
+                    row.selected_interaction_over_additive
+                }),
+                mean_oracle_interaction_over_additive: mean(|row| {
+                    row.oracle_interaction_over_additive
+                }),
+            }
+        })
+        .collect::<Vec<_>>();
+    let finite = checkpoints.iter().all(|checkpoint| {
+        checkpoint.scales.iter().all(|scale| {
+            [
+                scale.no_swap_post_horizon_accuracy,
+                scale.spearman_correlation,
+                scale.mean_shuffled_spearman_correlation,
+                scale.selected_benefit,
+                scale.random_mean_benefit,
+                scale.budgeted_oracle_benefit,
+                scale.selected_regret,
+                scale.mean_interaction_over_additive,
+                scale.selected_interaction_over_additive,
+                scale.oracle_interaction_over_additive,
+            ]
+            .into_iter()
+            .all(f64::is_finite)
+                && scale.candidates.iter().all(|candidate| {
+                    [
+                        candidate.evidence_score,
+                        candidate.benefit_over_no_swap,
+                        candidate.additive_single_edge_prediction,
+                        candidate.interaction_over_additive,
+                        candidate.evidence_rank,
+                        candidate.benefit_rank,
+                    ]
+                    .into_iter()
+                    .all(f64::is_finite)
+                })
+        })
+    });
+    StructuralGroupSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        checkpoints,
+        group_metrics,
+        topology_digest_before: topology_before,
+        topology_digest_after: controller.topology_digest(),
+        action_readout_digest_before: readout_before,
+        action_readout_digest_after: controller.action_readout_digest(),
+        finite,
+    }
+}
+
+fn evaluate_structural_group_checkpoint<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    structure: &StructuralEvidenceState,
+    seed: u64,
+    global_trial: usize,
+    phase_index: usize,
+    rule: M1Rule,
+    scheduled_target: usize,
+    protocol: StructuralGroupSeedProtocol,
+) -> StructuralGroupCheckpoint {
+    let horizon_seed = seed ^ 0x4d32_4448_4f52_495a ^ global_trial as u64;
+    let no_swap_post_horizon_accuracy = diagnostic_forward_accuracy(
+        controller,
+        rule,
+        protocol.forward_training_trials,
+        protocol.evaluation_trial_count,
+        protocol.exploration,
+        horizon_seed,
+    );
+    let scales = protocol
+        .group_sizes
+        .into_iter()
+        .map(|edge_count| {
+            evaluate_structural_group_scale(
+                controller,
+                structure,
+                seed,
+                global_trial,
+                rule,
+                scheduled_target,
+                edge_count,
+                no_swap_post_horizon_accuracy,
+                protocol,
+                horizon_seed,
+            )
+        })
+        .collect();
+    StructuralGroupCheckpoint {
+        global_trial,
+        phase_index,
+        rule,
+        scheduled_target_unit: scheduled_target,
+        scales,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evaluate_structural_group_scale<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    structure: &StructuralEvidenceState,
+    seed: u64,
+    global_trial: usize,
+    rule: M1Rule,
+    scheduled_target: usize,
+    edge_count: usize,
+    no_swap_post_horizon_accuracy: f64,
+    protocol: StructuralGroupSeedProtocol,
+    horizon_seed: u64,
+) -> StructuralGroupCheckpointScale {
+    let current_weakest =
+        controller.weakest_structural_slot(scheduled_target, &structure.scores[scheduled_target]);
+    let previous_target = (scheduled_target + HIDDEN_COUNT - 1) % HIDDEN_COUNT;
+    let previous_weakest =
+        controller.weakest_structural_slot(previous_target, &structure.scores[previous_target]);
+    let edge_specs = match edge_count {
+        1 => vec![(scheduled_target, current_weakest)],
+        2 => vec![
+            (scheduled_target, current_weakest),
+            (scheduled_target, 1 - current_weakest),
+        ],
+        4 => vec![
+            (scheduled_target, current_weakest),
+            (scheduled_target, 1 - current_weakest),
+            (previous_target, previous_weakest),
+            (previous_target, 1 - previous_weakest),
+        ],
+        _ => unreachable!("frozen group sizes are 1/2/4"),
+    };
+    let target_units = edge_specs
+        .iter()
+        .map(|(target, _)| *target)
+        .collect::<Vec<_>>();
+    let replaced_slots = edge_specs.iter().map(|(_, slot)| *slot).collect::<Vec<_>>();
+    let target_evidence_covered = target_units
+        .iter()
+        .map(|target| structure.scores[*target].iter().any(|score| *score > 0.0))
+        .collect::<Vec<_>>();
+    let replaced_source_units = target_units
+        .iter()
+        .zip(&replaced_slots)
+        .map(|(target, slot)| controller.recurrent_slots[*target][*slot])
+        .collect::<Vec<_>>();
+    let source_lists = target_units
+        .iter()
+        .map(|target| controller.structural_candidates(*target))
+        .collect::<Vec<_>>();
+    assert!(
+        source_lists
+            .iter()
+            .all(|sources| sources.len() == protocol.bundle_budget)
+    );
+    let selected_positions = target_units
+        .iter()
+        .enumerate()
+        .map(|(dimension, target)| {
+            let rank_within_target = target_units[..dimension]
+                .iter()
+                .filter(|prior| *prior == target)
+                .count();
+            let mut ranked_sources = source_lists[dimension].clone();
+            ranked_sources.sort_by(|left, right| {
+                structure.scores[*target][*right]
+                    .total_cmp(&structure.scores[*target][*left])
+                    .then_with(|| left.cmp(right))
+            });
+            let selected_source = ranked_sources[rank_within_target];
+            source_lists[dimension]
+                .iter()
+                .position(|source| *source == selected_source)
+                .expect("selected source is legal")
+        })
+        .collect::<Vec<_>>();
+    let anchor = selected_positions[0];
+    let mut slopes = vec![1usize; edge_count];
+    let mut offsets = vec![0usize; edge_count];
+    for dimension in 1..edge_count {
+        slopes[dimension] = target_units[..dimension]
+            .iter()
+            .position(|target| *target == target_units[dimension])
+            .map(|prior_dimension| slopes[prior_dimension])
+            .unwrap_or_else(|| {
+                let mut rng = Rng::new(
+                    seed ^ 0x4d32_474c_4154_494e
+                        ^ global_trial as u64
+                        ^ (edge_count as u64).wrapping_mul(SEED_STRIDE)
+                        ^ (dimension as u64).wrapping_mul(0x517c_c1b7_2722_0a95),
+                );
+                1 + (rng.next_u64() as usize % 16)
+            });
+        offsets[dimension] = (selected_positions[dimension] + protocol.bundle_budget
+            - (slopes[dimension] * anchor) % protocol.bundle_budget)
+            % protocol.bundle_budget;
+    }
+    let bundle_sources = (0..protocol.bundle_budget)
+        .map(|bundle_index| {
+            (0..edge_count)
+                .map(|dimension| {
+                    let source_index = (offsets[dimension] + slopes[dimension] * bundle_index)
+                        % protocol.bundle_budget;
+                    source_lists[dimension][source_index]
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let balanced_candidate_marginals = (0..edge_count).all(|dimension| {
+        let mut observed = bundle_sources
+            .iter()
+            .map(|bundle| bundle[dimension])
+            .collect::<Vec<_>>();
+        let mut expected = source_lists[dimension].clone();
+        observed.sort_unstable();
+        expected.sort_unstable();
+        observed == expected
+    }) && bundle_sources.iter().all(|bundle| {
+        (0..edge_count).all(|left| {
+            ((left + 1)..edge_count).all(|right| {
+                target_units[left] != target_units[right] || bundle[left] != bundle[right]
+            })
+        })
+    });
+    let original_connection_count = controller.allocated_connection_count();
+    let mut clone_connection_budget_preserved = true;
+    let component_benefits = (0..edge_count)
+        .map(|dimension| {
+            bundle_sources
+                .iter()
+                .map(|bundle| {
+                    let mut single = controller.clone();
+                    assert!(single.rewire_specific(
+                        target_units[dimension],
+                        replaced_slots[dimension],
+                        bundle[dimension],
+                    ));
+                    clone_connection_budget_preserved &=
+                        single.allocated_connection_count() == original_connection_count;
+                    diagnostic_forward_accuracy(
+                        &single,
+                        rule,
+                        protocol.forward_training_trials,
+                        protocol.evaluation_trial_count,
+                        protocol.exploration,
+                        horizon_seed,
+                    ) - no_swap_post_horizon_accuracy
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let mut candidates = bundle_sources
+        .iter()
+        .enumerate()
+        .map(|(bundle_index, sources)| {
+            let benefit_over_no_swap = if edge_count == 1 {
+                component_benefits[0][bundle_index]
+            } else {
+                let mut grouped = controller.clone();
+                for dimension in 0..edge_count {
+                    assert!(grouped.rewire_specific(
+                        target_units[dimension],
+                        replaced_slots[dimension],
+                        sources[dimension],
+                    ));
+                }
+                clone_connection_budget_preserved &=
+                    grouped.allocated_connection_count() == original_connection_count;
+                diagnostic_forward_accuracy(
+                    &grouped,
+                    rule,
+                    protocol.forward_training_trials,
+                    protocol.evaluation_trial_count,
+                    protocol.exploration,
+                    horizon_seed,
+                ) - no_swap_post_horizon_accuracy
+            };
+            let additive_single_edge_prediction = (0..edge_count)
+                .map(|dimension| component_benefits[dimension][bundle_index])
+                .sum::<f64>();
+            StructuralGroupCandidate {
+                bundle_index,
+                source_units: sources.clone(),
+                evidence_score: target_units
+                    .iter()
+                    .zip(sources)
+                    .map(|(target, source)| structure.scores[*target][*source])
+                    .sum::<f64>()
+                    / edge_count as f64,
+                benefit_over_no_swap,
+                additive_single_edge_prediction,
+                interaction_over_additive: benefit_over_no_swap - additive_single_edge_prediction,
+                evidence_rank: 0.0,
+                benefit_rank: 0.0,
+            }
+        })
+        .collect::<Vec<_>>();
+    let evidence_values = candidates
+        .iter()
+        .map(|candidate| candidate.evidence_score)
+        .collect::<Vec<_>>();
+    let benefit_values = candidates
+        .iter()
+        .map(|candidate| candidate.benefit_over_no_swap)
+        .collect::<Vec<_>>();
+    let evidence_ranks = rank_values(&evidence_values);
+    let benefit_ranks = rank_values(&benefit_values);
+    for (index, candidate) in candidates.iter_mut().enumerate() {
+        candidate.evidence_rank = evidence_ranks[index];
+        candidate.benefit_rank = benefit_ranks[index];
+    }
+    let spearman_correlation = pearson(&evidence_ranks, &benefit_ranks);
+    let mut shuffled_sum = 0.0;
+    for shuffle in 0..protocol.shuffled_ranking_count {
+        let mut shuffled = evidence_values.clone();
+        let mut rng = Rng::new(
+            seed ^ 0x4d32_4453_4855_4646
+                ^ global_trial as u64
+                ^ (shuffle as u64).wrapping_mul(SEED_STRIDE),
+        );
+        for index in (1..shuffled.len()).rev() {
+            let swap = (rng.next_u64() as usize) % (index + 1);
+            shuffled.swap(index, swap);
+        }
+        shuffled_sum += pearson(&rank_values(&shuffled), &benefit_ranks);
+    }
+    let selected_index = candidates
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| {
+            left.evidence_score
+                .total_cmp(&right.evidence_score)
+                .then_with(|| right.source_units.cmp(&left.source_units))
+        })
+        .map(|(index, _)| index)
+        .expect("17 bundles");
+    let oracle_index = candidates
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| {
+            left.benefit_over_no_swap
+                .total_cmp(&right.benefit_over_no_swap)
+                .then_with(|| right.source_units.cmp(&left.source_units))
+        })
+        .map(|(index, _)| index)
+        .expect("17 bundles");
+    let mut benefit_order = (0..candidates.len()).collect::<Vec<_>>();
+    benefit_order.sort_by(|left, right| {
+        candidates[*right]
+            .benefit_over_no_swap
+            .total_cmp(&candidates[*left].benefit_over_no_swap)
+            .then_with(|| {
+                candidates[*left]
+                    .source_units
+                    .cmp(&candidates[*right].source_units)
+            })
+    });
+    let random_mean_benefit =
+        benefit_values.iter().sum::<f64>() / benefit_values.len().max(1) as f64;
+    let selected_benefit = candidates[selected_index].benefit_over_no_swap;
+    let budgeted_oracle_benefit = candidates[oracle_index].benefit_over_no_swap;
+    let mean_interaction_over_additive = candidates
+        .iter()
+        .map(|candidate| candidate.interaction_over_additive)
+        .sum::<f64>()
+        / candidates.len().max(1) as f64;
+    StructuralGroupCheckpointScale {
+        edge_count,
+        target_units,
+        target_evidence_covered,
+        replaced_slots,
+        replaced_source_units,
+        bundle_count: candidates.len(),
+        component_control_evaluation_count: edge_count * protocol.bundle_budget,
+        no_swap_post_horizon_accuracy,
+        spearman_correlation,
+        mean_shuffled_spearman_correlation: shuffled_sum / protocol.shuffled_ranking_count as f64,
+        selected_bundle_index: candidates[selected_index].bundle_index,
+        selected_source_units: candidates[selected_index].source_units.clone(),
+        selected_benefit,
+        random_mean_benefit,
+        budgeted_oracle_bundle_index: candidates[oracle_index].bundle_index,
+        budgeted_oracle_source_units: candidates[oracle_index].source_units.clone(),
+        budgeted_oracle_benefit,
+        selected_regret: budgeted_oracle_benefit - selected_benefit,
+        selected_is_top_quartile: benefit_order[..candidates.len().div_ceil(4)]
+            .contains(&selected_index),
+        mean_interaction_over_additive,
+        selected_interaction_over_additive: candidates[selected_index].interaction_over_additive,
+        oracle_interaction_over_additive: candidates[oracle_index].interaction_over_additive,
+        balanced_candidate_marginals,
+        clone_connection_budget_preserved,
+        candidates,
+    }
 }
 
 fn rank_values(values: &[f64]) -> Vec<f64> {

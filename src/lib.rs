@@ -20,6 +20,7 @@ pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
 pub mod structural_diagnostic;
+pub mod structural_group;
 pub mod structural_timescale;
 
 pub use adaptive_mechanism::{
@@ -131,6 +132,14 @@ pub use structural_diagnostic::{
     StructuralDiagnosticAcceptanceReport, StructuralDiagnosticConfig, StructuralDiagnosticDecision,
     StructuralDiagnosticPhaseSummary, StructuralDiagnosticResult, StructuralDiagnosticSeedResult,
     StructuralDiagnosticSummary, run_structural_diagnostic,
+};
+pub use structural_group::{
+    STRUCTURAL_GROUP_SIZE_COUNT, StructuralGroupAcceptanceReport, StructuralGroupCandidate,
+    StructuralGroupCapabilityContrast, StructuralGroupCheckpoint, StructuralGroupCheckpointScale,
+    StructuralGroupComparison, StructuralGroupConfig, StructuralGroupDecision,
+    StructuralGroupPhaseSummary, StructuralGroupPublishedResult, StructuralGroupResult,
+    StructuralGroupSeedMetrics, StructuralGroupSeedResult, StructuralGroupSummary,
+    run_structural_group_diagnostic,
 };
 pub use structural_timescale::{
     STRUCTURAL_TIMESCALE_HORIZON_COUNT, StructuralTimescaleAcceptanceReport,

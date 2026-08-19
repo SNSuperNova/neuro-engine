@@ -48,6 +48,8 @@ M2C 首个候选已经执行。它保持 24 个节点和每节点 6 条循环入
 
 M2C-T 随后完全复用这些冻结反事实，把累计前向训练窗口扩展为 `0 / 32 / 128 / 256`。oracle 收益为 `+0.62 / +1.38 / +1.40 / +1.24 pp`，32 → 256 配对变化 `-0.15 pp [-0.36, +0.07]`；证据选择也未随时间改善。正式决策为 `SingleEdgeFreedomInsufficient`：短窗口不是主因，一次单边替换的自由度不足。下一步若继续，只做固定预算 `1 / 2 / 4` 边成组离线反事实，不增加在线机制、节点或总连接数。
 
+M2C-G 已完成该成组诊断。相同 17-bundle 搜索预算下，1/2/4 边 oracle 为 `+1.38 / +1.80 / +2.55 pp`，4 边相对单边增加 `+1.16 pp [0.91, 1.42]`，说明少数组合结构动作确有作用。但已有 A 阶段 oracle 为 `+4.69 pp`，B/C/D 新规则平均只有 `+1.47 pp`；总体收益由历史恢复主导。正式决策为 `HistoryDominatedGroupedEffect`，M2C 固定预算结构分支关闭，不进入在线成组重连或 M3。
+
 ## 运行
 
 ```powershell
@@ -98,6 +100,7 @@ src/mechanism_m1.rs         M1 多规则保留协议、失败分类与配对对�
 src/mechanism_m2c.rs        M2C 固定预算结构扫描、配对效应与机制决策
 src/structural_diagnostic.rs M2C 离线单边结构信用与反事实诊断
 src/structural_timescale.rs  M2C-T 同克隆多时长结构作用诊断
+src/structural_group.rs      M2C-G 等预算成组结构与单边加和诊断
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -120,6 +123,7 @@ experiments/                版本化结果与失败记录
 - [experiments/mechanism-m2c-v0.3.md](experiments/mechanism-m2c-v0.3.md)：固定预算局部重连、随机配对和首个结构候选负结果；
 - [experiments/structural-diagnostic-v0.4.md](experiments/structural-diagnostic-v0.4.md)：14688 个候选换边反事实、证据排序和分阶段解释；
 - [experiments/structural-timescale-v0.5.md](experiments/structural-timescale-v0.5.md)：同一冻结反事实的 0/32/128/256 试次时间尺度诊断；
+- [experiments/structural-group-v0.6.md](experiments/structural-group-v0.6.md)：固定预算 1/2/4 边 bundle、组合交互与历史偏置诊断；
 - [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；

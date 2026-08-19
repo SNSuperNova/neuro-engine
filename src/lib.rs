@@ -1,6 +1,7 @@
 //! Deterministic embodied-learning experiments and retained neural simulation
 //! primitives for Neuro Engine.
 
+pub mod adaptive_mechanism;
 pub mod embodied;
 pub mod experiment;
 pub mod gate_a;
@@ -13,9 +14,16 @@ pub mod learnability_map;
 pub mod lif;
 pub mod map1;
 pub mod map2;
+pub mod mechanism_m0;
 pub mod metrics;
 pub mod network;
 
+pub use adaptive_mechanism::{
+    ActivityAdjustment, ActivityObservation, AdjustableVariable, AdjustmentMechanism,
+    HomeostasisAdjustment, HomeostasisObservation, MechanismStateContract, PlasticityAdjustment,
+    PlasticityObservation, REFERENCE_MECHANISM_ID, REFERENCE_SUBSTRATE_VERSION,
+    ReferenceSubstrateManifest, VariableContract, reference_substrate_manifest,
+};
 pub use embodied::{
     ACTION_COUNT, AdaptiveController, AgentAction, ArenaConfig, BehaviorFrame, BehaviorTrace,
     ControllerConfig, EmbodiedAcceptanceReport, EmbodiedError, EmbodiedExperimentConfig,
@@ -72,10 +80,11 @@ pub use gate_f::{
     run_gate_f_experiment,
 };
 pub use learnability_map::{
-    ContinuousSeedResult, Map0AcceptanceReport, Map0Control, Map0ControlSummary,
-    Map0DynamicsMetrics, Map0ExperimentConfig, Map0ExperimentResult, Map0Interval,
-    Map0ParameterPoint, Map0ParameterSummary, Map0ProbeMetrics, Map0RegionClass, Map0SeedResult,
-    Map0Thresholds, run_map0_experiment,
+    ContinuousSeedResult, ContinuousStreamConfig, Map0AcceptanceReport, Map0Control,
+    Map0ControlSummary, Map0DynamicsMetrics, Map0ExperimentConfig, Map0ExperimentResult,
+    Map0Interval, Map0ParameterPoint, Map0ParameterSummary, Map0ProbeMetrics, Map0RegionClass,
+    Map0SeedResult, Map0Thresholds, run_continuous_seed_with_adjustment_mechanism,
+    run_map_seed_with_adjustment_mechanism, run_map0_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,
@@ -90,6 +99,9 @@ pub use map2::{
     Map2BAcceptanceReport, Map2BExperimentConfig, Map2BExperimentResult, Map2BMechanismComparison,
     Map2CAcceptanceReport, Map2CExperimentConfig, Map2CExperimentResult, Map2CParameterSummary,
     run_map2a_experiment, run_map2b_experiment, run_map2c_experiment,
+};
+pub use mechanism_m0::{
+    FrozenArtifact, M0CapabilityResult, M0InterfaceAudit, MechanismM0Release, mechanism_m0_release,
 };
 pub use metrics::{
     MetricsConfig, MetricsError, NetworkMetrics, TrajectoryDifference, compare_spike_trajectories,

@@ -261,16 +261,28 @@ fn invalid_map2c_stream_protocol_is_rejected() {
 #[test]
 fn published_map2_stage_decisions_are_frozen() {
     let map2a = run_map2a_experiment(Map2AExperimentConfig::default()).expect("formal Map 2A");
+    assert_eq!(
+        serde_json::to_string_pretty(&map2a).expect("Map 2A JSON"),
+        include_str!("../app/public/map2a-v0.3.json")
+    );
     assert_eq!(map2a.confirmation_parameter_ids, [38, 18, 2, 14, 26, 6]);
     assert!(map2a.acceptance.stage_passed);
     assert!(!map2a.acceptance.stable_region_found);
 
     let map2b = run_map2b_experiment(Map2BExperimentConfig::default()).expect("formal Map 2B");
+    assert_eq!(
+        serde_json::to_string_pretty(&map2b).expect("Map 2B JSON"),
+        include_str!("../app/public/map2b-v0.4.json")
+    );
     assert_eq!(map2b.confirmation_parameter_ids, [30, 10, 14, 34, 44, 22]);
     assert!(map2b.acceptance.stage_passed);
     assert!(!map2b.acceptance.stable_region_found);
 
     let map2c = run_map2c_experiment(Map2CExperimentConfig::default()).expect("formal Map 2C");
+    assert_eq!(
+        serde_json::to_string_pretty(&map2c).expect("Map 2C JSON"),
+        include_str!("../app/public/map2c-v0.5.json")
+    );
     assert_eq!(map2c.confirmation_parameter_ids, [0, 20, 29, 45, 16, 21]);
     assert_eq!(map2c.stable_region_parameter_ids, [0, 16, 20, 21, 29, 45]);
     assert!(map2c.acceptance.stage_passed);

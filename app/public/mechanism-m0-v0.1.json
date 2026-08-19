@@ -1,0 +1,128 @@
+{
+  "version": "adaptive-mechanism/m0-v0.1",
+  "carrierState": {
+    "version": "reference-substrate/v1",
+    "hiddenUnitCount": 24,
+    "sensoryChannelCount": 4,
+    "actionCount": 2,
+    "plasticRecurrentConnectionsPerUnit": 2,
+    "adjustableVariables": [
+      {
+        "variable": "activityState",
+        "readScope": "current unit plus its local raw activation and resource",
+        "updatePermission": "carrier transition; mechanism may only modulate the current unit",
+        "valueRange": "[-1, 1]",
+        "updateBudget": "one write per unit per carrier step",
+        "freezeMode": "freeze adjustment action to identity; carrier transition remains active"
+      },
+      {
+        "variable": "sensoryWeights",
+        "readScope": "incoming sensory weights of the current unit",
+        "updatePermission": "seeded initialization only in reference-substrate/v1",
+        "valueRange": "[-1.2, 1.2] at initialization",
+        "updateBudget": "zero online writes",
+        "freezeMode": "fixed after deterministic initialization"
+      },
+      {
+        "variable": "recurrentWeights",
+        "readScope": "one eligible incoming recurrent connection",
+        "updatePermission": "mechanism action for that connection only",
+        "valueRange": "soft bound derived from the unit reference norm",
+        "updateBudget": "at most 2 writes per unit per rewarded trial",
+        "freezeMode": "FrozenPlasticity returns the existing value"
+      },
+      {
+        "variable": "excitability",
+        "readScope": "current unit activity EMA and gain",
+        "updatePermission": "homeostatic action for the current unit only",
+        "valueRange": "[minimum_excitability_gain, maximum_excitability_gain]",
+        "updateBudget": "at most one write per unit per rewarded trial",
+        "freezeMode": "NoHomeostasis returns the existing gain"
+      },
+      {
+        "variable": "resource",
+        "readScope": "current unit resource and local activity/plasticity cost",
+        "updatePermission": "activity and plasticity actions for the current unit only",
+        "valueRange": "[0, 1]",
+        "updateBudget": "one write per unit step plus one per eligible weight update",
+        "freezeMode": "NoResourceAccounting fixes resource at 1; NoResourceSupply sets supply to 0"
+      },
+      {
+        "variable": "mechanismState",
+        "readScope": "mechanism-owned local history only",
+        "updatePermission": "reserved; reference mechanism has no additional state",
+        "valueRange": "must be declared and bounded by each candidate",
+        "updateBudget": "zero for the reference mechanism",
+        "freezeMode": "candidate-specific state reset/freeze must be paired"
+      }
+    ],
+    "developmentSeedRule": "seed_partition(protocol.seed XOR 0x4445_5601)",
+    "confirmationSeedRule": "seed_partition(protocol.seed XOR 0x434f_4e46_0101)",
+    "taskGenerationRule": "balanced binary cue; deterministic per-trial RNG; continuous rule changes use fixed minimum gap and seeded probability",
+    "controlInterface": [
+      "FrozenPlasticity",
+      "RandomReward",
+      "NoHomeostasis",
+      "NoResourceAccounting",
+      "NoResourceSupply",
+      "ResetBetweenTrials",
+      "ShuffledStructure"
+    ],
+    "forbiddenObservations": [
+      "target label or correct action",
+      "action probabilities or readout logits",
+      "action readout weights",
+      "future task events"
+    ],
+    "forbiddenWrites": [
+      "action choice",
+      "action probabilities or logits",
+      "action readout weights",
+      "task generator, target label, or reward"
+    ]
+  },
+  "adjustmentMechanism": "map2-soft-bound-resource-modulation/v1",
+  "interfaceAudit": {
+    "allAdjustableVariablesDeclared": true,
+    "readAndWritePermissionsDeclared": true,
+    "updateBudgetsDeclared": true,
+    "freezeModesDeclared": true,
+    "taskLabelsNotExposed": true,
+    "readoutStateNotExposed": true,
+    "outputWritesNotRepresentable": true,
+    "boundaryEnforcesFiniteBoundedWrites": true,
+    "candidateRunnerUsesClosedTaskLoop": true,
+    "map2ExactJsonRegressionTested": true,
+    "candidateInterfaceDisabledByDefault": true
+  },
+  "frozenMap2Artifacts": [
+    {
+      "file": "map2a-v0.3.json",
+      "sha256": "28a6319ef533583622e56c1895776380e4c277f7ee98f32af4dc41db13d920cb"
+    },
+    {
+      "file": "map2b-v0.4.json",
+      "sha256": "d07fbd50964293bc48150399600fb91e97e6304a9826b50ce6f977b0a8af4636"
+    },
+    {
+      "file": "map2c-v0.5.json",
+      "sha256": "78a9c9f118f83978761d5e7538cf021da9b1d625bf3a4210a4880a37961ac08f"
+    }
+  ],
+  "capabilityResult": {
+    "map2cContinuousAccuracy": 0.661,
+    "resetControlAccuracy": 0.676,
+    "noSupplyAccuracy": 0.557,
+    "frozenPlasticityAccuracy": 0.53,
+    "stableRegionParameterIds": [
+      0,
+      16,
+      20,
+      21,
+      29,
+      45
+    ],
+    "interpretation": "Map 2 is retained as a bounded continuous-adaptation reference, not evidence of general learning or a biologically complete neuron."
+  },
+  "verificationCommand": "cargo test --all-targets --release"
+}

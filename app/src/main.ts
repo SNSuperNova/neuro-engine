@@ -92,6 +92,14 @@ interface Map2ADataset { version: string; confirmationSummaries: Map0Summary[]; 
 interface Map2BDataset { version: string; confirmationSummaries: Map0Summary[]; noSupplySummaries: Map0Summary[]; mechanismComparisons: { meanProbeScoreChange: number; meanWeightDriftChange: number; meanResourceLevelChange: number }[]; stableRegionParameterIds: number[]; conclusions: string[]; acceptance: Record<string, boolean> & { passed: boolean; stagePassed: boolean; stableRegionFound: boolean } }
 interface Map2CSummary { parameters: Map0Parameters; formationProbability: Interval; meanOverallAccuracy: number; meanPostChangeAccuracy: number; meanSettledAccuracy: number; meanRecoveryGain: number; meanResourceLevel: number; meanRelativeWeightDrift: number }
 interface Map2CDataset { version: string; confirmationSummaries: Map2CSummary[]; resetSummaries: Map2CSummary[]; noSupplySummaries: Map2CSummary[]; frozenSummaries: Map2CSummary[]; stableRegionParameterIds: number[]; conclusions: string[]; acceptance: Record<string, boolean> & { passed: boolean; stagePassed: boolean; stableRegionFound: boolean } }
+interface M0Dataset {
+  version: string;
+  carrierState: { version: string; hiddenUnitCount: number; sensoryChannelCount: number; actionCount: number; plasticRecurrentConnectionsPerUnit: number; adjustableVariables: { variable: string; readScope: string; updatePermission: string; valueRange: string; updateBudget: string; freezeMode: string }[]; forbiddenObservations: string[]; forbiddenWrites: string[] };
+  adjustmentMechanism: string;
+  interfaceAudit: Record<string, boolean>;
+  frozenMap2Artifacts: { file: string; sha256: string }[];
+  capabilityResult: { map2cContinuousAccuracy: number; resetControlAccuracy: number; noSupplyAccuracy: number; frozenPlasticityAccuracy: number; stableRegionParameterIds: number[]; interpretation: string };
+}
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -160,6 +168,7 @@ let map1SelectedId = 0;
 let map2a: Map2ADataset;
 let map2b: Map2BDataset;
 let map2c: Map2CDataset;
+let mechanismM0: M0Dataset;
 let gateBTrace: GateBTrace;
 let gateBFrameIndex = 0;
 let gateBPlaying = false;
@@ -632,6 +641,19 @@ const renderMap2=()=>{
   byId("map2-conclusions").replaceChildren(...map2c.conclusions.map(text=>{const p=document.createElement("p");p.textContent=text;return p;}));
 };
 
+const renderMechanismM0=()=>{
+  const auditPassed=Object.values(mechanismM0.interfaceAudit).every(Boolean);
+  byId("m0-status").textContent=auditPassed?"M0 冻结完成":"M0 审计未通过";
+  byId("m0-status").className=auditPassed?"pass":"fail";
+  const carrier=mechanismM0.carrierState;
+  byId("m0-carrier").innerHTML=`<strong>${carrier.hiddenUnitCount} units</strong><small>${carrier.sensoryChannelCount} sensory · ${carrier.actionCount} actions · ${carrier.plasticRecurrentConnectionsPerUnit} plastic recurrent / unit</small><code>${carrier.version}</code>`;
+  byId("m0-actions").innerHTML=`<strong>${carrier.adjustableVariables.length} 类受控变量</strong><small>局部观测 → 有界动作；目标标签、读出状态和输出写入均不在接口类型中</small><code>${mechanismM0.adjustmentMechanism}</code>`;
+  const result=mechanismM0.capabilityResult;
+  byId("m0-capability").innerHTML=`<strong>${(result.map2cContinuousAccuracy*100).toFixed(1)}% continuous</strong><small>断供 ${(result.noSupplyAccuracy*100).toFixed(1)}% · 冻结可塑性 ${(result.frozenPlasticityAccuracy*100).toFixed(1)}% · 稳定区 ${result.stableRegionParameterIds.length} 点</small><code>不是通用学习结论</code>`;
+  const names:Record<string,string>={activityState:"活动状态",sensoryWeights:"感觉权重",recurrentWeights:"循环权重",excitability:"兴奋性",resource:"资源",mechanismState:"机制状态"};
+  byId("m0-contracts").replaceChildren(...carrier.adjustableVariables.map(contract=>{const article=document.createElement("article");article.innerHTML=`<header><strong>${names[contract.variable]??contract.variable}</strong><span>${contract.valueRange}</span></header><p>${contract.updatePermission}</p><dl><div><dt>预算</dt><dd>${contract.updateBudget}</dd></div><div><dt>冻结</dt><dd>${contract.freezeMode}</dd></div></dl>`;return article;}));
+};
+
 const renderEvidence = () => {
   const cards=byId("evaluation-cards");cards.replaceChildren();
   for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
@@ -666,13 +688,13 @@ window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGate
 const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}if(gateBPlaying&&now-gateBLastTick>=650){gateBLastTick=now;if(gateBFrameIndex>=gateBTrace.frames.length-1){gateBPlaying=false;gateBPlay.textContent="▶";}else setGateBFrame(gateBFrameIndex+1);}requestAnimationFrame(animate); };
 
 const start = async () => {
-  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse,gateFResponse,map0Response,map1Response,map2aResponse,map2bResponse,map2cResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json"),fetch("/gate-f-v1.6.json"),fetch("/map0-v0.1.json"),fetch("/map1-v0.2.json"),fetch("/map2a-v0.3.json"),fetch("/map2b-v0.4.json"),fetch("/map2c-v0.5.json")]);
-  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);if(!gateFResponse.ok)throw new Error(`Gate F dataset ${gateFResponse.status}`);if(!map0Response.ok)throw new Error(`Map 0 dataset ${map0Response.status}`);if(!map1Response.ok)throw new Error(`Map 1 dataset ${map1Response.status}`);if(!map2aResponse.ok)throw new Error(`Map 2A dataset ${map2aResponse.status}`);if(!map2bResponse.ok)throw new Error(`Map 2B dataset ${map2bResponse.status}`);if(!map2cResponse.ok)throw new Error(`Map 2C dataset ${map2cResponse.status}`);
-  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];gateF=await gateFResponse.json() as GateFDataset;map0=await map0Response.json() as Map0Dataset;map1=await map1Response.json() as Map1Dataset;map2a=await map2aResponse.json() as Map2ADataset;map2b=await map2bResponse.json() as Map2BDataset;map2c=await map2cResponse.json() as Map2CDataset;
+  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse,gateFResponse,map0Response,map1Response,map2aResponse,map2bResponse,map2cResponse,m0Response]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json"),fetch("/gate-f-v1.6.json"),fetch("/map0-v0.1.json"),fetch("/map1-v0.2.json"),fetch("/map2a-v0.3.json"),fetch("/map2b-v0.4.json"),fetch("/map2c-v0.5.json"),fetch("/mechanism-m0-v0.1.json")]);
+  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);if(!gateFResponse.ok)throw new Error(`Gate F dataset ${gateFResponse.status}`);if(!map0Response.ok)throw new Error(`Map 0 dataset ${map0Response.status}`);if(!map1Response.ok)throw new Error(`Map 1 dataset ${map1Response.status}`);if(!map2aResponse.ok)throw new Error(`Map 2A dataset ${map2aResponse.status}`);if(!map2bResponse.ok)throw new Error(`Map 2B dataset ${map2bResponse.status}`);if(!map2cResponse.ok)throw new Error(`Map 2C dataset ${map2cResponse.status}`);if(!m0Response.ok)throw new Error(`M0 dataset ${m0Response.status}`);
+  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];gateF=await gateFResponse.json() as GateFDataset;map0=await map0Response.json() as Map0Dataset;map1=await map1Response.json() as Map1Dataset;map2a=await map2aResponse.json() as Map2ADataset;map2b=await map2bResponse.json() as Map2BDataset;map2c=await map2cResponse.json() as Map2CDataset;mechanismM0=await m0Response.json() as M0Dataset;
   ready=true;
   byId("version").textContent=map2c.version;byId("acceptance-label").textContent=map2c.acceptance.stagePassed?"Map 2 完成 · 连续流稳定区域已确认":"Map 2C 完成 · 未达到冻结标准";byId("acceptance-dot").className=map2c.acceptance.passed?"pass":"fail";
   traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
-  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();renderGateF();renderMap0();renderMap1();renderMap2();drawCurve();selectTrace();requestAnimationFrame(animate);
+  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();renderGateF();renderMap0();renderMap1();renderMap2();renderMechanismM0();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
 start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

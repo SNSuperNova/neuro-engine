@@ -1,5 +1,11 @@
 use serde::Serialize;
 
+use crate::adaptive_mechanism::{
+    ActivityAdjustment, ActivityObservation, AdjustmentMechanism, HomeostasisAdjustment,
+    HomeostasisObservation, MechanismStateContract, PlasticityAdjustment, PlasticityObservation,
+    REFERENCE_MECHANISM_ID,
+};
+
 use crate::{EmbodiedError, GATE_B_SENSOR_COUNT, HIDDEN_COUNT};
 
 const ACTION_COUNT: usize = 2;
@@ -326,7 +332,157 @@ pub(crate) enum ResourceMechanism {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct ContinuousStreamConfig {
+pub(crate) struct ReferenceAdjustmentMechanism {
+    homeostasis: HomeostasisMechanism,
+    plasticity: PlasticityMechanism,
+    resource: ResourceMechanism,
+}
+
+impl ReferenceAdjustmentMechanism {
+    pub(crate) fn new(
+        homeostasis: HomeostasisMechanism,
+        plasticity: PlasticityMechanism,
+        resource: ResourceMechanism,
+    ) -> Self {
+        Self {
+            homeostasis,
+            plasticity,
+            resource,
+        }
+    }
+}
+
+impl AdjustmentMechanism for ReferenceAdjustmentMechanism {
+    fn mechanism_id(&self) -> &'static str {
+        REFERENCE_MECHANISM_ID
+    }
+
+    fn mechanism_state_contract(&self) -> MechanismStateContract {
+        MechanismStateContract {
+            scalar_state_per_unit: 0,
+            value_range: "none".into(),
+            update_budget: "zero".into(),
+            freeze_mode: "not applicable".into(),
+        }
+    }
+
+    fn initial_resource(&self) -> f64 {
+        match self.resource {
+            ResourceMechanism::Disabled => 1.0,
+            ResourceMechanism::Continuous(config) => config.initial_level,
+        }
+    }
+
+    fn excitability_bounds(&self) -> [f64; 2] {
+        match self.homeostasis {
+            HomeostasisMechanism::ReferenceNorm => [1.0, 1.0],
+            HomeostasisMechanism::DualTimescale(config) => [
+                config.minimum_excitability_gain,
+                config.maximum_excitability_gain,
+            ],
+        }
+    }
+
+    fn adjust_activity(&mut self, observation: ActivityObservation) -> ActivityAdjustment {
+        match self.resource {
+            ResourceMechanism::Disabled => ActivityAdjustment {
+                activity: observation.raw_activity,
+                resource_level: 1.0,
+            },
+            ResourceMechanism::Continuous(config) => {
+                let modulation = config.minimum_modulation
+                    + (1.0 - config.minimum_modulation) * observation.resource_level;
+                let activity = observation.raw_activity * modulation;
+                ActivityAdjustment {
+                    activity,
+                    resource_level: (observation.resource_level + config.supply_rate
+                        - config.maintenance_cost
+                        - config.activity_cost * activity.abs())
+                    .clamp(0.0, 1.0),
+                }
+            }
+        }
+    }
+
+    fn adjust_plasticity(&mut self, observation: PlasticityObservation) -> PlasticityAdjustment {
+        let recurrent_weight = match self.plasticity {
+            PlasticityMechanism::Additive => {
+                (observation.current_weight + observation.proposed_delta).clamp(
+                    -observation.absolute_weight_limit,
+                    observation.absolute_weight_limit,
+                )
+            }
+            PlasticityMechanism::SoftBounded(config) => {
+                let bound = observation.reference_norm / 2.0_f64.sqrt() * config.bound_scale;
+                let headroom = if observation.proposed_delta >= 0.0 {
+                    (bound - observation.current_weight) / (2.0 * bound)
+                } else {
+                    (bound + observation.current_weight) / (2.0 * bound)
+                }
+                .clamp(0.0, 1.0);
+                (observation.current_weight + observation.proposed_delta * headroom)
+                    .clamp(-bound, bound)
+            }
+        };
+        let resource_level = match self.resource {
+            ResourceMechanism::Disabled => 1.0,
+            ResourceMechanism::Continuous(config) => (observation.resource_level
+                - config.plasticity_cost * (recurrent_weight - observation.current_weight).abs())
+            .max(0.0),
+        };
+        PlasticityAdjustment {
+            recurrent_weight,
+            resource_level,
+        }
+    }
+
+    fn adjust_homeostasis(&mut self, observation: HomeostasisObservation) -> HomeostasisAdjustment {
+        let (activity_ema, excitability_gain, weight_rate) = match self.homeostasis {
+            HomeostasisMechanism::ReferenceNorm => {
+                (observation.activity_ema, observation.excitability_gain, 1.0)
+            }
+            HomeostasisMechanism::DualTimescale(config) => {
+                let activity_ema = (1.0 - config.activity_ema_rate) * observation.activity_ema
+                    + config.activity_ema_rate * observation.mean_absolute_activity;
+                let adjustment = (config.excitability_adjustment_rate
+                    * observation.strength
+                    * (config.activity_target - activity_ema))
+                    .exp();
+                let excitability_gain = (observation.excitability_gain * adjustment).clamp(
+                    config.minimum_excitability_gain,
+                    config.maximum_excitability_gain,
+                );
+                (
+                    activity_ema,
+                    excitability_gain,
+                    config.weight_norm_relaxation_rate,
+                )
+            }
+        };
+        let mut recurrent_weights = observation.recurrent_weights;
+        let current = recurrent_weights[0].hypot(recurrent_weights[1]);
+        if current > 1e-12 {
+            let target_scale = observation.reference_recurrent_norm / current;
+            let correction = (observation.strength * weight_rate).min(1.0);
+            let scale = if correction == 1.0 {
+                target_scale
+            } else {
+                target_scale.powf(correction)
+            };
+            recurrent_weights[0] *= scale;
+            recurrent_weights[1] *= scale;
+        }
+        HomeostasisAdjustment {
+            activity_ema,
+            excitability_gain,
+            recurrent_weights,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContinuousStreamConfig {
     pub trial_count: usize,
     pub minimum_change_gap: usize,
     pub change_probability: f64,
@@ -379,7 +535,7 @@ impl Rng {
 }
 
 #[derive(Clone)]
-struct MapController {
+struct MapController<M: AdjustmentMechanism> {
     config: Map0ExperimentConfig,
     parameters: Map0ParameterPoint,
     input_weights: [[f64; GATE_B_SENSOR_COUNT]; HIDDEN_COUNT],
@@ -390,9 +546,7 @@ struct MapController {
     lesioned: [bool; HIDDEN_COUNT],
     baseline: f64,
     reference_recurrent_norms: [f64; HIDDEN_COUNT],
-    homeostasis_mechanism: HomeostasisMechanism,
-    plasticity_mechanism: PlasticityMechanism,
-    resource_mechanism: ResourceMechanism,
+    adjustment_mechanism: M,
     resource: [f64; HIDDEN_COUNT],
     activity_ema: [f64; HIDDEN_COUNT],
     excitability_gain: [f64; HIDDEN_COUNT],
@@ -425,14 +579,12 @@ struct ActivityAccumulator {
     resource_constrained: usize,
 }
 
-impl MapController {
+impl<M: AdjustmentMechanism> MapController<M> {
     fn new(
         config: Map0ExperimentConfig,
         parameters: Map0ParameterPoint,
         seed: u64,
-        homeostasis_mechanism: HomeostasisMechanism,
-        plasticity_mechanism: PlasticityMechanism,
-        resource_mechanism: ResourceMechanism,
+        adjustment_mechanism: M,
     ) -> Self {
         let mut rng = Rng::new(seed);
         let mut input_weights = [[0.0; GATE_B_SENSOR_COUNT]; HIDDEN_COUNT];
@@ -484,9 +636,11 @@ impl MapController {
             let [a, b] = recurrent_slots[target];
             recurrent_weights[target][a].hypot(recurrent_weights[target][b])
         });
-        let initial_resource = match resource_mechanism {
-            ResourceMechanism::Disabled => 1.0,
-            ResourceMechanism::Continuous(config) => config.initial_level,
+        let proposed_resource = adjustment_mechanism.initial_resource();
+        let initial_resource = if proposed_resource.is_finite() {
+            proposed_resource.clamp(0.0, 1.0)
+        } else {
+            1.0
         };
         Self {
             config,
@@ -499,9 +653,7 @@ impl MapController {
             lesioned: [false; HIDDEN_COUNT],
             baseline: 0.0,
             reference_recurrent_norms,
-            homeostasis_mechanism,
-            plasticity_mechanism,
-            resource_mechanism,
+            adjustment_mechanism,
             resource: [initial_resource; HIDDEN_COUNT],
             activity_ema: [0.0; HIDDEN_COUNT],
             excitability_gain: [1.0; HIDDEN_COUNT],
@@ -514,7 +666,7 @@ impl MapController {
 
     fn step(&mut self, sensors: [f64; GATE_B_SENSOR_COUNT]) -> [f64; HIDDEN_COUNT] {
         let previous = self.hidden;
-        let next = std::array::from_fn(|target| {
+        let raw_next: [f64; HIDDEN_COUNT] = std::array::from_fn(|target| {
             let input = self.input_weights[target]
                 .iter()
                 .zip(sensors)
@@ -528,26 +680,30 @@ impl MapController {
             if self.lesioned[target] {
                 0.0
             } else {
-                let raw = (self.excitability_gain[target]
+                (self.excitability_gain[target]
                     * (input + self.config.hidden_leak * previous[target] + recurrent))
-                    .tanh();
-                match self.resource_mechanism {
-                    ResourceMechanism::Disabled => raw,
-                    ResourceMechanism::Continuous(config) => {
-                        let modulation = config.minimum_modulation
-                            + (1.0 - config.minimum_modulation) * self.resource[target];
-                        raw * modulation
-                    }
-                }
+                    .tanh()
             }
         });
-        if let ResourceMechanism::Continuous(config) = self.resource_mechanism {
-            for target in 0..HIDDEN_COUNT {
-                self.resource[target] = (self.resource[target] + config.supply_rate
-                    - config.maintenance_cost
-                    - config.activity_cost * next[target].abs())
-                .clamp(0.0, 1.0);
-            }
+        let mut next = [0.0; HIDDEN_COUNT];
+        for target in 0..HIDDEN_COUNT {
+            let action = self
+                .adjustment_mechanism
+                .adjust_activity(ActivityObservation {
+                    unit: target,
+                    raw_activity: raw_next[target],
+                    resource_level: self.resource[target],
+                });
+            next[target] = if action.activity.is_finite() {
+                action.activity.clamp(-1.0, 1.0)
+            } else {
+                raw_next[target]
+            };
+            self.resource[target] = if action.resource_level.is_finite() {
+                action.resource_level.clamp(0.0, 1.0)
+            } else {
+                self.resource[target]
+            };
         }
         self.hidden = next;
         previous
@@ -702,29 +858,29 @@ impl MapController {
                     * feedback_value
                     * trial.recurrent_eligibility[target][slot]
                     * delayed_scale;
-                let previous_weight = self.recurrent_weights[target][source];
-                self.recurrent_weights[target][source] = match self.plasticity_mechanism {
-                    PlasticityMechanism::Additive => (self.recurrent_weights[target][source]
-                        + delta)
-                        .clamp(-self.config.weight_limit, self.config.weight_limit),
-                    PlasticityMechanism::SoftBounded(config) => {
-                        let bound = self.reference_recurrent_norms[target] / 2.0_f64.sqrt()
-                            * config.bound_scale;
-                        let weight = self.recurrent_weights[target][source];
-                        let headroom = if delta >= 0.0 {
-                            (bound - weight) / (2.0 * bound)
-                        } else {
-                            (bound + weight) / (2.0 * bound)
-                        }
-                        .clamp(0.0, 1.0);
-                        (weight + delta * headroom).clamp(-bound, bound)
-                    }
+                let action = self
+                    .adjustment_mechanism
+                    .adjust_plasticity(PlasticityObservation {
+                        target_unit: target,
+                        source_unit: source,
+                        current_weight: self.recurrent_weights[target][source],
+                        proposed_delta: delta,
+                        reference_norm: self.reference_recurrent_norms[target],
+                        absolute_weight_limit: self.config.weight_limit,
+                        resource_level: self.resource[target],
+                    });
+                self.recurrent_weights[target][source] = if action.recurrent_weight.is_finite() {
+                    action
+                        .recurrent_weight
+                        .clamp(-self.config.weight_limit, self.config.weight_limit)
+                } else {
+                    self.recurrent_weights[target][source]
                 };
-                if let ResourceMechanism::Continuous(config) = self.resource_mechanism {
-                    let cost = config.plasticity_cost
-                        * (self.recurrent_weights[target][source] - previous_weight).abs();
-                    self.resource[target] = (self.resource[target] - cost).max(0.0);
-                }
+                self.resource[target] = if action.resource_level.is_finite() {
+                    action.resource_level.clamp(0.0, 1.0)
+                } else {
+                    self.resource[target]
+                };
             }
         }
         let homeostasis = if control == Map0Control::NoHomeostasis {
@@ -738,45 +894,43 @@ impl MapController {
     }
 
     fn apply_homeostasis(&mut self, trial: &Trial, strength: f64) {
-        let (activity, weight_rate) = match self.homeostasis_mechanism {
-            HomeostasisMechanism::ReferenceNorm => (None, 1.0),
-            HomeostasisMechanism::DualTimescale(config) => {
-                (Some(config), config.weight_norm_relaxation_rate)
-            }
-        };
-        if let Some(config) = activity {
-            for target in 0..HIDDEN_COUNT {
-                self.activity_ema[target] = (1.0 - config.activity_ema_rate)
-                    * self.activity_ema[target]
-                    + config.activity_ema_rate * trial.mean_absolute_activity[target];
-                let adjustment = (config.excitability_adjustment_rate
-                    * strength
-                    * (config.activity_target - self.activity_ema[target]))
-                    .exp();
-                self.excitability_gain[target] = (self.excitability_gain[target] * adjustment)
-                    .clamp(
-                        config.minimum_excitability_gain,
-                        config.maximum_excitability_gain,
-                    );
-            }
-        }
         for target in 0..HIDDEN_COUNT {
             let [a, b] = self.recurrent_slots[target];
-            let current =
-                self.recurrent_weights[target][a].hypot(self.recurrent_weights[target][b]);
-            if current > 1e-12 {
-                let target_scale = self.reference_recurrent_norms[target] / current;
-                let correction = (strength * weight_rate).min(1.0);
-                // Relax in log-norm space. This preserves the exact Map 0
-                // projection at rate 1 while giving a genuinely slow rule a
-                // meaningful restoring force after large deviations.
-                let scale = if correction == 1.0 {
-                    target_scale
-                } else {
-                    target_scale.powf(correction)
-                };
-                self.recurrent_weights[target][a] *= scale;
-                self.recurrent_weights[target][b] *= scale;
+            let action = self
+                .adjustment_mechanism
+                .adjust_homeostasis(HomeostasisObservation {
+                    unit: target,
+                    strength,
+                    mean_absolute_activity: trial.mean_absolute_activity[target],
+                    activity_ema: self.activity_ema[target],
+                    excitability_gain: self.excitability_gain[target],
+                    recurrent_weights: [
+                        self.recurrent_weights[target][a],
+                        self.recurrent_weights[target][b],
+                    ],
+                    reference_recurrent_norm: self.reference_recurrent_norms[target],
+                });
+            self.activity_ema[target] = if action.activity_ema.is_finite() {
+                action.activity_ema.clamp(0.0, 1.0)
+            } else {
+                self.activity_ema[target]
+            };
+            let [minimum_gain, maximum_gain] = self.adjustment_mechanism.excitability_bounds();
+            self.excitability_gain[target] = if action.excitability_gain.is_finite()
+                && minimum_gain.is_finite()
+                && maximum_gain.is_finite()
+                && minimum_gain > 0.0
+                && minimum_gain <= maximum_gain
+            {
+                action.excitability_gain.clamp(minimum_gain, maximum_gain)
+            } else {
+                self.excitability_gain[target]
+            };
+            for (source, proposed) in [a, b].into_iter().zip(action.recurrent_weights) {
+                if proposed.is_finite() {
+                    self.recurrent_weights[target][source] =
+                        proposed.clamp(-self.config.weight_limit, self.config.weight_limit);
+                }
             }
         }
     }
@@ -878,9 +1032,9 @@ impl ActivityAccumulator {
         }
     }
 
-    fn finish(
+    fn finish<M: AdjustmentMechanism>(
         &self,
-        controller: &MapController,
+        controller: &MapController<M>,
         approximate_state_updates: u64,
     ) -> Map0DynamicsMetrics {
         let scalar_samples = (self.samples * HIDDEN_COUNT).max(1) as f64;
@@ -1133,14 +1287,32 @@ pub(crate) fn run_map_seed_with_mechanisms(
     plasticity_mechanism: PlasticityMechanism,
     resource_mechanism: ResourceMechanism,
 ) -> Map0SeedResult {
-    let mut controller = MapController::new(
+    run_map_seed_with_adjustment_mechanism(
         config,
         parameters,
-        seed ^ 0x434f_4e54_524f_4c01,
-        homeostasis_mechanism,
-        plasticity_mechanism,
-        resource_mechanism,
-    );
+        seed,
+        control,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    )
+}
+
+/// Runs the frozen closed-loop Map probe with a candidate mechanism.
+///
+/// The mechanism can affect the carrier only through [`AdjustmentMechanism`]
+/// actions; the task generator, labels and action readout remain private.
+pub fn run_map_seed_with_adjustment_mechanism<M: AdjustmentMechanism>(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: Map0Control,
+    mechanism: M,
+) -> Map0SeedResult {
+    let mut controller =
+        MapController::new(config, parameters, seed ^ 0x434f_4e54_524f_4c01, mechanism);
     controller.train_readout(seed);
     if control == Map0Control::ShuffledStructure {
         controller.shuffle_structure(seed ^ 0x5348_5546_464c_4501);
@@ -1227,14 +1399,31 @@ pub(crate) fn run_continuous_seed_with_mechanisms(
     resource_mechanism: ResourceMechanism,
     stream: ContinuousStreamConfig,
 ) -> ContinuousSeedResult {
-    let mut controller = MapController::new(
+    run_continuous_seed_with_adjustment_mechanism(
         config,
         parameters,
-        seed ^ 0x434f_4e54_524f_4c01,
-        homeostasis_mechanism,
-        plasticity_mechanism,
-        resource_mechanism,
-    );
+        seed,
+        control,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+        stream,
+    )
+}
+
+/// Runs the frozen continuous closed-loop stream with a candidate mechanism.
+pub fn run_continuous_seed_with_adjustment_mechanism<M: AdjustmentMechanism>(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: Map0Control,
+    mechanism: M,
+    stream: ContinuousStreamConfig,
+) -> ContinuousSeedResult {
+    let mut controller =
+        MapController::new(config, parameters, seed ^ 0x434f_4e54_524f_4c01, mechanism);
     controller.train_readout(seed);
     controller.reset_state();
     let mut original_rule = true;
@@ -1330,8 +1519,8 @@ pub(crate) fn run_continuous_seed_with_mechanisms(
     }
 }
 
-fn adapt_phase(
-    controller: &mut MapController,
+fn adapt_phase<M: AdjustmentMechanism>(
+    controller: &mut MapController<M>,
     original_rule: bool,
     reward_delay_steps: usize,
     control: Map0Control,
@@ -1388,8 +1577,8 @@ fn adapt_phase(
     (threshold_episode, accuracy)
 }
 
-fn evaluate(
-    controller: &MapController,
+fn evaluate<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
     original_rule: bool,
     delay_steps: usize,
     seed: u64,

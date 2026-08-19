@@ -20,6 +20,7 @@ pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
 pub mod representation_capacity;
+pub mod rule_formation;
 pub mod structural_diagnostic;
 pub mod structural_group;
 pub mod structural_timescale;
@@ -133,6 +134,11 @@ pub use representation_capacity::{
     RepresentationCapacityDecision, RepresentationCapacityPublishedResult,
     RepresentationCapacityResult, RepresentationCapacitySeedResult, RepresentationNovelSummary,
     RepresentationRuleResult, RepresentationRuleSummary, run_representation_capacity_diagnostic,
+};
+pub use rule_formation::{
+    M1F_GAIN_COUNT, M1FAcceptanceReport, M1FConfig, M1FControl, M1FControlSummary, M1FDecision,
+    M1FGainSummary, M1FPairedEffects, M1FPublishedResult, M1FResult, M1FRuleResult, M1FSeedResult,
+    run_m1f_experiment,
 };
 pub use structural_diagnostic::{
     StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,

@@ -1,0 +1,533 @@
+{
+  "version": "adaptive-mechanism/m1f-v0.8-node-perturbation",
+  "config": {
+    "m1Protocol": {
+      "map2Protocol": {
+        "map2bProtocol": {
+          "map2aProtocol": {
+            "map1Protocol": {
+              "seed": 5566818783092277505,
+              "developmentConfigCount": 48,
+              "developmentSeedCount": 8,
+              "confirmationSeedCount": 12,
+              "confirmationCandidateCount": 6,
+              "recurrentGainRange": [
+                0.1,
+                0.45
+              ],
+              "internalLearningRateRange": [
+                0.06,
+                0.16
+              ],
+              "homeostasisStrengthRange": [
+                0.25,
+                1.0
+              ],
+              "explorationRateRange": [
+                0.04,
+                0.18
+              ],
+              "activityTarget": 0.35,
+              "activityEmaRate": 0.05,
+              "excitabilityAdjustmentRate": 0.02,
+              "weightNormRelaxationRate": 0.03,
+              "minimumExcitabilityGain": 0.65,
+              "maximumExcitabilityGain": 1.35,
+              "probeProtocol": {
+                "seed": 5566818783092277505,
+                "developmentConfigCount": 64,
+                "developmentSeedCount": 8,
+                "confirmationSeedCount": 12,
+                "confirmationCandidateCount": 6,
+                "pretrainingEpisodes": 320,
+                "adaptationEpisodes": 240,
+                "evaluationEpisodes": 80,
+                "thresholdCheckInterval": 20,
+                "cueSteps": 2,
+                "memoryDelaySteps": 8,
+                "rewardDelaySteps": 6,
+                "eligibilityDecay": 0.88,
+                "hiddenLeak": 0.8,
+                "policyLearningRate": 0.055,
+                "softmaxTemperature": 0.4,
+                "rewardBaselineDecay": 0.92,
+                "weightLimit": 2.5,
+                "recurrentGainRange": [
+                  0.1,
+                  0.45
+                ],
+                "internalLearningRateRange": [
+                  0.06,
+                  0.16
+                ],
+                "homeostasisStrengthRange": [
+                  0.25,
+                  1.0
+                ],
+                "explorationRateRange": [
+                  0.04,
+                  0.18
+                ],
+                "thresholds": {
+                  "memoryAccuracy": 0.65,
+                  "delayedCreditAccuracy": 0.65,
+                  "reversalAccuracy": 0.7,
+                  "restorationAccuracy": 0.7,
+                  "repeatedReversalAccuracy": 0.7,
+                  "perturbationRecoveryAccuracy": 0.65,
+                  "minimumPerturbationDamageDrop": 0.15,
+                  "minimumPerturbationRecoveryGain": 0.1,
+                  "maximumSaturationFraction": 0.25,
+                  "maximumSynchronyFraction": 0.5,
+                  "maximumRelativeWeightDrift": 1.0,
+                  "minimumRegionFormationProbability": 0.5,
+                  "minimumRegionSize": 3,
+                  "minimumCausalProbabilityDrop": 0.15,
+                  "minimumCausalProbeScoreDrop": 0.1
+                }
+              }
+            },
+            "softBoundScale": 1.0,
+            "minimumMeanWeightDriftReduction": 0.25,
+            "maximumAccuracyDegradation": 0.02
+          },
+          "initialResource": 0.75,
+          "supplyRate": 0.007,
+          "maintenanceCost": 0.001,
+          "activityCost": 0.012,
+          "plasticityCost": 0.05,
+          "minimumModulation": 0.6,
+          "minimumNoSupplyResourceDrop": 0.2,
+          "minimumNoSupplyProbeScoreDrop": 0.1,
+          "maximumProbeScoreDegradation": 0.02,
+          "maximumWeightDriftIncrease": 0.05
+        },
+        "streamTrialCount": 720,
+        "minimumChangeGap": 30,
+        "changeProbability": 0.025,
+        "settlingWindow": 20,
+        "exploration": 0.12,
+        "minimumRuleChanges": 5,
+        "minimumOverallAccuracy": 0.6,
+        "minimumSettledAccuracy": 0.65,
+        "maximumRelativeWeightDrift": 1.0,
+        "minimumResourceLevel": 0.05,
+        "minimumFormationProbability": 0.5,
+        "minimumRegionSize": 3,
+        "maximumResetAdvantage": 0.05,
+        "minimumNoSupplyAccuracyDrop": 0.1,
+        "minimumFrozenAccuracyDrop": 0.1
+      },
+      "referenceParameterIds": [
+        0,
+        16,
+        20,
+        21,
+        29,
+        45
+      ],
+      "developmentSeedCount": 4,
+      "confirmationSeedCount": 8,
+      "phaseTrialCount": 240,
+      "evaluationTrialCount": 48,
+      "thresholdCheckInterval": 20,
+      "accuracyThreshold": 0.7,
+      "minimumRetainedAccuracy": 0.6,
+      "maximumRetentionDrop": 0.15,
+      "maximumRelativeWeightDrift": 1.0,
+      "minimumMeanResourceLevel": 0.2,
+      "minimumSingleRuleAccuracy": 0.7,
+      "minimumRetentionProbability": 0.5,
+      "minimumCausalAccuracyDrop": 0.05,
+      "maximumResetRetentionAdvantage": 0.05
+    },
+    "formationGains": [
+      0.025,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "perturbationScale": 0.05,
+    "minimumNovelAccuracy": 0.7,
+    "minimumAccuracyAdvantage": 0.05,
+    "minimumTargetProbabilityGain": 0.05,
+    "minimumHistoryAccuracy": 0.75,
+    "maximumHistoryDegradation": 0.05,
+    "minimumMeanResourceLevel": 0.2,
+    "maximumRelativeWeightDrift": 1.0
+  },
+  "mechanismContract": [
+    "the candidate reads only the target unit's self-generated perturbation, the connection's existing local eligibility trace and resource state, and one global scalar consequence",
+    "target labels, rule identity, action probabilities, action readout weights, and task generator state are unavailable to the candidate update",
+    "node count, topology, 48 adjustable recurrent connections, weight bounds, resource dynamics, homeostasis, action exploration, and 240-trial budget match M1",
+    "development chooses one of four frozen formation gains; confirmation cannot modify the selected gain or acceptance thresholds",
+    "success requires both frozen-readout behavior and target-probability formation, plus reward specificity and A preservation"
+  ],
+  "carrierParameters": [
+    {
+      "id": 0,
+      "recurrentGain": 0.275,
+      "internalLearningRate": 0.09333333333333332,
+      "homeostasisStrength": 0.4,
+      "explorationRate": 0.06
+    },
+    {
+      "id": 16,
+      "recurrentGain": 0.28593749999999996,
+      "internalLearningRate": 0.15259259259259259,
+      "homeostasisStrength": 0.64,
+      "explorationRate": 0.1057142857142857
+    },
+    {
+      "id": 20,
+      "recurrentGain": 0.3296875,
+      "internalLearningRate": 0.07851851851851852,
+      "homeostasisStrength": 0.52,
+      "explorationRate": 0.04857142857142857
+    },
+    {
+      "id": 21,
+      "recurrentGain": 0.2421875,
+      "internalLearningRate": 0.11185185185185184,
+      "homeostasisStrength": 0.67,
+      "explorationRate": 0.06857142857142857
+    },
+    {
+      "id": 29,
+      "recurrentGain": 0.2640625,
+      "internalLearningRate": 0.07234567901234568,
+      "homeostasisStrength": 0.28600000000000003,
+      "explorationRate": 0.09142857142857141
+    },
+    {
+      "id": 45,
+      "recurrentGain": 0.25859374999999996,
+      "internalLearningRate": 0.1019753086419753,
+      "homeostasisStrength": 0.526,
+      "explorationRate": 0.13714285714285712
+    }
+  ],
+  "developmentGainSummaries": [
+    {
+      "formationGain": 0.025,
+      "runCount": 24,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.7491319444444445,
+        "lower95": 0.6714661486053889,
+        "upper95": 0.8267977402835002
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.4736689814814816,
+        "lower95": 0.4633063333118026,
+        "upper95": 0.48403162965116064
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.022337397181461226,
+        "lower95": 0.0022181727467207486,
+        "upper95": 0.0424566216162017
+      },
+      "meanResourceLevel": {
+        "mean": 0.9661591790596651,
+        "lower95": 0.9609071975586201,
+        "upper95": 0.9714111605607101
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.34210581143646834,
+        "lower95": 0.3171103142796493,
+        "upper95": 0.3671013085932874
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "formationGain": 0.05,
+      "runCount": 24,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.6796875,
+        "lower95": 0.6157915394751994,
+        "upper95": 0.7435834605248006
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.470486111111111,
+        "lower95": 0.4545519755892189,
+        "upper95": 0.4864202466330031
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.026788786165580756,
+        "lower95": 0.008675883461089762,
+        "upper95": 0.044901688870071746
+      },
+      "meanResourceLevel": {
+        "mean": 0.9714293125053973,
+        "lower95": 0.9668440415211058,
+        "upper95": 0.9760145834896888
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.5515694169264495,
+        "lower95": 0.5175628462981772,
+        "upper95": 0.5855759875547217
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "formationGain": 0.1,
+      "runCount": 24,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.5842013888888887,
+        "lower95": 0.5402693292576501,
+        "upper95": 0.6281334485201273
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.48871527777777773,
+        "lower95": 0.4800519605544248,
+        "upper95": 0.4973785950011307
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.050604987201469755,
+        "lower95": 0.034880668198759235,
+        "upper95": 0.06632930620418027
+      },
+      "meanResourceLevel": {
+        "mean": 0.9756060335365772,
+        "lower95": 0.9715948280976852,
+        "upper95": 0.9796172389754692
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.7304539524596724,
+        "lower95": 0.7020986952103762,
+        "upper95": 0.7588092097089686
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "formationGain": 0.2,
+      "runCount": 24,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.5494791666666666,
+        "lower95": 0.5299994187485001,
+        "upper95": 0.5689589145848332
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.49045138888888884,
+        "lower95": 0.48534722222222215,
+        "upper95": 0.4955555555555555
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.055725122341253173,
+        "lower95": 0.039211329940421216,
+        "upper95": 0.07223891474208513
+      },
+      "meanResourceLevel": {
+        "mean": 0.9771117619993884,
+        "lower95": 0.9735040762759751,
+        "upper95": 0.9807194477228017
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.7512600564091603,
+        "lower95": 0.7394893813393267,
+        "upper95": 0.7630307314789938
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "selectedFormationGain": 0.2,
+  "confirmationSummaries": [
+    {
+      "control": "reward-local-baseline",
+      "formationGain": 0.2,
+      "runCount": 48,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.8576388888888888,
+        "lower95": 0.811209957773297,
+        "upper95": 0.9040678200044807
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.5533854166666667,
+        "lower95": 0.5301430000321933,
+        "upper95": 0.5766278333011402
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.09837444097912017,
+        "lower95": 0.07589473145518448,
+        "upper95": 0.12085415050305585
+      },
+      "meanResourceLevel": {
+        "mean": 0.9769382347953264,
+        "lower95": 0.9744619795494276,
+        "upper95": 0.9794144900412252
+      },
+      "meanMinimumResourceLevel": {
+        "mean": 0.6855906059733597,
+        "lower95": 0.6745671870532527,
+        "upper95": 0.6966140248934668
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.3811128267034552,
+        "lower95": 0.3641156181676315,
+        "upper95": 0.3981100352392789
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "node-perturbation",
+      "formationGain": 0.2,
+      "runCount": 48,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.6223958333333334,
+        "lower95": 0.5856670565452226,
+        "upper95": 0.6591246101214442
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.4830729166666667,
+        "lower95": 0.4748179748246245,
+        "upper95": 0.49132785850870886
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.0330344523674549,
+        "lower95": 0.020259972011014916,
+        "upper95": 0.045808932723894885
+      },
+      "meanResourceLevel": {
+        "mean": 0.9825656407031307,
+        "lower95": 0.980341536758362,
+        "upper95": 0.9847897446478994
+      },
+      "meanMinimumResourceLevel": {
+        "mean": 0.6871287328474063,
+        "lower95": 0.6730859923371475,
+        "upper95": 0.701171473357665
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.7375221905487624,
+        "lower95": 0.7287159395912248,
+        "upper95": 0.7463284415063001
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "random-consequence",
+      "formationGain": 0.2,
+      "runCount": 48,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.8528645833333335,
+        "lower95": 0.8070756420234194,
+        "upper95": 0.8986535246432475
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.47323495370370366,
+        "lower95": 0.46684011464859393,
+        "upper95": 0.4796297927588134
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.021696332317192608,
+        "lower95": 0.015394559982929906,
+        "upper95": 0.02799810465145531
+      },
+      "meanResourceLevel": {
+        "mean": 0.9762150742655816,
+        "lower95": 0.9732167407319117,
+        "upper95": 0.9792134077992516
+      },
+      "meanMinimumResourceLevel": {
+        "mean": 0.6959523363134611,
+        "lower95": 0.6835648998269459,
+        "upper95": 0.7083397727999763
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.06217421122683483,
+        "lower95": 0.05556588873836923,
+        "upper95": 0.06878253371530044
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "control": "frozen-adjustment",
+      "formationGain": 0.2,
+      "runCount": 48,
+      "meanHistoryFinalAccuracy": {
+        "mean": 0.861545138888889,
+        "lower95": 0.8266772633291473,
+        "upper95": 0.8964130144486306
+      },
+      "meanNovelFinalAccuracy": {
+        "mean": 0.45486111111111116,
+        "lower95": 0.44294191176911646,
+        "upper95": 0.46678031045310586
+      },
+      "meanNovelTargetProbabilityGain": {
+        "mean": 0.0028549359553541997,
+        "lower95": 0.0004859486420667131,
+        "upper95": 0.005223923268641686
+      },
+      "meanResourceLevel": {
+        "mean": 0.9322603968743638,
+        "lower95": 0.9258782491569887,
+        "upper95": 0.9386425445917389
+      },
+      "meanMinimumResourceLevel": {
+        "mean": 0.6926396883590619,
+        "lower95": 0.6804663309728292,
+        "upper95": 0.7048130457452946
+      },
+      "meanRelativeWeightDrift": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "pairedEffects": {
+    "candidateOverBaselineNovelAccuracy": {
+      "mean": -0.07031249999999999,
+      "lower95": -0.09371852364969392,
+      "upper95": -0.04690647635030605
+    },
+    "candidateOverRandomNovelAccuracy": {
+      "mean": 0.009837962962962974,
+      "lower95": -0.0033367839401836196,
+      "upper95": 0.023012709866109565
+    },
+    "candidateHistoryAccuracyChange": {
+      "mean": -0.23524305555555555,
+      "lower95": -0.2730884325005079,
+      "upper95": -0.19739767861060323
+    },
+    "candidateNovelTargetProbabilityGain": {
+      "mean": 0.0330344523674549,
+      "lower95": 0.020259972011014916,
+      "upper95": 0.045808932723894885
+    }
+  },
+  "decision": "consequence-independent",
+  "acceptance": {
+    "m1TaskCarrierAndBudgetFrozen": true,
+    "developmentAndConfirmationSeedsDisjoint": true,
+    "developmentGainScanComplete": true,
+    "confirmationControlsComplete": true,
+    "allFourRulesComplete": true,
+    "selectedGainFromDevelopmentOnly": true,
+    "candidateObservationScopeLocal": true,
+    "targetRuleAndReadoutHiddenFromCandidate": true,
+    "pairedTrialAndPerturbationStreams": true,
+    "actionReadoutRemainedFrozen": true,
+    "topologyAndConnectionBudgetPreserved": true,
+    "finiteOutputs": true,
+    "stabilityWithinBounds": true,
+    "novelBehaviorThresholdPassed": false,
+    "baselineAdvantagePassed": false,
+    "consequenceSpecificityPassed": false,
+    "targetProbabilityFormationPassed": false,
+    "historyPreserved": false,
+    "mechanismAccepted": false,
+    "stagePassed": true,
+    "passed": true
+  },
+  "conclusions": [
+    "开发增益扫描的 B/C/D 行为为 0.025: 47.4% · 0.050: 47.0% · 0.100: 48.9% · 0.200: 49.0%；冻结选择 0.200。",
+    "独立确认中，候选 B/C/D 为 48.3%，现有基线 55.3%，随机后果 47.3%。",
+    "候选相对基线为 -7.03 pp [-9.37, -4.69]，相对随机后果为 +0.98 pp [-0.33, +2.30]。",
+    "候选 B/C/D 目标概率形成增益为 +3.30 pp [+2.03, +4.58]；A 最终行为 62.2%。",
+    "M1-F 正式决策为 ConsequenceIndependent。",
+    "候选没有可靠优于相同扰动的随机后果；观察到的变化不能归因于任务后果信用。"
+  ]
+}

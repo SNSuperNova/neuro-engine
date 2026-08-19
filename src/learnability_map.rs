@@ -10,6 +10,7 @@ use crate::mechanism_m1::{
 };
 use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
 use crate::representation_capacity::{RepresentationCapacitySeedResult, RepresentationRuleResult};
+use crate::rule_formation::{M1FControl, M1FRuleResult, M1FSeedResult};
 use crate::structural_diagnostic::{
     StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,
     StructuralDiagnosticSeedProtocol, StructuralDiagnosticSeedResult,
@@ -41,6 +42,15 @@ pub(crate) struct RepresentationCapacitySeedProtocol {
     pub probe_evaluation_trials: usize,
     pub probe_ridge: f64,
     pub shuffled_label_repeats: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct M1FSeedProtocol {
+    pub trial_count: usize,
+    pub evaluation_trial_count: usize,
+    pub exploration: f64,
+    pub perturbation_scale: f64,
+    pub formation_gain: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -593,6 +603,7 @@ struct Trial {
     activity: Vec<[f64; HIDDEN_COUNT]>,
     resource: Vec<[f64; HIDDEN_COUNT]>,
     mean_absolute_activity: [f64; HIDDEN_COUNT],
+    formation_perturbation: [f64; HIDDEN_COUNT],
 }
 
 #[derive(Default)]
@@ -896,6 +907,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
             activity,
             resource,
             mean_absolute_activity: activity_sum.map(|sum| sum / total_steps as f64),
+            formation_perturbation: [0.0; HIDDEN_COUNT],
         }
     }
 
@@ -916,6 +928,28 @@ impl<M: AdjustmentMechanism> MapController<M> {
             reset_before,
             capture_activity,
             None,
+            None,
+        )
+    }
+
+    fn formation_symbol_trial(
+        &mut self,
+        rule: M1Rule,
+        symbol: usize,
+        action_rng: &mut Rng,
+        perturbation_rng: &mut Rng,
+        exploration: f64,
+        perturbation_scale: f64,
+    ) -> Trial {
+        self.symbol_trial_with_structural_target(
+            rule,
+            symbol,
+            action_rng,
+            exploration,
+            false,
+            false,
+            None,
+            Some((perturbation_rng, perturbation_scale)),
         )
     }
 
@@ -935,6 +969,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
             false,
             false,
             Some(structural_target),
+            None,
         )
     }
 
@@ -947,6 +982,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
         reset_before: bool,
         capture_activity: bool,
         structural_target: Option<usize>,
+        formation_perturbation: Option<(&mut Rng, f64)>,
     ) -> Trial {
         if reset_before {
             self.reset_state();
@@ -984,6 +1020,14 @@ impl<M: AdjustmentMechanism> MapController<M> {
                 resource.push(self.resource);
             }
         }
+        let mut applied_perturbation = [0.0; HIDDEN_COUNT];
+        if let Some((perturbation_rng, scale)) = formation_perturbation {
+            for target in 0..HIDDEN_COUNT {
+                let perturbation = perturbation_rng.signed(scale);
+                applied_perturbation[target] = perturbation;
+                self.hidden[target] = (self.hidden[target] + perturbation).clamp(-1.0, 1.0);
+            }
+        }
         let probabilities = self
             .probabilities()
             .map(|value| value * (1.0 - exploration) + exploration / ACTION_COUNT as f64);
@@ -998,6 +1042,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
             activity,
             resource,
             mean_absolute_activity: activity_sum.map(|sum| sum / total_steps as f64),
+            formation_perturbation: applied_perturbation,
         }
     }
 
@@ -1102,6 +1147,56 @@ impl<M: AdjustmentMechanism> MapController<M> {
                 let source = self.recurrent_slots[target][slot];
                 let delta = self.parameters.internal_learning_rate
                     * feedback_value
+                    * trial.recurrent_eligibility[target][slot];
+                let action = self
+                    .adjustment_mechanism
+                    .adjust_plasticity(PlasticityObservation {
+                        target_unit: target,
+                        source_unit: source,
+                        current_weight: self.recurrent_weights[target][source],
+                        proposed_delta: delta,
+                        reference_norm: self.reference_recurrent_norms[target],
+                        absolute_weight_limit: self.config.weight_limit,
+                        resource_level: self.resource[target],
+                    });
+                self.recurrent_weights[target][source] = if action.recurrent_weight.is_finite() {
+                    action
+                        .recurrent_weight
+                        .clamp(-self.config.weight_limit, self.config.weight_limit)
+                } else {
+                    self.recurrent_weights[target][source]
+                };
+                self.resource[target] = if action.resource_level.is_finite() {
+                    action.resource_level.clamp(0.0, 1.0)
+                } else {
+                    self.resource[target]
+                };
+            }
+        }
+        if self.parameters.homeostasis_strength > 0.0 {
+            self.apply_homeostasis(trial, self.parameters.homeostasis_strength);
+        }
+    }
+
+    fn adapt_trial_node_perturbation(
+        &mut self,
+        trial: &Trial,
+        consequence: f64,
+        formation_gain: f64,
+        perturbation_scale: f64,
+    ) {
+        let advantage = consequence - self.baseline;
+        self.baseline = self.config.reward_baseline_decay * self.baseline
+            + (1.0 - self.config.reward_baseline_decay) * consequence;
+        for target in 0..HIDDEN_COUNT {
+            let local_perturbation =
+                trial.formation_perturbation[target] / perturbation_scale.max(1e-12);
+            for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+                let source = self.recurrent_slots[target][slot];
+                let delta = self.parameters.internal_learning_rate
+                    * formation_gain
+                    * advantage
+                    * local_perturbation
                     * trial.recurrent_eligibility[target][slot];
                 let action = self
                     .adjustment_mechanism
@@ -3585,6 +3680,191 @@ fn pearson(left: &[f64], right: &[f64]) -> f64 {
     } else {
         (covariance / denominator).clamp(-1.0, 1.0)
     }
+}
+
+pub(crate) fn run_m1f_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: M1FControl,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M1FSeedProtocol,
+) -> M1FSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_434f_4e54_524c,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let mut rule_results = Vec::new();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let mut candidate = controller.clone();
+        candidate.reset_state();
+        let rule_seed =
+            seed ^ 0x4d31_5349_4e47_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let (initial_behavior_accuracy, initial_target_probability) =
+            evaluate_multisymbol_rule_with_probability(
+                &candidate,
+                rule,
+                protocol.evaluation_trial_count,
+                rule_seed ^ 0x494e_4954,
+            );
+        let action_readout_digest_before = candidate.action_readout_digest();
+        let topology_digest_before = candidate.topology_digest();
+        let mut resource_sum = 0.0;
+        let mut resource_samples = 0usize;
+        let mut minimum_resource_level = f64::INFINITY;
+        for episode in 0..protocol.trial_count {
+            let symbol = (episode + rule_seed.count_ones() as usize) % 4;
+            let action_seed =
+                rule_seed ^ 0x4d31_4143_5449_4f4e ^ (episode as u64).wrapping_mul(SEED_STRIDE);
+            let mut action_rng = Rng::new(action_seed);
+            match control {
+                M1FControl::RewardLocalBaseline | M1FControl::FrozenAdjustment => {
+                    let trial = candidate.symbol_trial(
+                        rule,
+                        symbol,
+                        &mut action_rng,
+                        protocol.exploration,
+                        false,
+                        false,
+                    );
+                    if control == M1FControl::RewardLocalBaseline {
+                        candidate.adapt_trial(
+                            &trial,
+                            Map0Control::Baseline,
+                            false,
+                            rule_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                            0,
+                        );
+                    }
+                }
+                M1FControl::NodePerturbation | M1FControl::RandomConsequence => {
+                    let mut perturbation_rng = Rng::new(
+                        rule_seed
+                            ^ 0x4d31_4650_4552_5455
+                            ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+                    );
+                    let trial = candidate.formation_symbol_trial(
+                        rule,
+                        symbol,
+                        &mut action_rng,
+                        &mut perturbation_rng,
+                        protocol.exploration,
+                        protocol.perturbation_scale,
+                    );
+                    let consequence = if control == M1FControl::RandomConsequence {
+                        if Rng::new(rule_seed ^ 0x5241_4e44_5245_5701 ^ episode as u64).unit()
+                            >= 0.5
+                        {
+                            1.0
+                        } else {
+                            -1.0
+                        }
+                    } else if trial.chosen_right == trial.target_right {
+                        1.0
+                    } else {
+                        -1.0
+                    };
+                    candidate.adapt_trial_node_perturbation(
+                        &trial,
+                        consequence,
+                        protocol.formation_gain,
+                        protocol.perturbation_scale,
+                    );
+                }
+            }
+            for level in candidate.resource {
+                resource_sum += level;
+                resource_samples += 1;
+                minimum_resource_level = minimum_resource_level.min(level);
+            }
+        }
+        let (final_behavior_accuracy, final_target_probability) =
+            evaluate_multisymbol_rule_with_probability(
+                &candidate,
+                rule,
+                protocol.evaluation_trial_count,
+                rule_seed ^ 0x4649_4e41_4c01,
+            );
+        let (maximum_absolute_weight, mean_relative_weight_drift) = candidate.weight_dynamics();
+        let mean_resource_level = resource_sum / resource_samples.max(1) as f64;
+        let action_readout_digest_after = candidate.action_readout_digest();
+        let topology_digest_after = candidate.topology_digest();
+        let target_probability_gain = final_target_probability - initial_target_probability;
+        let finite = [
+            initial_behavior_accuracy,
+            final_behavior_accuracy,
+            initial_target_probability,
+            final_target_probability,
+            target_probability_gain,
+            mean_resource_level,
+            minimum_resource_level,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && candidate.hidden.iter().all(|value| value.is_finite())
+            && candidate.resource.iter().all(|value| value.is_finite());
+        rule_results.push(M1FRuleResult {
+            rule,
+            initial_behavior_accuracy,
+            final_behavior_accuracy,
+            initial_target_probability,
+            final_target_probability,
+            target_probability_gain,
+            mean_resource_level,
+            minimum_resource_level,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            action_readout_digest_before,
+            action_readout_digest_after,
+            topology_digest_before,
+            topology_digest_after,
+            adjustable_connection_count: HIDDEN_COUNT * PLASTIC_RECURRENT_PER_UNIT,
+            finite,
+        });
+    }
+    M1FSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        control,
+        formation_gain: protocol.formation_gain,
+        finite: rule_results.iter().all(|row| row.finite),
+        rule_results,
+    }
+}
+
+fn evaluate_multisymbol_rule_with_probability<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    rule: M1Rule,
+    trial_count: usize,
+    seed: u64,
+) -> (f64, f64) {
+    let mut evaluation = controller.clone();
+    let mut correct = 0usize;
+    let mut target_probability_sum = 0.0;
+    for episode in 0..trial_count {
+        let symbol = (episode + seed.count_ones() as usize) % 4;
+        let mut rng =
+            Rng::new(seed ^ 0x4d31_4556_414c_0101 ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+        let trial = evaluation.symbol_trial(rule, symbol, &mut rng, 0.0, false, false);
+        correct += usize::from(trial.chosen_right == trial.target_right);
+        target_probability_sum += trial.probabilities[usize::from(trial.target_right)];
+    }
+    (
+        correct as f64 / trial_count.max(1) as f64,
+        target_probability_sum / trial_count.max(1) as f64,
+    )
 }
 
 pub(crate) fn run_representation_capacity_seed(

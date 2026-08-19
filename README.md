@@ -30,6 +30,8 @@ Gate C 隔离了延迟信用分配：当前线索在岔路可见，分支动作�
 
 Gate D 加入 144 条固定稀疏跨单元连接。在 8 步无信息延迟中，与线索投影对齐的结构化循环达到 `80.6% [70.4%, 90.9%]`，拥有相同权重集合、连接数、正负边和谱半径的置乱循环为 `56.2% [49.7%, 62.6%]`，配对增益 `24.5 [14.3, 34.6]` 个百分点；可靠记忆边界从 4 步延长到 8 步。结构是设计者固定的，不宣称系统已经自行形成脑区。
 
+Gate E 把事件式 LIF 接入同一延迟线索闭环。在连续泄漏与脉冲迹衰减同为 0.86、动态状态和可训练连接预算匹配时，延迟 8 的 LIF 达到 `88.5% [85.3%, 91.6%]`，连续状态为 `67.3% [60.5%, 74.1%]`，配对增益 `21.2 [13.6, 28.7]` 个百分点；可靠记忆边界分别为 12 和 4 步。代价同样公开：LIF 当前 CPU 实现慢约 6.3 倍，概念状态预算相同但实现动态状态为 2,496 B（连续状态 384 B），25% 损伤下降也更大，因此仍是实验分支而非默认控制器。
+
 ## 运行
 
 ```powershell
@@ -40,6 +42,7 @@ cargo run --release --example gate_b_lab
 cargo run --release --example gate_b_robustness_lab
 cargo run --release --example gate_c_lab
 cargo run --release --example gate_d_lab
+cargo run --release --example gate_e_lab
 npm install
 npm run dev
 ```
@@ -59,6 +62,7 @@ src/embodied.rs             二维世界、主体、控制器、可塑性与实�
 src/gate_b.rs               延迟线索环境、等预算控制器和配对统计
 src/gate_c.rs               延迟能量环境、资格迹矩阵和因果对照
 src/gate_d.rs               稀疏循环动力学、置乱控制和稳定性审计
+src/gate_e.rs               连续状态与 LIF 的等预算行为、损伤和成本比较
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -78,12 +82,14 @@ experiments/                版本化结果与失败记录
 - [GATE_B_ROBUSTNESS.md](GATE_B_ROBUSTNESS.md)：已完成的状态延迟、线索带宽与持续干扰边界扫描；
 - [GATE_C.md](GATE_C.md)：已完成的资格迹 × 延迟能量冻结规格；
 - [GATE_D.md](GATE_D.md)：已完成的稀疏内部循环、等权重置乱与稳定性冻结规格；
+- [GATE_E.md](GATE_E.md)：已完成的连续状态与 LIF 脉冲状态等预算冻结规格；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
 - [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)：奖励塑形与方向感觉的多种子审计；
 - [experiments/gate-b-v1.2.md](experiments/gate-b-v1.2.md)：连续状态必要性的多种子配对实验；
 - [experiments/gate-b-robustness-v1.2b.md](experiments/gate-b-robustness-v1.2b.md)：固定状态机制的能力边界；
 - [experiments/gate-c-v1.3.md](experiments/gate-c-v1.3.md)：资格迹解决受控延迟信用分配的 4×4 实验；
 - [experiments/gate-d-v1.4.md](experiments/gate-d-v1.4.md)：结构化循环延长可靠记忆的多种子实验；
+- [experiments/gate-e-v1.5.md](experiments/gate-e-v1.5.md)：LIF 的记忆收益、CPU 代价和损伤边界；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

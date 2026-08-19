@@ -1,0 +1,23 @@
+[
+  {
+    "controller": "stateless",
+    "repetitions": 3,
+    "environmentSteps": 1921074,
+    "elapsedSeconds": 0.6811866,
+    "nanosecondsPerEnvironmentStep": 354.58634076563425
+  },
+  {
+    "controller": "continuous-state",
+    "repetitions": 3,
+    "environmentSteps": 1986117,
+    "elapsedSeconds": 0.7652348,
+    "nanosecondsPerEnvironmentStep": 385.2919037498798
+  },
+  {
+    "controller": "lif-spiking",
+    "repetitions": 3,
+    "environmentSteps": 2134014,
+    "elapsedSeconds": 5.1476236,
+    "nanosecondsPerEnvironmentStep": 2412.1789266612122
+  }
+]

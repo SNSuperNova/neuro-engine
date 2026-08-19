@@ -67,6 +67,13 @@ interface GateDReport { delaySteps: number; controller: GateDController; metrics
 interface GateDFrame { step: number; visibleCue: ForkSide | null; delayStepsRemaining: number; action: Action; reward: number; energy: number; branchChoice: ForkSide | null; hiddenActivity: number[]; actionProbabilities: number[] }
 interface GateDTrace { label: string; delaySteps: number; controller: GateDController; target: ForkSide; presentedCue: ForkSide; frames: GateDFrame[]; correctChoice: boolean; foodEaten: boolean; finalEnergy: number }
 interface GateDDataset { version: string; config: { modelSeedCount: number; evaluationEpisodes: number; memoryDelays: number[]; recurrentInDegree: number; recurrentSpectralRadius: number }; controllerBudgets: { controller: GateDController; activeRecurrentWeightCount: number; excitatoryEdgeCount: number; inhibitoryEdgeCount: number; estimatedSpectralRadius: number; recurrentWeightDigest: number }[]; reports: GateDReport[]; pairedEffects: { id: string; effect: { correctChoiceFraction: Interval } }[]; reliableMemoryBoundarySteps: [GateDController, number | null][]; traces: GateDTrace[]; acceptance: Record<string, boolean> & { passed: boolean } }
+type GateEController = "stateless" | "continuous-state" | "lif-spiking";
+interface GateEActivity { meanAbsoluteFeature: Interval; activeUnitFraction: Interval; silentUnitFraction: Interval; emittedSpikesPerStep: Interval; finiteStateFraction: Interval }
+interface GateEReport { delaySteps: number; controller: GateEController; metrics: { correctChoiceFraction: Interval; branchChoiceFraction: Interval; foodFraction: Interval; meanFinalEnergy: Interval; leftTargetAccuracy: Interval; rightTargetAccuracy: Interval }; activity: GateEActivity; damagedMetrics: { correctChoiceFraction: Interval } | null; damageAccuracyDrop: Interval | null; sampleEfficiency: { reachedSeedCount: number; reachedSeedFraction: number; meanEpisodesWhenReached: Interval | null } }
+interface GateEFrame { step: number; visibleCue: ForkSide | null; delayStepsRemaining: number; action: Action; reward: number; energy: number; branchChoice: ForkSide | null; features: number[]; membranePotentialsMv: number[]; spikes: boolean[]; actionProbabilities: number[] }
+interface GateETrace { label: string; delaySteps: number; controller: GateEController; target: ForkSide; frames: GateEFrame[]; correctChoice: boolean; foodEaten: boolean; finalEnergy: number }
+interface GateEDataset { version: string; config: { modelSeedCount: number; evaluationEpisodes: number; memoryDelays: number[]; damageFraction: number; lifMembraneTimeConstantMs: number; lifSpikeTraceDecay: number; controller: { hiddenLeak: number } }; controllerBudgets: { controller: GateEController; conceptualStateBytes: number; implementationDynamicStateBytes: number; trainableActionWeightCount: number }[]; reports: GateEReport[]; pairedEffects: { id: string; effect: { correctChoiceFraction: Interval } }[]; reliableMemoryBoundarySteps: [GateEController, number | null][]; aggregateCosts: [GateEController, { environmentSteps: number; inputEvents: number; emittedSpikes: number; denseInputMultiplyAccumulates: number; denseReadoutMultiplyAccumulates: number }][]; traces: GateETrace[]; acceptance: Record<string, boolean> & { passed: boolean } }
+interface GateERuntime { controller: GateEController; repetitions: number; environmentSteps: number; elapsedSeconds: number; nanosecondsPerEnvironmentStep: number }
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -88,6 +95,10 @@ const gateCRange = byId<HTMLInputElement>("gate-c-range");
 const gateDBoundaryCanvas = byId<HTMLCanvasElement>("gate-d-boundary");
 const gateDTraceSelect = byId<HTMLSelectElement>("gate-d-trace-select");
 const gateDRange = byId<HTMLInputElement>("gate-d-range");
+const gateEBoundaryCanvas = byId<HTMLCanvasElement>("gate-e-boundary");
+const gateERasterCanvas = byId<HTMLCanvasElement>("gate-e-raster");
+const gateETraceSelect = byId<HTMLSelectElement>("gate-e-trace-select");
+const gateERange = byId<HTMLInputElement>("gate-e-range");
 const traceSelect = byId<HTMLSelectElement>("trace-select");
 const timeline = byId<HTMLInputElement>("timeline");
 const play = byId<HTMLButtonElement>("play");
@@ -105,6 +116,10 @@ let gateCFrameIndex = 0;
 let gateD: GateDDataset;
 let gateDTrace: GateDTrace;
 let gateDFrameIndex = 0;
+let gateE: GateEDataset;
+let gateERuntime: GateERuntime[];
+let gateETrace: GateETrace;
+let gateEFrameIndex = 0;
 let gateBTrace: GateBTrace;
 let gateBFrameIndex = 0;
 let gateBPlaying = false;
@@ -122,6 +137,7 @@ const labels: Record<string, string> = {
   left: "左", right: "右", stateless: "无状态", "state-reset": "每步清空", "leaky-state": "泄漏状态",
   "delayed-cue": "延迟线索", "cue-visible-at-fork": "岔路可见", "cue-randomized": "随机线索", "history-shuffled": "历史置乱",
   "no-recurrence": "无循环", "shuffled-recurrence": "置乱循环", "structured-recurrence": "结构化循环",
+  "continuous-state": "连续状态", "lif-spiking": "LIF 脉冲",
 };
 
 const fitCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContext2D => {
@@ -422,6 +438,50 @@ const renderGateD = () => {
   gateDTraceSelect.replaceChildren(...gateD.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=labels[trace.controller];if(trace.controller==="structured-recurrence")option.selected=true;return option;}));selectGateDTrace();drawGateDBoundary();
 };
 
+const drawGateEBoundary = () => {
+  const ctx=fitCanvas(gateEBoundaryCanvas);const rect=gateEBoundaryCanvas.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);
+  const pad={l:48,r:18,t:28,b:34},w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b;
+  const delays=gateE.config.memoryDelays;const xOf=(delay:number)=>pad.l+delays.indexOf(delay)/Math.max(1,delays.length-1)*w;const yOf=(value:number)=>pad.t+h-Math.max(0,Math.min(1,value))*h;
+  ctx.font="10px system-ui";ctx.strokeStyle="#d8e3db";ctx.fillStyle="#718078";ctx.textAlign="right";
+  for(let i=0;i<=4;i++){const value=i/4,y=yOf(value);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();ctx.fillText(`${value*100}%`,pad.l-7,y+3);}
+  ctx.setLineDash([5,4]);ctx.strokeStyle="#b79548";ctx.beginPath();ctx.moveTo(pad.l,yOf(.7));ctx.lineTo(pad.l+w,yOf(.7));ctx.stroke();ctx.setLineDash([]);
+  const colors:Record<GateEController,string>={stateless:"#8a9891","continuous-state":"#3b82a0","lif-spiking":"#d9822b"};
+  for(const controller of Object.keys(colors) as GateEController[]){const reports=gateE.reports.filter(report=>report.controller===controller).sort((a,b)=>a.delaySteps-b.delaySteps);ctx.strokeStyle=colors[controller];ctx.lineWidth=2.5;ctx.beginPath();reports.forEach((report,index)=>{const x=xOf(report.delaySteps),y=yOf(report.metrics.correctChoiceFraction.mean);index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();for(const report of reports){const metric=report.metrics.correctChoiceFraction,x=xOf(report.delaySteps);ctx.strokeStyle=colors[controller];ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,yOf(metric.lower95));ctx.lineTo(x,yOf(metric.upper95));ctx.stroke();ctx.fillStyle=colors[controller];ctx.beginPath();ctx.arc(x,yOf(metric.mean),4,0,Math.PI*2);ctx.fill();}}
+  ctx.fillStyle="#718078";ctx.textAlign="center";delays.forEach(delay=>ctx.fillText(`${delay} 步`,xOf(delay),rect.height-9));
+  let legendX=pad.l+5;ctx.textAlign="left";for(const controller of Object.keys(colors) as GateEController[]){ctx.fillStyle=colors[controller];ctx.fillRect(legendX,10,14,3);ctx.fillText(labels[controller],legendX+19,14);legendX+=112;}
+};
+
+const drawGateERaster = () => {
+  const ctx=fitCanvas(gateERasterCanvas);const rect=gateERasterCanvas.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);
+  const frames=gateETrace.frames,rows=24,pad={l:28,r:8,t:18,b:19},w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b,cellW=w/frames.length,rowH=h/rows;
+  ctx.fillStyle="#6d7d75";ctx.font="8px ui-monospace,monospace";ctx.textAlign="right";for(let row=0;row<rows;row+=4)ctx.fillText(`H${row}`,pad.l-5,pad.t+(row+.8)*rowH);
+  frames.forEach((frame,column)=>{for(let row=0;row<rows;row++){const value=Math.min(1,Math.abs(frame.features[row]));ctx.fillStyle=`rgba(39,151,103,${.04+value*.32})`;ctx.fillRect(pad.l+column*cellW,pad.t+row*rowH,Math.max(1,cellW),Math.max(1,rowH));if(frame.spikes[row]){ctx.fillStyle="#e38b21";ctx.fillRect(pad.l+column*cellW,pad.t+row*rowH,Math.max(2,cellW),Math.max(1.5,rowH));}}});
+  const markerX=pad.l+(gateEFrameIndex+.5)*cellW;ctx.strokeStyle="#174f3e";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(markerX,pad.t-4);ctx.lineTo(markerX,pad.t+h);ctx.stroke();
+  ctx.fillStyle="#718078";ctx.textAlign="center";ctx.fillText("时间 →",pad.l+w/2,rect.height-5);
+};
+
+const renderGateEFrame = () => {
+  const frame=gateETrace.frames[gateEFrameIndex];gateERange.value=String(gateEFrameIndex);const previous=gateEFrameIndex>0?gateETrace.frames[gateEFrameIndex-1]:null;
+  const phase=frame.reward>0?"获得真实食物能量":frame.visibleCue?"线索写入":frame.branchChoice&&!previous?.branchChoice?"岔路选择":frame.branchChoice?"已选分支":frame.delayStepsRemaining>0?`无信息延迟 · 剩 ${frame.delayStepsRemaining} 步`:"岔路决策";
+  byId("gate-e-phase").textContent=phase;byId("gate-e-cue").textContent=frame.visibleCue?`线索 ${labels[frame.visibleCue]}`:"线索关闭";
+  const neurons=byId("gate-e-neurons");neurons.replaceChildren();frame.features.forEach((value,index)=>{const cell=document.createElement("i");cell.title=`H${index}: trace ${value.toFixed(3)} · V ${frame.membranePotentialsMv[index].toFixed(3)} mV${frame.spikes[index]?" · spike":""}`;cell.style.setProperty("--activity",String(Math.min(1,Math.abs(value))));cell.className=frame.spikes[index]?"spike":"excited";neurons.append(cell);});
+  byId("gate-e-trace-note").textContent=`${labels[gateETrace.controller]} · 目标 ${labels[gateETrace.target]} · 动作 ${labels[frame.action]} · 本步 ${frame.spikes.filter(Boolean).length} 个脉冲 · 能量 ${frame.energy.toFixed(3)}`;drawGateERaster();
+};
+
+const selectGateETrace = () => {
+  gateETrace=gateE.traces.find(item=>item.label===gateETraceSelect.value)??gateE.traces[0];gateEFrameIndex=0;gateERange.max=String(gateETrace.frames.length-1);renderGateEFrame();
+};
+
+const renderGateE = () => {
+  byId("gate-e-protocol").textContent=`${gateE.config.modelSeedCount} 模型种子 · 衰减 ${gateE.config.lifSpikeTraceDecay.toFixed(2)} · 25% 损伤`;
+  const acceptanceLabels:Record<string,string>={budgetsMatched:"连接与状态预算匹配",lifBehaviorLearnable:"LIF 8 步可学习",lifImprovesAtLeastOneAxis:"至少一项功能收益",lifActivityValidAndSparse:"脉冲有限且稀疏",damageProtocolComplete:"损伤对照完整",deterministic:"完全确定性"};const acceptance=byId("gate-e-acceptance");acceptance.replaceChildren();for(const [key,label] of Object.entries(acceptanceLabels)){const pass=gateE.acceptance[key];const item=document.createElement("div");item.className=pass?"pass":"fail";item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`;acceptance.append(item);}
+  const boundary=new Map(gateE.reliableMemoryBoundarySteps);const comparison=byId("gate-e-comparison");comparison.replaceChildren(...(["stateless","continuous-state","lif-spiking"] as GateEController[]).map(controller=>{const report=gateE.reports.find(item=>item.delaySteps===8&&item.controller===controller)!;const metric=report.metrics.correctChoiceFraction;const card=document.createElement("article");if(controller==="lif-spiking")card.className="memory";card.innerHTML=`<span>${labels[controller]}</span><strong>${(metric.mean*100).toFixed(1)}%</strong><small>延迟 8 · 95% CI ${(metric.lower95*100).toFixed(1)}–${(metric.upper95*100).toFixed(1)}%</small><dl><div><dt>可靠边界</dt><dd>${boundary.get(controller)??"无"}${boundary.get(controller)?" 步":""}</dd></div><div><dt>左目标</dt><dd>${(report.metrics.leftTargetAccuracy.mean*100).toFixed(1)}%</dd></div><div><dt>右目标</dt><dd>${(report.metrics.rightTargetAccuracy.mean*100).toFixed(1)}%</dd></div></dl>`;return card;}));
+  const effects=byId("gate-e-effects");effects.replaceChildren(...gateE.pairedEffects.map(effect=>{const value=effect.effect.correctChoiceFraction;const card=document.createElement("article");card.innerHTML=`<span>${effect.id.includes("lif")?"LIF − 匹配衰减连续状态":"连续状态 − 无状态"}</span><strong>+${(value.mean*100).toFixed(1)} pp</strong><small>配对 95% CI ${(value.lower95*100).toFixed(1)}–${(value.upper95*100).toFixed(1)} pp</small>`;return card;}));
+  const damage=byId("gate-e-damage");damage.replaceChildren(...(["stateless","continuous-state","lif-spiking"] as GateEController[]).map(controller=>{const report=gateE.reports.find(item=>item.delaySteps===8&&item.controller===controller)!;const drop=report.damageAccuracyDrop!;const row=document.createElement("div");row.innerHTML=`<span>${labels[controller]}</span><div><i style="width:${Math.min(100,Math.max(0,drop.mean)*500)}%"></i></div><strong>${drop.mean>=0?"−":"+"}${Math.abs(drop.mean*100).toFixed(1)} pp</strong>`;return row;}));
+  const costMap=new Map(gateE.aggregateCosts),budgetMap=new Map(gateE.controllerBudgets.map(item=>[item.controller,item]));const runtimeMap=new Map(gateERuntime.map(item=>[item.controller,item]));const costs=byId("gate-e-costs");costs.replaceChildren(...(["stateless","continuous-state","lif-spiking"] as GateEController[]).map(controller=>{const cost=costMap.get(controller)!,runtime=runtimeMap.get(controller)!,budget=budgetMap.get(controller)!;const steps=cost.environmentSteps;const card=document.createElement("article");if(controller==="lif-spiking")card.className="warning";card.innerHTML=`<span>${labels[controller]} · 当前 CPU</span><strong>${runtime.nanosecondsPerEnvironmentStep.toFixed(0)} ns/步</strong><small>概念/实现状态 ${budget.conceptualStateBytes}/${budget.implementationDynamicStateBytes} B · 输入事件 ${(cost.inputEvents/steps).toFixed(1)}/步 · 脉冲 ${(cost.emittedSpikes/steps).toFixed(3)}/步<br>输入/读出仍为 288 + 96 稠密 MAC</small>`;return card;}));
+  gateETraceSelect.replaceChildren(...gateE.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=labels[trace.controller];if(trace.controller==="lif-spiking")option.selected=true;return option;}));selectGateETrace();drawGateEBoundary();
+};
+
 const renderEvidence = () => {
   const cards=byId("evaluation-cards");cards.replaceChildren();
   for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
@@ -442,20 +502,22 @@ gateCTraceSelect.addEventListener("change",selectGateCTrace);
 gateCRange.addEventListener("input",()=>{gateCFrameIndex=Number(gateCRange.value);renderGateCFrame();});
 gateDTraceSelect.addEventListener("change",selectGateDTrace);
 gateDRange.addEventListener("input",()=>{gateDFrameIndex=Number(gateDRange.value);renderGateDFrame();});
+gateETraceSelect.addEventListener("change",selectGateETrace);
+gateERange.addEventListener("input",()=>{gateEFrameIndex=Number(gateERange.value);renderGateEFrame();});
 gateBPlay.addEventListener("click",()=>{gateBPlaying=!gateBPlaying;gateBPlay.textContent=gateBPlaying?"Ⅱ":"▶";gateBLastTick=performance.now();});
 byId("gate-b-prev").addEventListener("click",()=>setGateBFrame(gateBFrameIndex-1));byId("gate-b-next").addEventListener("click",()=>setGateBFrame(gateBFrameIndex+1));gateBRange.addEventListener("input",()=>setGateBFrame(Number(gateBRange.value)));
-window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();drawGateDBoundary();}});
+window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();drawGateDBoundary();drawGateEBoundary();drawGateERaster();}});
 
 const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}if(gateBPlaying&&now-gateBLastTick>=650){gateBLastTick=now;if(gateBFrameIndex>=gateBTrace.frames.length-1){gateBPlaying=false;gateBPlay.textContent="▶";}else setGateBFrame(gateBFrameIndex+1);}requestAnimationFrame(animate); };
 
 const start = async () => {
-  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json")]);
-  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);
-  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;
+  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json")]);
+  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);
+  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];
   ready=true;
-  byId("version").textContent=gateD.version;byId("acceptance-label").textContent=gateD.acceptance.passed?"Gate D 验收通过":"Gate D 验收失败";byId("acceptance-dot").className=gateD.acceptance.passed?"pass":"fail";
+  byId("version").textContent=gateE.version;byId("acceptance-label").textContent=gateE.acceptance.passed?"Gate E 验收通过":"Gate E 验收失败";byId("acceptance-dot").className=gateE.acceptance.passed?"pass":"fail";
   traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
-  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();drawCurve();selectTrace();requestAnimationFrame(animate);
+  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
 start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

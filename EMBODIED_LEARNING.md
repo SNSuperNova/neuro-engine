@@ -31,7 +31,7 @@ v1 不宣称模拟真实生命、意识或完整生物神经元。它只建立�
 
 当前学习算法的公式、与 Reservoir Computing/策略梯度/三因素规则的关系，以及尚未证明的能力，集中记录在 [LEARNING.md](LEARNING.md)。下一阶段不会默认增加规模，而会依照 [ROADMAP.md](ROADMAP.md) 比较连续与脉冲状态的功能和成本。
 
-Gate A 已完成奖励与感觉辅助审计；Gate B 已完成状态必要性与鲁棒性边界；Gate C 已证明资格迹在受控延迟能量任务中的功能。Gate D 也已证明结构化固定稀疏循环可以在等权重置乱控制下延长可靠记忆，结果见 [experiments/gate-d-v1.4.md](experiments/gate-d-v1.4.md)。下一阶段只进入 Gate E 的连续状态与脉冲状态等预算比较。
+Gate A 已完成奖励与感觉辅助审计；Gate B 已完成状态必要性与鲁棒性边界；Gate C 已证明资格迹在受控延迟能量任务中的功能；Gate D 证明结构化固定稀疏循环可以延长可靠记忆；Gate E 又完成了连续状态与 LIF 脉冲状态的等预算比较。LIF 在冻结任务上延长记忆，但当前 CPU 更慢、状态内存不更小、损伤下降更大，结果见 [experiments/gate-e-v1.5.md](experiments/gate-e-v1.5.md)。下一阶段只进入 Gate F 的内部可塑性与环境变化。
 
 ## 验收标准
 

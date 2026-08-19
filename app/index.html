@@ -8,7 +8,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate D</small></div></div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate E</small></div></div>
     <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
@@ -146,6 +146,30 @@
           <p id="gate-d-trace-note"></p>
           <h3>结构化循环稳定性</h3>
           <div id="gate-d-stability" class="stability-list"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="gate-e card">
+      <div class="section-head"><div><span class="eyebrow">GATE E · CONTINUOUS vs SPIKING</span><h2>等预算状态表示比较</h2></div><span id="gate-e-protocol"></span></div>
+      <p class="audit-intro">连续泄漏与 LIF 脉冲迹衰减同为 0.86。绿色只表示冻结验收通过；速度、内存和损伤结果单独展示，不把稀疏放电视作已经获得的计算节省。</p>
+      <div id="gate-e-acceptance" class="acceptance-grid gate-e-acceptance"></div>
+      <div class="gate-e-layout">
+        <div>
+          <canvas id="gate-e-boundary" aria-label="Gate E 三种控制器随无信息延迟变化的正确率"></canvas>
+          <div id="gate-e-comparison" class="gate-b-comparison gate-e-comparison"></div>
+          <div id="gate-e-effects" class="gate-b-effects gate-e-effects"></div>
+          <div id="gate-e-costs" class="gate-e-costs"></div>
+        </div>
+        <aside class="spike-observer">
+          <label>延迟 8 代表轨迹 <select id="gate-e-trace-select"></select></label>
+          <div class="dynamics-readout"><span id="gate-e-phase">—</span><strong id="gate-e-cue">—</strong></div>
+          <canvas id="gate-e-raster" aria-label="24 个 LIF 单元的脉冲与低通活动栅格"></canvas>
+          <div id="gate-e-neurons" class="hidden-grid gate-e-neurons"></div>
+          <input id="gate-e-range" type="range" min="0" max="1" value="0" aria-label="Gate E 时间轨迹">
+          <p id="gate-e-trace-note"></p>
+          <h3>25% 单元损伤</h3>
+          <div id="gate-e-damage" class="damage-list"></div>
         </aside>
       </div>
     </section>

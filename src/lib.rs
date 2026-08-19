@@ -7,6 +7,7 @@ pub mod gate_a;
 pub mod gate_b;
 pub mod gate_c;
 pub mod gate_d;
+pub mod gate_e;
 pub mod lif;
 pub mod metrics;
 pub mod network;
@@ -51,6 +52,13 @@ pub use gate_d::{
     GateDMetricPoint, GateDPairedEffect, GateDSampleEfficiency, GateDSeedMetric,
     GateDStabilityIntervals, GateDStabilityPoint, GateDTraceFrame, GateDTrainingCurvePoint,
     run_gate_d_experiment,
+};
+pub use gate_e::{
+    GateEAcceptanceReport, GateEActivityIntervals, GateEActivityPoint, GateEBehaviorTrace,
+    GateEControllerBudget, GateEControllerKind, GateEControllerReport, GateECostPoint,
+    GateEExperimentConfig, GateEExperimentResult, GateEMetricIntervals, GateEMetricPoint,
+    GateEPairedEffect, GateERuntimeBenchmarkPoint, GateESampleEfficiency, GateESeedMetric,
+    GateETraceFrame, GateETrainingCurvePoint, benchmark_gate_e_runtime, run_gate_e_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,

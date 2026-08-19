@@ -101,6 +101,20 @@ sense [12] ──► fixed projection ──► state [24] ──► action [4]
 
 `no-recurrence` 将跨单元矩阵置零；`shuffled-recurrence` 对结构化矩阵做隐藏身份相似变换，保留全部权重、稀疏度、正负边和谱但破坏其与输入投影的对应。三者只训练相同 96 条状态到动作连接。`examples/gate_d_lab.rs` 输出 `app/public/gate-d-v1.4.json`，其中同时保存延迟扫描、配对效应、稳定性指标、预算摘要和代表轨迹。
 
+`gate_e.rs` 在同一个延迟线索接口上比较无状态、连续状态和事件式 LIF。三者共享固定输入投影、动作读出、训练序列和动作随机流；连续状态与 LIF 还共享 48 个概念动态标量和 0.86 的时间衰减。LIF 每环境步向 24 个 `LifNeuron` 注入带整数微秒时间戳的聚合电压事件，动作层读取低通脉冲迹。
+
+```text
+sense [12] ─► shared fixed projection [288]
+                     ├─ stateless tanh
+                     ├─ continuous state + adaptation [24 + 24]
+                     └─ LIF membrane + spike trace [24 + 24]
+                                      │
+                                      ▼
+                         shared trainable readout [96] ─► action [4]
+```
+
+`examples/gate_e_lab.rs` 输出 `app/public/gate-e-v1.5.json`。确定性结果保存行为、样本效率、活动、事件计数、概念状态内存、25% 损伤和代表轨迹；平台墙钟时间单独保存，避免破坏科学报告的精确重现。
+
 ## 5. Web 与桌面
 
 `app/` 使用原生 TypeScript、DOM 和 Canvas 2D，不再依赖 Three.js。主界面展示：
@@ -114,9 +128,10 @@ sense [12] ──► fixed projection ──► state [24] ──► action [4]
 - Gate B 的延迟、线索带宽和持续干扰边界曲线；
 - Gate C 的资格迹 × 能量延迟矩阵、因果效应与能量到账时间轨迹。
 - Gate D 的三控制器记忆边界、等权重因果比较和状态稳定性指标。
+- Gate E 的连续/LIF 记忆边界、脉冲轨迹、损伤结果和成本对照。
 
 Tauri 只是同一 Web 应用的桌面壳。核心 crate 不依赖浏览器、Tauri 或 UI 类型。
 
 ## 6. 保留的事件网络
 
-`lif.rs`、`network.rs`、`metrics.rs` 和 Gate 0～2 测试仍是经过验证的底层资产，但当前具身控制器不会假装它们已经足以模拟真实神经系统。未来只有在行为闭环中能定义明确对照时，才将内部循环连接、LIF、电导突触、AdEx 或脉冲可塑性逐项接入。接入顺序和验收标准见 [ROADMAP.md](ROADMAP.md)。
+`lif.rs` 已通过 Gate E 接入受控具身闭环；`network.rs`、`metrics.rs` 和 Gate 0～2 测试继续作为底层资产。Gate E 只使用单元 LIF、瞬时电压输入和低通脉冲迹，不代表完整事件网络、电导突触、AdEx 或脉冲可塑性已经获得行为证据。后续机制仍须逐项接入并独立验收。

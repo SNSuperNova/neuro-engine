@@ -65,7 +65,7 @@ body { margin: 0; min-width: 0; }
 .transport input { width: 100%; accent-color: #2c9d6d; }
 
 .state-column { display: grid; gap: 18px; }
-.vitals, .neural-state, .evidence, .learning, .audit, .gate-a-learning, .gate-b-lab, .gate-b-learning, .robustness, .gate-c, .gate-d, .gate-e, .gate-f, .map0, .map1 { padding: 17px; }
+.vitals, .neural-state, .evidence, .learning, .audit, .gate-a-learning, .gate-b-lab, .gate-b-learning, .robustness, .gate-c, .gate-d, .gate-e, .gate-f, .map0, .map1, .map2 { padding: 17px; }
 .energy-row { display: grid; grid-template-columns: 45px 1fr 40px; gap: 9px; align-items: center; font-size: 12px; }
 .meter { height: 10px; background: #e6eee8; border-radius: 10px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: linear-gradient(90deg, #d7a63b, #43ad73); border-radius: 10px; }
@@ -87,7 +87,7 @@ body { margin: 0; min-width: 0; }
 .hidden-grid i { aspect-ratio: 1; border-radius: 4px; background: rgba(34,146,101,calc(.12 + var(--activity)*.88)); border: 1px solid rgba(20,95,70,.12); }
 .hidden-grid i.suppressed { background: rgba(216,92,83,calc(.10 + var(--activity)*.75)); }
 
-.evidence, .learning, .audit, .gate-a-learning, .gate-b-lab, .gate-b-learning, .robustness, .gate-c, .gate-d, .gate-e, .gate-f, .map0, .map1 { grid-column: 1 / -1; }
+.evidence, .learning, .audit, .gate-a-learning, .gate-b-lab, .gate-b-learning, .robustness, .gate-c, .gate-d, .gate-e, .gate-f, .map0, .map1, .map2 { grid-column: 1 / -1; }
 .evaluation-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; }
 .evaluation { border: 1px solid #dce5de; border-radius: 11px; padding: 12px; display: grid; }
 .evaluation.learned { border-color: #62b68e; background: #eff9f3; }
@@ -245,6 +245,19 @@ body { margin: 0; min-width: 0; }
 .map1-mechanism-grid article { border: 1px solid #dce5de; border-radius: 9px; padding: 9px; display: grid; gap: 3px; }
 .map1-mechanism-grid article.warning { border-color: #e5aca6; background: #fff6f4; }
 .map1-mechanism-grid span { color: #66786f; font-size: 9px; }.map1-mechanism-grid strong { font-size: 16px; }.map1-mechanism-grid small { color: #7a8982; font-size: 9px; line-height: 1.4; }
+.map2 .section-head > strong { color: #1d7657; font-size: 13px; }
+.map2-stage-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+.map2-stage-grid article { border: 1px solid #dce5de; border-radius: 11px; padding: 13px; background: #fbfdfb; display: grid; gap: 6px; }
+.map2-stage-grid article.pass { border-top: 4px solid #2f9068; }.map2-stage-grid article.fail { border-top: 4px solid #c65b53; }
+.map2-stage-grid span, .map2-comparison span { color: #687a71; font-size: 9px; }.map2-stage-grid strong { font-size: 20px; }.map2-stage-grid small { color: #718078; line-height: 1.45; font-size: 9px; }
+.map2-evidence-layout { display: grid; grid-template-columns: 1.45fr .55fr; gap: 12px; }
+.map2-evidence-layout > div, .map2-evidence-layout > aside { border: 1px solid #dce5de; border-radius: 11px; padding: 12px; }
+.map2-evidence-layout h3 { margin: 0 0 10px; font-size: 11px; color: #61746a; }
+.map2-comparison { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.map2-comparison article { background: #f3f8f5; border-radius: 8px; padding: 10px; display: grid; gap: 4px; }
+.map2-comparison strong { font-size: 18px; }.map2-comparison small { color: #718078; font-size: 9px; }
+.map2-region { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.map2-region i { font-style: normal; text-align: center; border-radius: 9px; padding: 10px 4px; background: #dff1e7; color: #176746; font: 600 12px ui-monospace,monospace; }
 
 @media (max-width: 1150px) {
   .workspace { grid-template-columns: 1.3fr .8fr; }
@@ -286,7 +299,7 @@ body { margin: 0; min-width: 0; }
   .learning { order: 5; }
   .audit { order: 6; }
   .gate-a-learning { order: 7; }
-  .gate-b-lab { order: 8; }.gate-b-learning { order: 9; }.robustness { order: 10; }.gate-c { order: 11; }.gate-d { order: 12; }.gate-e { order: 13; }.gate-f { order: 14; }.map0 { order: 15; }.map1 { order: 16; }
+  .gate-b-lab { order: 8; }.gate-b-learning { order: 9; }.robustness { order: 10; }.gate-c { order: 11; }.gate-d { order: 12; }.gate-e { order: 13; }.gate-f { order: 14; }.map0 { order: 15; }.map1 { order: 16; }.map2 { order: 17; }
   .evaluation-cards { gap: 7px; }
   .learning canvas, .gate-a-learning canvas { height: 190px; }
   .gate-a-variants { grid-template-columns: 1fr; }
@@ -306,4 +319,5 @@ body { margin: 0; min-width: 0; }
   .map0-toolbar { flex-wrap: wrap; }.map0-controls > div { grid-template-columns: 1fr; }
   #map0-phase { height: 320px; }
   .map1-acceptance { grid-template-columns: 1fr 1fr; }.map1-mechanism-grid { grid-template-columns: 1fr; }#map1-phase { height: 300px; }
+  .map2-stage-grid, .map2-evidence-layout, .map2-comparison { grid-template-columns: 1fr; }
 }

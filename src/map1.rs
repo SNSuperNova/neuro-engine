@@ -291,7 +291,7 @@ pub fn run_map1_experiment(
     })
 }
 
-fn protocol_config(config: Map1ExperimentConfig) -> Map0ExperimentConfig {
+pub(crate) fn protocol_config(config: Map1ExperimentConfig) -> Map0ExperimentConfig {
     Map0ExperimentConfig {
         seed: config.seed,
         development_config_count: config.development_config_count,
@@ -306,7 +306,10 @@ fn protocol_config(config: Map1ExperimentConfig) -> Map0ExperimentConfig {
     }
 }
 
-fn same_probe_protocol(original: Map0ExperimentConfig, actual: Map0ExperimentConfig) -> bool {
+pub(crate) fn same_probe_protocol(
+    original: Map0ExperimentConfig,
+    actual: Map0ExperimentConfig,
+) -> bool {
     original.pretraining_episodes == actual.pretraining_episodes
         && original.adaptation_episodes == actual.adaptation_episodes
         && original.evaluation_episodes == actual.evaluation_episodes
@@ -323,7 +326,7 @@ fn same_probe_protocol(original: Map0ExperimentConfig, actual: Map0ExperimentCon
         && original.thresholds == actual.thresholds
 }
 
-fn parameter_points(config: Map1ExperimentConfig) -> Vec<Map0ParameterPoint> {
+pub(crate) fn parameter_points(config: Map1ExperimentConfig) -> Vec<Map0ParameterPoint> {
     (1..=config.development_config_count)
         .map(|index| Map0ParameterPoint {
             id: index - 1,
@@ -338,7 +341,7 @@ fn parameter_points(config: Map1ExperimentConfig) -> Vec<Map0ParameterPoint> {
         .collect()
 }
 
-fn select_candidates(
+pub(crate) fn select_candidates(
     config: Map1ExperimentConfig,
     summaries: &[Map0ParameterSummary],
 ) -> Vec<usize> {
@@ -373,11 +376,14 @@ fn select_candidates(
     selected
 }
 
-fn rank(summary: &Map0ParameterSummary) -> f64 {
+pub(crate) fn rank(summary: &Map0ParameterSummary) -> f64 {
     summary.formation_probability.mean * 2.0 + summary.mean_probe_score
 }
 
-fn stable_region(config: Map1ExperimentConfig, summaries: &[Map0ParameterSummary]) -> Vec<usize> {
+pub(crate) fn stable_region(
+    config: Map1ExperimentConfig,
+    summaries: &[Map0ParameterSummary],
+) -> Vec<usize> {
     let protocol = protocol_config(config);
     let eligible = summaries
         .iter()
@@ -501,7 +507,7 @@ fn conclusions(
     output
 }
 
-fn validate_config(config: Map1ExperimentConfig) -> Result<(), EmbodiedError> {
+pub(crate) fn validate_config(config: Map1ExperimentConfig) -> Result<(), EmbodiedError> {
     let finite = [
         config.recurrent_gain_range[0],
         config.recurrent_gain_range[1],

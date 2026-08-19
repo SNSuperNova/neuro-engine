@@ -122,6 +122,10 @@ impl Default for Map0ExperimentConfig {
 pub enum Map0Control {
     Baseline,
     ReferenceNormHomeostasis,
+    AdditivePlasticity,
+    NoResourceAccounting,
+    NoResourceSupply,
+    ResetBetweenTrials,
     FrozenPlasticity,
     ShuffledStructure,
     NoHomeostasis,
@@ -179,6 +183,10 @@ pub struct Map0DynamicsMetrics {
     pub mean_excitability_gain: f64,
     pub minimum_excitability_gain: f64,
     pub maximum_excitability_gain: f64,
+    pub mean_resource_level: f64,
+    pub minimum_resource_level: f64,
+    pub maximum_resource_level: f64,
+    pub resource_constrained_fraction: f64,
     pub approximate_state_updates: u64,
 }
 
@@ -223,6 +231,8 @@ pub struct Map0ParameterSummary {
     pub mean_saturation_fraction: f64,
     pub mean_synchrony_fraction: f64,
     pub mean_relative_weight_drift: f64,
+    pub mean_resource_level: f64,
+    pub mean_resource_constrained_fraction: f64,
     pub dominant_class: Map0RegionClass,
 }
 
@@ -288,6 +298,63 @@ pub(crate) enum HomeostasisMechanism {
     DualTimescale(DualTimescaleHomeostasis),
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct SoftBoundedPlasticity {
+    pub bound_scale: f64,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum PlasticityMechanism {
+    Additive,
+    SoftBounded(SoftBoundedPlasticity),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ContinuousResource {
+    pub initial_level: f64,
+    pub supply_rate: f64,
+    pub maintenance_cost: f64,
+    pub activity_cost: f64,
+    pub plasticity_cost: f64,
+    pub minimum_modulation: f64,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ResourceMechanism {
+    Disabled,
+    Continuous(ContinuousResource),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ContinuousStreamConfig {
+    pub trial_count: usize,
+    pub minimum_change_gap: usize,
+    pub change_probability: f64,
+    pub settling_window: usize,
+    pub exploration: f64,
+    pub reset_between_trials: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContinuousSeedResult {
+    pub parameter_id: usize,
+    pub seed: u64,
+    pub control: Map0Control,
+    pub trial_count: usize,
+    pub rule_change_count: usize,
+    pub state_reset_count: usize,
+    pub overall_accuracy: f64,
+    pub post_change_accuracy: f64,
+    pub settled_accuracy: f64,
+    pub recovery_gain: f64,
+    pub mean_resource_level: f64,
+    pub minimum_resource_level: f64,
+    pub mean_relative_weight_drift: f64,
+    pub maximum_absolute_weight: f64,
+    pub finite: bool,
+}
+
 impl Rng {
     fn new(seed: u64) -> Self {
         Self(seed.max(1))
@@ -324,6 +391,9 @@ struct MapController {
     baseline: f64,
     reference_recurrent_norms: [f64; HIDDEN_COUNT],
     homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    resource: [f64; HIDDEN_COUNT],
     activity_ema: [f64; HIDDEN_COUNT],
     excitability_gain: [f64; HIDDEN_COUNT],
 }
@@ -335,6 +405,7 @@ struct Trial {
     probabilities: [f64; ACTION_COUNT],
     recurrent_eligibility: [[f64; PLASTIC_RECURRENT_PER_UNIT]; HIDDEN_COUNT],
     activity: Vec<[f64; HIDDEN_COUNT]>,
+    resource: Vec<[f64; HIDDEN_COUNT]>,
     mean_absolute_activity: [f64; HIDDEN_COUNT],
 }
 
@@ -347,6 +418,11 @@ struct ActivityAccumulator {
     synchronized: usize,
     sums: [f64; HIDDEN_COUNT],
     sums_squared: [f64; HIDDEN_COUNT],
+    resource_samples: usize,
+    resource_sum: f64,
+    resource_minimum: f64,
+    resource_maximum: f64,
+    resource_constrained: usize,
 }
 
 impl MapController {
@@ -355,6 +431,8 @@ impl MapController {
         parameters: Map0ParameterPoint,
         seed: u64,
         homeostasis_mechanism: HomeostasisMechanism,
+        plasticity_mechanism: PlasticityMechanism,
+        resource_mechanism: ResourceMechanism,
     ) -> Self {
         let mut rng = Rng::new(seed);
         let mut input_weights = [[0.0; GATE_B_SENSOR_COUNT]; HIDDEN_COUNT];
@@ -406,6 +484,10 @@ impl MapController {
             let [a, b] = recurrent_slots[target];
             recurrent_weights[target][a].hypot(recurrent_weights[target][b])
         });
+        let initial_resource = match resource_mechanism {
+            ResourceMechanism::Disabled => 1.0,
+            ResourceMechanism::Continuous(config) => config.initial_level,
+        };
         Self {
             config,
             parameters,
@@ -418,6 +500,9 @@ impl MapController {
             baseline: 0.0,
             reference_recurrent_norms,
             homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+            resource: [initial_resource; HIDDEN_COUNT],
             activity_ema: [0.0; HIDDEN_COUNT],
             excitability_gain: [1.0; HIDDEN_COUNT],
         }
@@ -429,7 +514,7 @@ impl MapController {
 
     fn step(&mut self, sensors: [f64; GATE_B_SENSOR_COUNT]) -> [f64; HIDDEN_COUNT] {
         let previous = self.hidden;
-        self.hidden = std::array::from_fn(|target| {
+        let next = std::array::from_fn(|target| {
             let input = self.input_weights[target]
                 .iter()
                 .zip(sensors)
@@ -443,11 +528,28 @@ impl MapController {
             if self.lesioned[target] {
                 0.0
             } else {
-                (self.excitability_gain[target]
+                let raw = (self.excitability_gain[target]
                     * (input + self.config.hidden_leak * previous[target] + recurrent))
-                    .tanh()
+                    .tanh();
+                match self.resource_mechanism {
+                    ResourceMechanism::Disabled => raw,
+                    ResourceMechanism::Continuous(config) => {
+                        let modulation = config.minimum_modulation
+                            + (1.0 - config.minimum_modulation) * self.resource[target];
+                        raw * modulation
+                    }
+                }
             }
         });
+        if let ResourceMechanism::Continuous(config) = self.resource_mechanism {
+            for target in 0..HIDDEN_COUNT {
+                self.resource[target] = (self.resource[target] + config.supply_rate
+                    - config.maintenance_cost
+                    - config.activity_cost * next[target].abs())
+                .clamp(0.0, 1.0);
+            }
+        }
+        self.hidden = next;
         previous
     }
 
@@ -477,6 +579,7 @@ impl MapController {
                 self.config.memory_delay_steps,
                 &mut rng,
                 0.04,
+                true,
                 false,
             );
             let reward = if trial.chosen_right == trial.target_right {
@@ -510,11 +613,15 @@ impl MapController {
         delay_steps: usize,
         rng: &mut Rng,
         exploration: f64,
+        reset_before: bool,
         capture_activity: bool,
     ) -> Trial {
-        self.reset_state();
+        if reset_before {
+            self.reset_state();
+        }
         let mut eligibility = [[0.0; PLASTIC_RECURRENT_PER_UNIT]; HIDDEN_COUNT];
         let mut activity = Vec::new();
+        let mut resource = Vec::new();
         let mut activity_sum = [0.0; HIDDEN_COUNT];
         let total_steps = self.config.cue_steps + delay_steps;
         for step in 0..total_steps {
@@ -533,6 +640,7 @@ impl MapController {
             }
             if capture_activity {
                 activity.push(self.hidden);
+                resource.push(self.resource);
             }
         }
         let probabilities = self
@@ -545,6 +653,7 @@ impl MapController {
             probabilities,
             recurrent_eligibility: eligibility,
             activity,
+            resource,
             mean_absolute_activity: activity_sum.map(|sum| sum / total_steps as f64),
         }
     }
@@ -593,9 +702,29 @@ impl MapController {
                     * feedback_value
                     * trial.recurrent_eligibility[target][slot]
                     * delayed_scale;
-                self.recurrent_weights[target][source] = (self.recurrent_weights[target][source]
-                    + delta)
-                    .clamp(-self.config.weight_limit, self.config.weight_limit);
+                let previous_weight = self.recurrent_weights[target][source];
+                self.recurrent_weights[target][source] = match self.plasticity_mechanism {
+                    PlasticityMechanism::Additive => (self.recurrent_weights[target][source]
+                        + delta)
+                        .clamp(-self.config.weight_limit, self.config.weight_limit),
+                    PlasticityMechanism::SoftBounded(config) => {
+                        let bound = self.reference_recurrent_norms[target] / 2.0_f64.sqrt()
+                            * config.bound_scale;
+                        let weight = self.recurrent_weights[target][source];
+                        let headroom = if delta >= 0.0 {
+                            (bound - weight) / (2.0 * bound)
+                        } else {
+                            (bound + weight) / (2.0 * bound)
+                        }
+                        .clamp(0.0, 1.0);
+                        (weight + delta * headroom).clamp(-bound, bound)
+                    }
+                };
+                if let ResourceMechanism::Continuous(config) = self.resource_mechanism {
+                    let cost = config.plasticity_cost
+                        * (self.recurrent_weights[target][source] - previous_weight).abs();
+                    self.resource[target] = (self.resource[target] - cost).max(0.0);
+                }
             }
         }
         let homeostasis = if control == Map0Control::NoHomeostasis {
@@ -717,7 +846,7 @@ impl MapController {
 }
 
 impl ActivityAccumulator {
-    fn push(&mut self, values: [f64; HIDDEN_COUNT]) {
+    fn push(&mut self, values: [f64; HIDDEN_COUNT], resource: [f64; HIDDEN_COUNT]) {
         self.samples += 1;
         let mean = values.iter().sum::<f64>() / HIDDEN_COUNT as f64;
         let variance = values
@@ -735,6 +864,17 @@ impl ActivityAccumulator {
                 self.sums[index] += value;
                 self.sums_squared[index] += value * value;
             }
+        }
+        for level in resource {
+            self.resource_samples += 1;
+            self.resource_sum += level;
+            self.resource_minimum = if self.resource_samples == 1 {
+                level
+            } else {
+                self.resource_minimum.min(level)
+            };
+            self.resource_maximum = self.resource_maximum.max(level);
+            self.resource_constrained += usize::from(level < 0.5);
         }
     }
 
@@ -772,6 +912,7 @@ impl ActivityAccumulator {
             .iter()
             .copied()
             .fold(f64::NEG_INFINITY, f64::max);
+        let resource_samples = self.resource_samples.max(1) as f64;
         Map0DynamicsMetrics {
             finite_activity_fraction: self.finite as f64 / scalar_samples,
             saturation_fraction: self.saturated as f64 / scalar_samples,
@@ -784,6 +925,10 @@ impl ActivityAccumulator {
             mean_excitability_gain,
             minimum_excitability_gain,
             maximum_excitability_gain,
+            mean_resource_level: self.resource_sum / resource_samples,
+            minimum_resource_level: self.resource_minimum,
+            maximum_resource_level: self.resource_maximum,
+            resource_constrained_fraction: self.resource_constrained as f64 / resource_samples,
             approximate_state_updates,
         }
     }
@@ -950,11 +1095,51 @@ pub(crate) fn run_map_seed(
     control: Map0Control,
     homeostasis_mechanism: HomeostasisMechanism,
 ) -> Map0SeedResult {
+    run_map_seed_with_plasticity(
+        config,
+        parameters,
+        seed,
+        control,
+        homeostasis_mechanism,
+        PlasticityMechanism::Additive,
+    )
+}
+
+pub(crate) fn run_map_seed_with_plasticity(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: Map0Control,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+) -> Map0SeedResult {
+    run_map_seed_with_mechanisms(
+        config,
+        parameters,
+        seed,
+        control,
+        homeostasis_mechanism,
+        plasticity_mechanism,
+        ResourceMechanism::Disabled,
+    )
+}
+
+pub(crate) fn run_map_seed_with_mechanisms(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: Map0Control,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+) -> Map0SeedResult {
     let mut controller = MapController::new(
         config,
         parameters,
         seed ^ 0x434f_4e54_524f_4c01,
         homeostasis_mechanism,
+        plasticity_mechanism,
+        resource_mechanism,
     );
     controller.train_readout(seed);
     if control == Map0Control::ShuffledStructure {
@@ -1032,6 +1217,119 @@ pub(crate) fn run_map_seed(
     )
 }
 
+pub(crate) fn run_continuous_seed_with_mechanisms(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: Map0Control,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    stream: ContinuousStreamConfig,
+) -> ContinuousSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x434f_4e54_524f_4c01,
+        homeostasis_mechanism,
+        plasticity_mechanism,
+        resource_mechanism,
+    );
+    controller.train_readout(seed);
+    controller.reset_state();
+    let mut original_rule = true;
+    let mut since_change = 0usize;
+    let mut has_changed = false;
+    let mut rule_change_count = 0usize;
+    let mut overall_correct = 0usize;
+    let mut post_change_correct = 0usize;
+    let mut post_change_trials = 0usize;
+    let mut settled_correct = 0usize;
+    let mut settled_trials = 0usize;
+    let mut resource_sum = 0.0;
+    let mut resource_samples = 0usize;
+    let mut resource_minimum = f64::INFINITY;
+    let mut change_rng = Rng::new(seed ^ 0x434f_4e54_5354_524d);
+    for episode in 0..stream.trial_count {
+        if since_change >= stream.minimum_change_gap
+            && change_rng.unit() < stream.change_probability
+        {
+            original_rule = !original_rule;
+            since_change = 0;
+            has_changed = true;
+            rule_change_count += 1;
+        }
+        let cue_right = balanced_cue(episode, seed ^ 0x4355_455f_5354_524d);
+        let mut rng =
+            Rng::new(seed ^ 0x4143_545f_5354_524d ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+        let trial = controller.trial(
+            original_rule,
+            cue_right,
+            config.memory_delay_steps,
+            &mut rng,
+            stream.exploration,
+            stream.reset_between_trials,
+            false,
+        );
+        let correct = trial.chosen_right == trial.target_right;
+        overall_correct += usize::from(correct);
+        if has_changed && since_change < stream.settling_window {
+            post_change_correct += usize::from(correct);
+            post_change_trials += 1;
+        } else if has_changed {
+            settled_correct += usize::from(correct);
+            settled_trials += 1;
+        }
+        controller.adapt_trial(
+            &trial,
+            control,
+            control == Map0Control::RandomReward,
+            seed ^ 0x5245_575f_5354_524d ^ episode as u64,
+            0,
+        );
+        for level in controller.resource {
+            resource_sum += level;
+            resource_samples += 1;
+            resource_minimum = resource_minimum.min(level);
+        }
+        since_change += 1;
+    }
+    let ratio = |numerator: usize, denominator: usize| numerator as f64 / denominator.max(1) as f64;
+    let post_change_accuracy = ratio(post_change_correct, post_change_trials);
+    let settled_accuracy = ratio(settled_correct, settled_trials);
+    let (maximum_absolute_weight, mean_relative_weight_drift) = controller.weight_dynamics();
+    let mean_resource_level = resource_sum / resource_samples.max(1) as f64;
+    let finite = controller.hidden.iter().all(|value| value.is_finite())
+        && controller.resource.iter().all(|value| value.is_finite())
+        && [
+            post_change_accuracy,
+            settled_accuracy,
+            maximum_absolute_weight,
+            mean_relative_weight_drift,
+            mean_resource_level,
+            resource_minimum,
+        ]
+        .into_iter()
+        .all(f64::is_finite);
+    ContinuousSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        control,
+        trial_count: stream.trial_count,
+        rule_change_count,
+        state_reset_count: usize::from(stream.reset_between_trials) * stream.trial_count,
+        overall_accuracy: ratio(overall_correct, stream.trial_count),
+        post_change_accuracy,
+        settled_accuracy,
+        recovery_gain: settled_accuracy - post_change_accuracy,
+        mean_resource_level,
+        minimum_resource_level: resource_minimum,
+        mean_relative_weight_drift,
+        maximum_absolute_weight,
+        finite,
+    }
+}
+
 fn adapt_phase(
     controller: &mut MapController,
     original_rule: bool,
@@ -1054,6 +1352,7 @@ fn adapt_phase(
             controller.config.memory_delay_steps,
             &mut rng,
             exploration,
+            true,
             false,
         );
         controller.adapt_trial(
@@ -1107,12 +1406,13 @@ fn evaluate(
             delay_steps,
             &mut rng,
             0.0,
+            true,
             activity.is_some(),
         );
         correct += usize::from(trial.chosen_right == trial.target_right);
         if let Some(accumulator) = activity.as_deref_mut() {
-            for values in trial.activity {
-                accumulator.push(values);
+            for (values, resource) in trial.activity.into_iter().zip(trial.resource) {
+                accumulator.push(values, resource);
             }
         }
     }
@@ -1222,6 +1522,10 @@ pub(crate) fn summarize(
                 mean_saturation_fraction: mean(|row| row.dynamics.saturation_fraction),
                 mean_synchrony_fraction: mean(|row| row.dynamics.synchrony_fraction),
                 mean_relative_weight_drift: mean(|row| row.dynamics.mean_relative_weight_drift),
+                mean_resource_level: mean(|row| row.dynamics.mean_resource_level),
+                mean_resource_constrained_fraction: mean(|row| {
+                    row.dynamics.resource_constrained_fraction
+                }),
                 dominant_class,
             }
         })
@@ -1409,6 +1713,10 @@ pub(crate) fn result_is_finite(result: &Map0SeedResult) -> bool {
         result.dynamics.mean_excitability_gain,
         result.dynamics.minimum_excitability_gain,
         result.dynamics.maximum_excitability_gain,
+        result.dynamics.mean_resource_level,
+        result.dynamics.minimum_resource_level,
+        result.dynamics.maximum_resource_level,
+        result.dynamics.resource_constrained_fraction,
     ]
     .into_iter()
     .all(f64::is_finite)

@@ -12,6 +12,7 @@ pub mod gate_f;
 pub mod learnability_map;
 pub mod lif;
 pub mod map1;
+pub mod map2;
 pub mod metrics;
 pub mod network;
 
@@ -71,10 +72,10 @@ pub use gate_f::{
     run_gate_f_experiment,
 };
 pub use learnability_map::{
-    Map0AcceptanceReport, Map0Control, Map0ControlSummary, Map0DynamicsMetrics,
-    Map0ExperimentConfig, Map0ExperimentResult, Map0Interval, Map0ParameterPoint,
-    Map0ParameterSummary, Map0ProbeMetrics, Map0RegionClass, Map0SeedResult, Map0Thresholds,
-    run_map0_experiment,
+    ContinuousSeedResult, Map0AcceptanceReport, Map0Control, Map0ControlSummary,
+    Map0DynamicsMetrics, Map0ExperimentConfig, Map0ExperimentResult, Map0Interval,
+    Map0ParameterPoint, Map0ParameterSummary, Map0ProbeMetrics, Map0RegionClass, Map0SeedResult,
+    Map0Thresholds, run_map0_experiment,
 };
 pub use lif::{
     BatchResult, EventId, InputPolarity, LifNeuron, LifParameters, ModelError, NeuronId,
@@ -83,6 +84,12 @@ pub use lif::{
 pub use map1::{
     Map1AcceptanceReport, Map1ExperimentConfig, Map1ExperimentResult, Map1MechanismComparison,
     run_map1_experiment,
+};
+pub use map2::{
+    Map2AAcceptanceReport, Map2AExperimentConfig, Map2AExperimentResult, Map2AMechanismComparison,
+    Map2BAcceptanceReport, Map2BExperimentConfig, Map2BExperimentResult, Map2BMechanismComparison,
+    Map2CAcceptanceReport, Map2CExperimentConfig, Map2CExperimentResult, Map2CParameterSummary,
+    run_map2a_experiment, run_map2b_experiment, run_map2c_experiment,
 };
 pub use metrics::{
     MetricsConfig, MetricsError, NetworkMetrics, TrajectoryDifference, compare_spike_trajectories,

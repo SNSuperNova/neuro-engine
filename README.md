@@ -38,7 +38,7 @@ Map 0 随后在统一 24 单元底层上扫描 64 组循环增益、内部可塑
 
 Map 1 只把参考范数投影替换为活动目标与慢速权重回拉，并在 Map 0 候选区局部重绘。正式确认中，新机制 72 次运行有 59 次因权重漂移不稳定；相对旧机制平均探针得分仅 `+1.2 pp`，权重漂移却增加 `1.766`，重复反转和损伤恢复总体下降。该机制已作为负结果淘汰。当前瓶颈仍指向局部可塑性与稳定性的冲突，而不是节点数量。
 
-后续不以补齐“真实神经元”或直接扩容为目标，而按最小动态基座审计依次测试：内生有界可塑性、持续且无任务信息的基础供能、持续输入下的自然演变，最后才在禁止重新调参的条件下扫描节点数量。
+Map 2 已完成最小动态基座审计。软边界可塑性把相对权重漂移平均降低 `0.687`，持续供能在断供时产生 `13.9 pp` 探针下降；冻结两者后的 720 试次无重置连续流达到 `66.1%`，逐试次重置为 `67.6%`，断供为 `55.7%`，冻结可塑性为 `53.0%`。6 个相邻确认配置形成跨种子稳定区域。该结果只支持当前任务族中的连续适应，不等于通用学习。下一步进入禁止按规模重新调参的 Scale 0。
 
 ## 运行
 
@@ -54,6 +54,9 @@ cargo run --release --example gate_e_lab
 cargo run --release --example gate_f_lab
 cargo run --release --example map0_lab
 cargo run --release --example map1_lab
+cargo run --release --example map2a_lab
+cargo run --release --example map2b_lab
+cargo run --release --example map2c_lab
 npm install
 npm run dev
 ```

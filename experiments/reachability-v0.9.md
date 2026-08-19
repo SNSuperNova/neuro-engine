@@ -78,7 +78,7 @@ M1-X 排除了“固定 24 节点、固定拓扑和固定 A 读出在任何 48 �
 
 但这不等于 M1-F 本来只缺更强学习率。绝对边界解的平均相对权重漂移为 `4.53`，而当前双时间尺度稳态把每个单元的权重对拉回原参考范数。真实问题已经收窄为：**系统需要多大的、怎样分配的权重范数自由度，才能在保持稳定的同时让局部信用形成规则？** 在线信用本身仍未通过，因为 oracle 使用了目标标签、精确梯度和跨重启选择。
 
-后续 M1-XE 已完成：开发与独立确认一致把最小通过边界定位为 `1.5×`，稳定通过窗口为 `1.5×–4×`，而 `6×/8×` 再次失败，说明它是有限窗口而非“越大越好”。下一步 M1-NE 在冻结 `1.5×` 条件下因果测试现有局部信用能否利用该自由度；不增加节点、不改拓扑、不开放读出训练，也不把 oracle 当作在线机制。详见 [reachability-envelope-v1.0.md](reachability-envelope-v1.0.md)。
+后续 M1-XE 与 M1-NE 均已完成：统一 oracle 范数边界为 `1.5×`，但同条件在线局部规则只有部分、后果特异的收益，最终 B/C/D 行为 `59.0%`，正式决策 `AmplitudeNecessaryButInsufficient`。下一步分解局部更新的强度与方向对齐；不增加节点、不改拓扑、不开放读出训练，也不把 oracle 当作在线机制。详见 [reachability-envelope-v1.0.md](reachability-envelope-v1.0.md) 与 [norm-enabled-sufficiency-v1.1.md](norm-enabled-sufficiency-v1.1.md)。
 
 发布数据为 `app/public/reachability-v0.9.json`，SHA-256：`f146cebae0db2b02b8c7edb6e8add84132dc3625a1c63e6ee9a484ce36523d4e`。完整参数点×种子结果可用：
 

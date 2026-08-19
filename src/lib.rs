@@ -19,6 +19,7 @@ pub mod mechanism_m1;
 pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
+pub mod norm_enabled_sufficiency;
 pub mod reachability;
 pub mod reachability_envelope;
 pub mod representation_capacity;
@@ -130,6 +131,11 @@ pub use network::{
     NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
     Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
     simulate_network, simulate_network_with_limits,
+};
+pub use norm_enabled_sufficiency::{
+    M1NE_CONTROL_COUNT, M1NEAcceptanceReport, M1NEConfig, M1NEControl, M1NEControlSummary,
+    M1NEDecision, M1NEFrozenArtifact, M1NEPairedEffects, M1NEPublishedResult, M1NEResult,
+    M1NERuleResult, M1NESeedResult, run_m1ne_experiment,
 };
 pub use reachability::{
     M1X_LEARNING_RATE_COUNT, M1XAcceptanceReport, M1XConfig, M1XControl, M1XControlSummary,

@@ -86,7 +86,7 @@ M1-XE 仍不算在线学习能力。只有 `UniformEnvelopeBoundaryConfirmed` �
 4. `1.5×` 随机后果对照；
 5. `1.5×` 离线 oracle 上界。
 
-若 `1.5×` 在线局部规则仍失败，则可判定“幅度空间必要但不足”，主瓶颈仍是信用方向或规则形成；只有它产生真实、后果特异且保持 A 的收益，才进一步设计能局部形成并维持目标范数的动态机制。
+后续 M1-NE 已完成：`1.5×` 在线局部规则相对冻结与随机后果产生显著、后果特异的部分收益并保持 A，但没有跨过能力和形成门槛，正式决策为 `AmplitudeNecessaryButInsufficient`。下一步分解信用强度与方向对齐，不继续放大范数。详见 [norm-enabled-sufficiency-v1.1.md](norm-enabled-sufficiency-v1.1.md)。
 
 发布数据为 `app/public/reachability-envelope-v1.0.json`，SHA-256：`33d3effecc9821b58294ade846eeb3b0a1fd346668c30e237c75f2cf004f31f2`。正式复现命令：
 

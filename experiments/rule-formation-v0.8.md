@@ -92,7 +92,7 @@ M1-F 已完成，协议通过，但候选机制未通过。正式决策为 **`Co
 
 结合 M1-R，现在应先做固定可塑子空间的**离线可达性上界诊断**，而不是立即尝试第二个启发式规则：允许隔离克隆中的 oracle 优化器读取目标并直接搜索现有 48 个循环权重，但仍冻结节点、拓扑和动作读出。如果 oracle 也无法使 B/C/D 达到门槛，瓶颈是当前可塑子空间/固定读出接口的表达可达性；如果 oracle 可以，瓶颈才明确位于在线局部信用估计。该诊断只能提供上界，不可成为在线机制。
 
-后续 M1-X 与 M1-XE 均已完成：同一 48 权重子空间在绝对边界内可达，统一目标范数的独立确认最小边界为 `1.5×`，稳定窗口为 `1.5×–4×`；见 [reachability-v0.9.md](reachability-v0.9.md) 与 [reachability-envelope-v1.0.md](reachability-envelope-v1.0.md)。下一步 M1-NE 冻结 `1.5×`，因果测试现有在线局部信用能否利用新增自由度，而不是直接重试节点扰动。
+后续 M1-X、M1-XE 与 M1-NE 均已完成：同一 48 权重子空间在 `1.5×` 下可由 oracle 达到 `88.1%`，但既有在线局部规则只有 `59.0%`；它显著胜过冻结与随机后果，却仍未形成稳定能力。下一步分解局部信用的强度、噪声和方向对齐，而不是重试节点扰动或继续放大范数。见 [reachability-v0.9.md](reachability-v0.9.md)、[reachability-envelope-v1.0.md](reachability-envelope-v1.0.md) 与 [norm-enabled-sufficiency-v1.1.md](norm-enabled-sufficiency-v1.1.md)。
 
 发布数据为 `app/public/rule-formation-v0.8.json`，SHA-256：`25d3f478bbb978990668d7e6f7a2a01c1495db47dcdbe0931f21307ae53cd865`。完整参数点×种子结果可用：
 

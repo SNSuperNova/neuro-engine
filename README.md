@@ -54,7 +54,7 @@ M1-R 随后把“容量不足”拆成信息、形成、信用和读出四层。
 
 M1-F 已完成首个局部规则形成候选。奖励调制节点扰动只读取目标单元自己产生的微扰、本地资格迹和全局标量后果；开发集在 `[0.025, 0.05, 0.10, 0.20]` 中冻结选择 `0.20`。独立确认中候选 B/C/D 为 `48.3%`，比现有基线低 `7.03 pp`，相对相同扰动的随机后果仅 `+0.98 pp [-0.33, 2.30]`；目标概率形成只有 `+3.30 pp`，A 降至 `62.2%`。正式决策为 `ConsequenceIndependent`，候选淘汰。下一步先离线测量现有 48 权重可塑子空间的 oracle 可达上界，不继续追加启发式信用规则。
 
-M1-XE 已完成固定可塑子空间的统一范数边界诊断。节点、输入、拓扑、48 个循环权重槽位和 A 动作读出继续冻结；开发与独立确认一致定位到最小通过目标范数 `1.5×`，确认集 B/C/D 行为为 `85.4%`、目标概率 `85.9%`、最低新规则 `70.8%`。稳定通过窗口为 `1.5×–4×`，`6×/8×` 再次失败，因此不是“权重越大越好”。正式决策为 `UniformEnvelopeBoundaryConfirmed`。该结果只证明 oracle 可利用这项幅度自由度，在线方向信用仍未通过；下一步 M1-NE 在冻结 `1.5×` 条件下做在线充分性因果测试。
+M1-NE 已完成 `1.5×` 条件下的在线充分性因果测试。既有奖励局部规则在独立确认中达到 B/C/D 行为 `59.0%`、目标概率 `59.7%`、最低新规则 `49.1%`；它相对同初态冻结提升 `14.13 pp`，相对随机后果提升 `10.85 pp`，说明存在真实但不充分的后果信用。相同 `1.5×` 空间的 oracle 达到 `88.1%`。正式决策为 `AmplitudeNecessaryButInsufficient`：幅度空间不是当前唯一瓶颈，下一步只分解局部信用强度、噪声和方向对齐，不继续放大范数或增加节点。
 
 ## 运行
 
@@ -83,6 +83,7 @@ cargo run --release --example representation_capacity_lab
 cargo run --release --example rule_formation_lab
 cargo run --release --example reachability_lab
 cargo run --release --example reachability_envelope_lab
+cargo run --release --example norm_enabled_sufficiency_lab
 npm install
 npm run dev
 ```
@@ -117,6 +118,7 @@ src/representation_capacity.rs M1-R 表征、信用和固定读出因果诊断
 src/rule_formation.rs        M1-F 奖励调制节点扰动与规则形成验收
 src/reachability.rs           M1-X 固定 48 权重离线可达性上界与正式判定
 src/reachability_envelope.rs  M1-XE 统一参考范数边界、独立确认与稳定窗口判定
+src/norm_enabled_sufficiency.rs M1-NE 1.5× 在线充分性、因果对照与信用缺口判定
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘

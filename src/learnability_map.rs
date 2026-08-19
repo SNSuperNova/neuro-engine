@@ -9,6 +9,9 @@ use crate::mechanism_m1::{
     M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
 };
 use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
+use crate::norm_enabled_sufficiency::{
+    M1NEControl, M1NERuleResult, M1NESeedProtocol, M1NESeedResult,
+};
 use crate::reachability::{M1XControl, M1XRuleResult, M1XSeedResult};
 use crate::reachability_envelope::{M1XEBoundKind, M1XESeedResult};
 use crate::representation_capacity::{RepresentationCapacitySeedResult, RepresentationRuleResult};
@@ -3853,6 +3856,205 @@ pub(crate) fn run_m1f_seed(
         formation_gain: protocol.formation_gain,
         finite: rule_results.iter().all(|row| row.finite),
         rule_results,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_m1ne_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: M1NEControl,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M1NESeedProtocol,
+) -> M1NESeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_4e45_434f_4e54,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    if control.norm_multiplier() == protocol.norm_multiplier {
+        set_reference_norm_multiplier(&mut controller, protocol.norm_multiplier);
+    }
+    controller.reset_state();
+    let mut rule_results = Vec::new();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let mut candidate = controller.clone();
+        candidate.reset_state();
+        let rule_seed =
+            seed ^ 0x4d31_4e45_5255_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let (initial_behavior_accuracy, _, initial_target_probability, _) = evaluate_m1x_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let action_readout_digest_before = candidate.action_readout_digest();
+        let topology_digest_before = candidate.topology_digest();
+        let initial_weights = m1x_recurrent_weights(&candidate);
+        let mut resource_sum = 0.0;
+        let mut resource_samples = 0usize;
+        let mut minimum_resource_level = f64::INFINITY;
+        if control == M1NEControl::OracleOnePointFive {
+            optimize_m1x_oracle(
+                &mut candidate,
+                rule,
+                protocol.oracle,
+                rule_seed ^ 0x4d31_4e45_4f50_5449,
+                M1XWeightConstraint::ReferenceNorm(1.0),
+                false,
+            );
+        } else {
+            for episode in 0..protocol.online_trial_count {
+                let symbol = (episode + rule_seed.count_ones() as usize) % 4;
+                let action_seed =
+                    rule_seed ^ 0x4d31_4e45_4143_544e ^ (episode as u64).wrapping_mul(SEED_STRIDE);
+                let mut action_rng = Rng::new(action_seed);
+                let trial = candidate.symbol_trial(
+                    rule,
+                    symbol,
+                    &mut action_rng,
+                    protocol.exploration,
+                    false,
+                    false,
+                );
+                match control {
+                    M1NEControl::RewardLocalOneX | M1NEControl::RewardLocalOnePointFive => {
+                        candidate.adapt_trial(
+                            &trial,
+                            Map0Control::Baseline,
+                            false,
+                            rule_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                            0,
+                        )
+                    }
+                    M1NEControl::RandomConsequenceOnePointFive => candidate.adapt_trial(
+                        &trial,
+                        Map0Control::RandomReward,
+                        true,
+                        rule_seed ^ 0x5241_4e44_5245_5701 ^ episode as u64,
+                        0,
+                    ),
+                    M1NEControl::FrozenOnePointFive => {}
+                    M1NEControl::OracleOnePointFive => unreachable!("handled above"),
+                }
+                for level in candidate.resource {
+                    resource_sum += level;
+                    resource_samples += 1;
+                    minimum_resource_level = minimum_resource_level.min(level);
+                }
+            }
+        }
+        if resource_samples == 0 {
+            for level in candidate.resource {
+                resource_sum += level;
+                resource_samples += 1;
+                minimum_resource_level = minimum_resource_level.min(level);
+            }
+        }
+        candidate.reset_state();
+        let (
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            final_target_probability,
+            saturation_fraction,
+        ) = evaluate_m1x_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x0046_494e_414c,
+        );
+        let final_weights = m1x_recurrent_weights(&candidate);
+        let mean_relative_weight_drift = initial_weights
+            .iter()
+            .zip(&final_weights)
+            .map(|(before, after)| (after - before).abs() / before.abs().max(1e-6))
+            .sum::<f64>()
+            / M1X_VARIABLE_COUNT as f64;
+        let maximum_absolute_weight = final_weights
+            .iter()
+            .copied()
+            .map(f64::abs)
+            .fold(0.0, f64::max);
+        let mean_resource_level = resource_sum / resource_samples.max(1) as f64;
+        let action_readout_digest_after = candidate.action_readout_digest();
+        let topology_digest_after = candidate.topology_digest();
+        let target_probability_gain = final_target_probability - initial_target_probability;
+        let finite = [
+            initial_behavior_accuracy,
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            initial_target_probability,
+            final_target_probability,
+            target_probability_gain,
+            mean_resource_level,
+            minimum_resource_level,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            saturation_fraction,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && candidate.hidden.iter().all(|value| value.is_finite())
+            && candidate.resource.iter().all(|value| value.is_finite())
+            && final_weights.iter().all(|value| value.is_finite());
+        rule_results.push(M1NERuleResult {
+            rule,
+            initial_behavior_accuracy,
+            final_behavior_accuracy,
+            final_argmax_accuracy,
+            initial_target_probability,
+            final_target_probability,
+            target_probability_gain,
+            mean_resource_level,
+            minimum_resource_level,
+            mean_relative_weight_drift,
+            maximum_absolute_weight,
+            saturation_fraction,
+            action_readout_digest_before,
+            action_readout_digest_after,
+            topology_digest_before,
+            topology_digest_after,
+            adjustable_connection_count: M1X_VARIABLE_COUNT,
+            finite,
+        });
+    }
+    M1NESeedResult {
+        parameter_id: parameters.id,
+        seed,
+        control,
+        norm_multiplier: control.norm_multiplier(),
+        finite: rule_results.iter().all(|row| row.finite),
+        rule_results,
+    }
+}
+
+fn set_reference_norm_multiplier(
+    controller: &mut MapController<ReferenceAdjustmentMechanism>,
+    multiplier: f64,
+) {
+    for target in 0..HIDDEN_COUNT {
+        let sources = controller.recurrent_slots[target];
+        let current = controller.recurrent_weights[target][sources[0]]
+            .hypot(controller.recurrent_weights[target][sources[1]]);
+        let target_norm = controller.reference_recurrent_norms[target] * multiplier;
+        if current > 1e-12 {
+            let scale = target_norm / current;
+            controller.recurrent_weights[target][sources[0]] *= scale;
+            controller.recurrent_weights[target][sources[1]] *= scale;
+        } else {
+            controller.recurrent_weights[target][sources[0]] = target_norm;
+            controller.recurrent_weights[target][sources[1]] = 0.0;
+        }
+        controller.reference_recurrent_norms[target] = target_norm;
     }
 }
 

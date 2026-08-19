@@ -16,6 +16,7 @@ pub mod map1;
 pub mod map2;
 pub mod mechanism_m0;
 pub mod mechanism_m1;
+pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
 
@@ -107,6 +108,11 @@ pub use mechanism_m0::{
 pub use mechanism_m1::{
     M1AcceptanceReport, M1Control, M1ExperimentConfig, M1ExperimentResult, M1FailureClass,
     M1ParameterSummary, M1PhaseResult, M1Rule, M1SeedResult, M1SingleRuleResult, run_m1_experiment,
+};
+pub use mechanism_m2c::{
+    M2CAcceptanceReport, M2CControl, M2CControlSummary, M2CDecision, M2CDevelopmentSummary,
+    M2CExperimentConfig, M2CExperimentResult, M2CMechanismParameter, M2CPairedEffect,
+    M2CSeedResult, run_m2c_experiment,
 };
 pub use metrics::{
     MetricsConfig, MetricsError, NetworkMetrics, TrajectoryDifference, compare_spike_trajectories,

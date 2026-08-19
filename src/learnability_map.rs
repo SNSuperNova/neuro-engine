@@ -8,6 +8,7 @@ use crate::adaptive_mechanism::{
 use crate::mechanism_m1::{
     M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
 };
+use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
 
 use crate::{EmbodiedError, GATE_B_SENSOR_COUNT, HIDDEN_COUNT};
 
@@ -561,6 +562,8 @@ struct Trial {
     chosen_right: bool,
     probabilities: [f64; ACTION_COUNT],
     recurrent_eligibility: [[f64; PLASTIC_RECURRENT_PER_UNIT]; HIDDEN_COUNT],
+    structural_target: Option<usize>,
+    structural_candidate_eligibility: [f64; HIDDEN_COUNT],
     activity: Vec<[f64; HIDDEN_COUNT]>,
     resource: Vec<[f64; HIDDEN_COUNT]>,
     mean_absolute_activity: [f64; HIDDEN_COUNT],
@@ -580,6 +583,27 @@ struct ActivityAccumulator {
     resource_minimum: f64,
     resource_maximum: f64,
     resource_constrained: usize,
+}
+
+#[derive(Clone)]
+struct StructuralEvidenceState {
+    scores: [[f64; HIDDEN_COUNT]; HIDDEN_COUNT],
+    rewire_count: usize,
+}
+
+impl StructuralEvidenceState {
+    fn new() -> Self {
+        Self {
+            scores: [[0.0; HIDDEN_COUNT]; HIDDEN_COUNT],
+            rewire_count: 0,
+        }
+    }
+
+    fn observe(&mut self, target: usize, evidence: [f64; HIDDEN_COUNT], decay: f64) {
+        for (score, evidence) in self.scores[target].iter_mut().zip(evidence) {
+            *score = (decay * *score + (1.0 - decay) * evidence.abs().min(1.0)).clamp(0.0, 1.0);
+        }
+    }
 }
 
 impl<M: AdjustmentMechanism> MapController<M> {
@@ -841,6 +865,8 @@ impl<M: AdjustmentMechanism> MapController<M> {
             chosen_right,
             probabilities,
             recurrent_eligibility: eligibility,
+            structural_target: None,
+            structural_candidate_eligibility: [0.0; HIDDEN_COUNT],
             activity,
             resource,
             mean_absolute_activity: activity_sum.map(|sum| sum / total_steps as f64),
@@ -856,6 +882,46 @@ impl<M: AdjustmentMechanism> MapController<M> {
         reset_before: bool,
         capture_activity: bool,
     ) -> Trial {
+        self.symbol_trial_with_structural_target(
+            rule,
+            symbol,
+            rng,
+            exploration,
+            reset_before,
+            capture_activity,
+            None,
+        )
+    }
+
+    fn structural_symbol_trial(
+        &mut self,
+        rule: M1Rule,
+        symbol: usize,
+        rng: &mut Rng,
+        exploration: f64,
+        structural_target: usize,
+    ) -> Trial {
+        self.symbol_trial_with_structural_target(
+            rule,
+            symbol,
+            rng,
+            exploration,
+            false,
+            false,
+            Some(structural_target),
+        )
+    }
+
+    fn symbol_trial_with_structural_target(
+        &mut self,
+        rule: M1Rule,
+        symbol: usize,
+        rng: &mut Rng,
+        exploration: f64,
+        reset_before: bool,
+        capture_activity: bool,
+        structural_target: Option<usize>,
+    ) -> Trial {
         if reset_before {
             self.reset_state();
         }
@@ -863,6 +929,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
         let mut activity = Vec::new();
         let mut resource = Vec::new();
         let mut activity_sum = [0.0; HIDDEN_COUNT];
+        let mut structural_candidate_eligibility = [0.0; HIDDEN_COUNT];
         let total_steps = self.config.cue_steps + self.config.memory_delay_steps;
         for step in 0..total_steps {
             let cue_visible = step < self.config.cue_steps;
@@ -875,6 +942,14 @@ impl<M: AdjustmentMechanism> MapController<M> {
                     let source = self.recurrent_slots[target][slot];
                     eligibility[target][slot] = self.config.eligibility_decay
                         * eligibility[target][slot]
+                        + previous[source] * sensitivity;
+                }
+            }
+            if let Some(target) = structural_target {
+                let sensitivity = 1.0 - self.hidden[target].powi(2);
+                for source in 0..HIDDEN_COUNT {
+                    structural_candidate_eligibility[source] = self.config.eligibility_decay
+                        * structural_candidate_eligibility[source]
                         + previous[source] * sensitivity;
                 }
             }
@@ -892,6 +967,8 @@ impl<M: AdjustmentMechanism> MapController<M> {
             chosen_right,
             probabilities,
             recurrent_eligibility: eligibility,
+            structural_target,
+            structural_candidate_eligibility,
             activity,
             resource,
             mean_absolute_activity: activity_sum.map(|sum| sum / total_steps as f64),
@@ -975,6 +1052,101 @@ impl<M: AdjustmentMechanism> MapController<M> {
         if homeostasis > 0.0 {
             self.apply_homeostasis(trial, homeostasis);
         }
+    }
+
+    fn structural_evidence(&self, trial: &Trial) -> (usize, [f64; HIDDEN_COUNT]) {
+        let target = trial
+            .structural_target
+            .expect("structural trial declares target");
+        let reward = if trial.chosen_right == trial.target_right {
+            1.0
+        } else {
+            -1.0
+        };
+        let chosen = usize::from(trial.chosen_right);
+        let feedback = (0..ACTION_COUNT)
+            .map(|action| {
+                (f64::from(action == chosen) - trial.probabilities[action])
+                    * self.action_weights[action][target]
+            })
+            .sum::<f64>();
+        (
+            target,
+            trial
+                .structural_candidate_eligibility
+                .map(|eligibility| reward * feedback * eligibility),
+        )
+    }
+
+    fn rewire_from_evidence(
+        &mut self,
+        target: usize,
+        state: &mut StructuralEvidenceState,
+        control: M2CControl,
+        seed: u64,
+    ) -> bool {
+        let current = self.recurrent_slots[target];
+        let mut candidates = (0..HIDDEN_COUNT)
+            .filter(|source| {
+                *source != target
+                    && !current.contains(source)
+                    && self.recurrent_weights[target][*source] == 0.0
+            })
+            .collect::<Vec<_>>();
+        if candidates.is_empty() {
+            return false;
+        }
+        let (slot, source) = match control {
+            M2CControl::LocalEvidenceRewiring => {
+                let slot = if state.scores[target][current[0]] <= state.scores[target][current[1]] {
+                    0
+                } else {
+                    1
+                };
+                candidates.sort_by(|left, right| {
+                    state.scores[target][*right]
+                        .total_cmp(&state.scores[target][*left])
+                        .then_with(|| left.cmp(right))
+                });
+                (slot, candidates[0])
+            }
+            M2CControl::RandomRewiring => {
+                let mut rng = Rng::new(seed);
+                let slot = (rng.next_u64() as usize) % PLASTIC_RECURRENT_PER_UNIT;
+                let source = candidates[(rng.next_u64() as usize) % candidates.len()];
+                (slot, source)
+            }
+            M2CControl::WeightOnly | M2CControl::FrozenAdjustment => return false,
+        };
+        let old_source = current[slot];
+        let transferred_weight = self.recurrent_weights[target][old_source];
+        self.recurrent_weights[target][old_source] = 0.0;
+        self.recurrent_weights[target][source] = transferred_weight;
+        self.recurrent_slots[target][slot] = source;
+        state.rewire_count += 1;
+        true
+    }
+
+    fn allocated_connection_count(&self) -> usize {
+        (0..HIDDEN_COUNT)
+            .map(|target| {
+                (0..HIDDEN_COUNT)
+                    .filter(|source| {
+                        self.recurrent_weights[target][*source] != 0.0
+                            || self.recurrent_slots[target].contains(source)
+                    })
+                    .count()
+            })
+            .sum()
+    }
+
+    fn topology_digest(&self) -> u64 {
+        self.recurrent_slots
+            .iter()
+            .flatten()
+            .fold(0xcbf2_9ce4_8422_2325, |hash, source| {
+                (hash ^ *source as u64).wrapping_mul(0x1000_0000_01b3)
+            })
     }
 
     fn apply_homeostasis(&mut self, trial: &Trial, strength: f64) {
@@ -1783,6 +1955,378 @@ pub(crate) fn run_multirule_seed_with_mechanisms(
         state_reset_count,
         action_readout_digest_before: readout_before,
         action_readout_digest_after: readout_after,
+        finite,
+    }
+}
+
+struct M2CSequenceOutcome {
+    controller_readout_digest: u64,
+    phase_results: Vec<M1PhaseResult>,
+    initial_a_accuracy: f64,
+    departure_a_accuracy: f64,
+    return_a_initial_accuracy: f64,
+    return_a_final_accuracy: f64,
+    mean_novel_rule_final_accuracy: f64,
+    mean_resource_level: f64,
+    minimum_resource_level: f64,
+    mean_relative_weight_drift: f64,
+    maximum_absolute_weight: f64,
+    rewire_count: usize,
+    allocated_connection_count: usize,
+    topology_digest: u64,
+    finite: bool,
+}
+
+struct M2CSingleOutcome {
+    controller_readout_digest: u64,
+    results: Vec<M1SingleRuleResult>,
+    minimum_final_accuracy: f64,
+    mean_resource_level: f64,
+    minimum_resource_level: f64,
+    mean_relative_weight_drift: f64,
+    maximum_absolute_weight: f64,
+    rewire_count: usize,
+    finite: bool,
+}
+
+pub(crate) fn run_m2c_seed_with_mechanisms(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    control: M2CControl,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: M2CSeedProtocol,
+) -> M2CSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d32_4343_4f4e_5452,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let readout_before = controller.action_readout_digest();
+    let connection_count_before = controller.allocated_connection_count();
+    let topology_digest_before = controller.topology_digest();
+    let sequence = run_m2c_sequence(controller.clone(), seed, control, protocol);
+    let single = run_m2c_single_rules(controller, seed, control, protocol);
+    let finite = sequence.finite
+        && single.finite
+        && sequence.controller_readout_digest == readout_before
+        && single.controller_readout_digest == readout_before;
+    M2CSeedResult {
+        parameter_id: parameters.id,
+        mechanism_parameter_id: protocol.structural_parameters.id,
+        seed,
+        control,
+        phase_results: sequence.phase_results,
+        single_rule_results: single.results,
+        initial_a_accuracy: sequence.initial_a_accuracy,
+        departure_a_accuracy: sequence.departure_a_accuracy,
+        return_a_initial_accuracy: sequence.return_a_initial_accuracy,
+        return_a_final_accuracy: sequence.return_a_final_accuracy,
+        retention_drop: sequence.departure_a_accuracy - sequence.return_a_initial_accuracy,
+        mean_novel_rule_final_accuracy: sequence.mean_novel_rule_final_accuracy,
+        minimum_single_rule_final_accuracy: single.minimum_final_accuracy,
+        mean_resource_level: (sequence.mean_resource_level + single.mean_resource_level) / 2.0,
+        minimum_resource_level: sequence
+            .minimum_resource_level
+            .min(single.minimum_resource_level),
+        mean_relative_weight_drift: sequence
+            .mean_relative_weight_drift
+            .max(single.mean_relative_weight_drift),
+        maximum_absolute_weight: sequence
+            .maximum_absolute_weight
+            .max(single.maximum_absolute_weight),
+        sequence_rewire_count: sequence.rewire_count,
+        single_rule_rewire_count: single.rewire_count,
+        allocated_connection_count_before: connection_count_before,
+        allocated_connection_count_after: sequence.allocated_connection_count,
+        topology_digest_before,
+        topology_digest_after: sequence.topology_digest,
+        action_readout_digest_before: readout_before,
+        action_readout_digest_after: sequence.controller_readout_digest,
+        finite,
+    }
+}
+
+fn run_m2c_sequence<M: AdjustmentMechanism>(
+    mut controller: MapController<M>,
+    seed: u64,
+    control: M2CControl,
+    protocol: M2CSeedProtocol,
+) -> M2CSequenceOutcome {
+    let mut structure = StructuralEvidenceState::new();
+    let map_control = if control == M2CControl::FrozenAdjustment {
+        Map0Control::FrozenPlasticity
+    } else {
+        Map0Control::Baseline
+    };
+    let mut phase_results = Vec::new();
+    let mut resource_sum = 0.0;
+    let mut resource_samples = 0usize;
+    let mut resource_minimum = f64::INFINITY;
+    let mut global_episode = 0usize;
+    for (phase_index, rule) in M1Rule::SEQUENCE.into_iter().enumerate() {
+        let phase_seed =
+            seed ^ 0x4d32_4350_4841_5345 ^ (phase_index as u64).wrapping_mul(SEED_STRIDE);
+        let initial_accuracy = evaluate_multisymbol_rule(
+            &controller,
+            rule,
+            protocol.evaluation_trial_count,
+            phase_seed ^ 0x494e_4954,
+        );
+        let mut trials_to_threshold =
+            (initial_accuracy >= protocol.accuracy_threshold).then_some(0);
+        let mut correct = 0usize;
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + phase_seed.count_ones() as usize) % 4;
+            let structural_target =
+                (global_episode / protocol.structural_parameters.rewiring_interval) % HIDDEN_COUNT;
+            let mut rng = Rng::new(
+                phase_seed ^ 0x4d32_4341_4354_494f ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = controller.structural_symbol_trial(
+                rule,
+                symbol,
+                &mut rng,
+                protocol.exploration,
+                structural_target,
+            );
+            correct += usize::from(trial.chosen_right == trial.target_right);
+            let (target, evidence) = controller.structural_evidence(&trial);
+            structure.observe(
+                target,
+                evidence,
+                protocol.structural_parameters.evidence_decay,
+            );
+            controller.adapt_trial(
+                &trial,
+                map_control,
+                false,
+                phase_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            global_episode += 1;
+            if global_episode.is_multiple_of(protocol.structural_parameters.rewiring_interval) {
+                controller.rewire_from_evidence(
+                    target,
+                    &mut structure,
+                    control,
+                    seed ^ 0x4d32_4352_4557_4952 ^ global_episode as u64,
+                );
+            }
+            for level in controller.resource {
+                resource_sum += level;
+                resource_samples += 1;
+                resource_minimum = resource_minimum.min(level);
+            }
+            let completed = episode + 1;
+            if trials_to_threshold.is_none()
+                && completed.is_multiple_of(protocol.threshold_check_interval)
+                && evaluate_multisymbol_rule(
+                    &controller,
+                    rule,
+                    protocol.evaluation_trial_count,
+                    phase_seed ^ 0x4348_4543_4b01 ^ completed as u64,
+                ) >= protocol.accuracy_threshold
+            {
+                trials_to_threshold = Some(completed);
+            }
+        }
+        let departure_accuracy = evaluate_multisymbol_rule(
+            &controller,
+            rule,
+            protocol.evaluation_trial_count,
+            phase_seed ^ 0x4649_4e41_4c01,
+        );
+        phase_results.push(M1PhaseResult {
+            phase_index,
+            rule,
+            initial_accuracy,
+            online_accuracy: correct as f64 / protocol.phase_trial_count as f64,
+            departure_accuracy,
+            trials_to_threshold,
+        });
+    }
+    let initial_a_accuracy = phase_results[0].initial_accuracy;
+    let departure_a_accuracy = phase_results[0].departure_accuracy;
+    let return_a_initial_accuracy = phase_results[4].initial_accuracy;
+    let return_a_final_accuracy = phase_results[4].departure_accuracy;
+    let mean_novel_rule_final_accuracy = phase_results[1..4]
+        .iter()
+        .map(|phase| phase.departure_accuracy)
+        .sum::<f64>()
+        / 3.0;
+    let (maximum_absolute_weight, mean_relative_weight_drift) = controller.weight_dynamics();
+    let mean_resource_level = resource_sum / resource_samples.max(1) as f64;
+    let finite = controller.hidden.iter().all(|value| value.is_finite())
+        && controller.resource.iter().all(|value| value.is_finite())
+        && phase_results.iter().all(|phase| {
+            [
+                phase.initial_accuracy,
+                phase.online_accuracy,
+                phase.departure_accuracy,
+            ]
+            .into_iter()
+            .all(f64::is_finite)
+        })
+        && [
+            mean_novel_rule_final_accuracy,
+            mean_resource_level,
+            resource_minimum,
+            maximum_absolute_weight,
+            mean_relative_weight_drift,
+        ]
+        .into_iter()
+        .all(f64::is_finite);
+    M2CSequenceOutcome {
+        controller_readout_digest: controller.action_readout_digest(),
+        phase_results,
+        initial_a_accuracy,
+        departure_a_accuracy,
+        return_a_initial_accuracy,
+        return_a_final_accuracy,
+        mean_novel_rule_final_accuracy,
+        mean_resource_level,
+        minimum_resource_level: resource_minimum,
+        mean_relative_weight_drift,
+        maximum_absolute_weight,
+        rewire_count: structure.rewire_count,
+        allocated_connection_count: controller.allocated_connection_count(),
+        topology_digest: controller.topology_digest(),
+        finite,
+    }
+}
+
+fn run_m2c_single_rules<M: AdjustmentMechanism>(
+    controller: MapController<M>,
+    seed: u64,
+    control: M2CControl,
+    protocol: M2CSeedProtocol,
+) -> M2CSingleOutcome {
+    let map_control = if control == M2CControl::FrozenAdjustment {
+        Map0Control::FrozenPlasticity
+    } else {
+        Map0Control::Baseline
+    };
+    let mut results = Vec::new();
+    let mut resource_sum = 0.0;
+    let mut resource_samples = 0usize;
+    let mut resource_minimum = f64::INFINITY;
+    let mut drift_sum = 0.0;
+    let mut maximum_absolute_weight = 0.0_f64;
+    let mut rewire_count = 0usize;
+    let mut finite = true;
+    let mut readout_digest = controller.action_readout_digest();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let mut candidate = controller.clone();
+        candidate.reset_state();
+        let mut structure = StructuralEvidenceState::new();
+        let rule_seed =
+            seed ^ 0x4d32_4353_494e_474c ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let initial_accuracy = evaluate_multisymbol_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let mut trials_to_threshold =
+            (initial_accuracy >= protocol.accuracy_threshold).then_some(0);
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + rule_seed.count_ones() as usize) % 4;
+            let target =
+                (episode / protocol.structural_parameters.rewiring_interval) % HIDDEN_COUNT;
+            let mut rng = Rng::new(
+                rule_seed ^ 0x4d32_4353_4143_544e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = candidate.structural_symbol_trial(
+                rule,
+                symbol,
+                &mut rng,
+                protocol.exploration,
+                target,
+            );
+            let (_, evidence) = candidate.structural_evidence(&trial);
+            structure.observe(
+                target,
+                evidence,
+                protocol.structural_parameters.evidence_decay,
+            );
+            candidate.adapt_trial(
+                &trial,
+                map_control,
+                false,
+                rule_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            let completed = episode + 1;
+            if completed.is_multiple_of(protocol.structural_parameters.rewiring_interval) {
+                candidate.rewire_from_evidence(
+                    target,
+                    &mut structure,
+                    control,
+                    rule_seed ^ 0x4d32_4352_4557_4952 ^ completed as u64,
+                );
+            }
+            for level in candidate.resource {
+                resource_sum += level;
+                resource_samples += 1;
+                resource_minimum = resource_minimum.min(level);
+            }
+            if trials_to_threshold.is_none()
+                && completed.is_multiple_of(protocol.threshold_check_interval)
+                && evaluate_multisymbol_rule(
+                    &candidate,
+                    rule,
+                    protocol.evaluation_trial_count,
+                    rule_seed ^ 0x4348_4543_4b01 ^ completed as u64,
+                ) >= protocol.accuracy_threshold
+            {
+                trials_to_threshold = Some(completed);
+            }
+        }
+        let final_accuracy = evaluate_multisymbol_rule(
+            &candidate,
+            rule,
+            protocol.evaluation_trial_count,
+            rule_seed ^ 0x4649_4e41_4c01,
+        );
+        let (maximum, drift) = candidate.weight_dynamics();
+        maximum_absolute_weight = maximum_absolute_weight.max(maximum);
+        drift_sum += drift;
+        rewire_count += structure.rewire_count;
+        readout_digest = candidate.action_readout_digest();
+        finite &= candidate.hidden.iter().all(|value| value.is_finite())
+            && candidate.resource.iter().all(|value| value.is_finite())
+            && final_accuracy.is_finite()
+            && drift.is_finite();
+        results.push(M1SingleRuleResult {
+            rule,
+            initial_accuracy,
+            final_accuracy,
+            trials_to_threshold,
+        });
+    }
+    let minimum_final_accuracy = results
+        .iter()
+        .map(|result| result.final_accuracy)
+        .fold(f64::INFINITY, f64::min);
+    M2CSingleOutcome {
+        controller_readout_digest: readout_digest,
+        results,
+        minimum_final_accuracy,
+        mean_resource_level: resource_sum / resource_samples.max(1) as f64,
+        minimum_resource_level: resource_minimum,
+        mean_relative_weight_drift: drift_sum / M1Rule::UNIQUE.len() as f64,
+        maximum_absolute_weight,
+        rewire_count,
         finite,
     }
 }

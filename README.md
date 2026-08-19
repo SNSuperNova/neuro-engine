@@ -40,7 +40,9 @@ Map 1 只把参考范数投影替换为活动目标与慢速权重回拉，并�
 
 Map 2 已完成最小动态基座审计。软边界可塑性把相对权重漂移平均降低 `0.687`，持续供能在断供时产生 `13.9 pp` 探针下降；冻结两者后的 720 试次无重置连续流达到 `66.1%`，逐试次重置为 `67.6%`，断供为 `55.7%`，冻结可塑性为 `53.0%`。6 个相邻确认配置形成跨种子稳定区域。M0 随后把它冻结为 `reference-substrate/v1`：候选机制只能通过局部、有界动作接口改变载体，不能读取目标或直接写入动作读出；Map 2A/B/C 完整 JSON 已逐字段回归，原发布哈希保持不变。M1 已在这一冻结基座上完成，Scale 0 继续后移。
 
-M1 现已完成四规则连续保留诊断。A 离开前为 `83.4%`，经过 B/C/D 后回归初始为 `60.7%`；但 B/C/D 连续学习最终只有 `55.4%`，四个规则单独训练时的最低准确率也只有 `51.3%`。因此六个参考参数点全部归为容量不足，不能把 A 的下降单独解释成覆盖性遗忘。冻结可塑性和随机后果对照分别为 `45.9%`、`47.6%`，说明现有调整有效但不足。下一候选是固定总连接预算的 M2C 结构调整，不进入元可塑性或节点扩容。
+M1 已完成四规则连续保留诊断。A 离开前为 `83.4%`，经过 B/C/D 后回归初始为 `60.7%`；但 B/C/D 连续学习最终只有 `55.4%`，四个规则单独训练时的最低准确率也只有 `51.3%`。因此六个参考参数点全部归为容量不足，不能把 A 的下降单独解释成覆盖性遗忘。冻结可塑性和随机后果对照分别为 `45.9%`、`47.6%`，说明现有调整有效但不足，并由此触发了固定总连接预算的 M2C 结构调整分支。
+
+M2C 首个候选已经执行。它保持 24 个节点和每节点 6 条循环入边，只允许两个可塑来源槽位按奖励调制的局部资格证据移动。开发集选择每 64 试次重连一次；独立确认中，局部重连的单规则最低准确率为 `47.9%`，仅权重可塑为 `48.7%`，B/C/D 连续学习为 `59.5%` 对 `59.6%`，且没有可靠优于等次数随机重连。候选机制因此淘汰，不进入 M3；下一步先诊断局部结构证据能否预测反事实换边收益。
 
 ## 运行
 
@@ -61,6 +63,7 @@ cargo run --release --example map2b_lab
 cargo run --release --example map2c_lab
 cargo run --release --example mechanism_m0_lab
 cargo run --release --example mechanism_m1_lab
+cargo run --release --example mechanism_m2c_lab
 npm install
 npm run dev
 ```
@@ -87,6 +90,7 @@ src/map1.rs                 双时间尺度内稳态、局部重绘和旧机制�
 src/adaptive_mechanism.rs   参考载体清单与受约束候选机制接口
 src/mechanism_m0.rs         M0 冻结发布清单与能力边界
 src/mechanism_m1.rs         M1 多规则保留协议、失败分类与配对对照
+src/mechanism_m2c.rs        M2C 固定预算结构扫描、配对效应与机制决策
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -106,6 +110,7 @@ experiments/                版本化结果与失败记录
 - [ADAPTIVE_MECHANISMS.md](ADAPTIVE_MECHANISMS.md)：M0～M4 调整机制研究主线与条件分支；
 - [experiments/mechanism-m0-v0.1.md](experiments/mechanism-m0-v0.1.md)：参考载体、权限接口、Map 2 回归和能力边界冻结记录；
 - [experiments/mechanism-m1-v0.2.md](experiments/mechanism-m1-v0.2.md)：四规则连续保留、单规则容量和条件分支诊断；
+- [experiments/mechanism-m2c-v0.3.md](experiments/mechanism-m2c-v0.3.md)：固定预算局部重连、随机配对和首个结构候选负结果；
 - [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；

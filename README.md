@@ -44,7 +44,9 @@ M1 已完成四规则连续保留诊断。A 离开前为 `83.4%`，经过 B/C/D 
 
 M2C 首个候选已经执行。它保持 24 个节点和每节点 6 条循环入边，只允许两个可塑来源槽位按奖励调制的局部资格证据移动。开发集选择每 64 试次重连一次；独立确认中，局部重连的单规则最低准确率为 `47.9%`，仅权重可塑为 `48.7%`，B/C/D 连续学习为 `59.5%` 对 `59.6%`，且没有可靠优于等次数随机重连。候选机制因此淘汰，没有进入 M3，并触发了后续离线结构证据诊断。
 
-离线结构证据诊断也已完成。正式确认在不污染主连续流的克隆控制器中覆盖全部 864 个重连时点并枚举 14688 个合法换边：oracle 单边换边平均收益只有 `+1.38 pp [1.16, 1.61]`，局部证据 Spearman 为 `0.046`，证据首选相对随机仅增加 `0.20 pp`。A 回归阶段出现局部正信号，但 B/C/D 没有。正式决策为 `CounterfactualEffectsFlat`；下一步只允许比较不同前向时间窗口，不增加在线机制或结构预算。
+离线结构证据诊断也已完成。正式确认在不污染主连续流的克隆控制器中覆盖全部 864 个重连时点并枚举 14688 个合法换边：oracle 单边换边平均收益只有 `+1.38 pp [1.16, 1.61]`，局部证据 Spearman 为 `0.046`，证据首选相对随机仅增加 `0.20 pp`。A 回归阶段出现局部正信号，但 B/C/D 没有。
+
+M2C-T 随后完全复用这些冻结反事实，把累计前向训练窗口扩展为 `0 / 32 / 128 / 256`。oracle 收益为 `+0.62 / +1.38 / +1.40 / +1.24 pp`，32 → 256 配对变化 `-0.15 pp [-0.36, +0.07]`；证据选择也未随时间改善。正式决策为 `SingleEdgeFreedomInsufficient`：短窗口不是主因，一次单边替换的自由度不足。下一步若继续，只做固定预算 `1 / 2 / 4` 边成组离线反事实，不增加在线机制、节点或总连接数。
 
 ## 运行
 
@@ -94,7 +96,8 @@ src/adaptive_mechanism.rs   参考载体清单与受约束候选机制接口
 src/mechanism_m0.rs         M0 冻结发布清单与能力边界
 src/mechanism_m1.rs         M1 多规则保留协议、失败分类与配对对照
 src/mechanism_m2c.rs        M2C 固定预算结构扫描、配对效应与机制决策
-src/structural_diagnostic.rs 离线候选换边、排名对照和反事实诊断
+src/structural_diagnostic.rs M2C 离线单边结构信用与反事实诊断
+src/structural_timescale.rs  M2C-T 同克隆多时长结构作用诊断
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -116,6 +119,7 @@ experiments/                版本化结果与失败记录
 - [experiments/mechanism-m1-v0.2.md](experiments/mechanism-m1-v0.2.md)：四规则连续保留、单规则容量和条件分支诊断；
 - [experiments/mechanism-m2c-v0.3.md](experiments/mechanism-m2c-v0.3.md)：固定预算局部重连、随机配对和首个结构候选负结果；
 - [experiments/structural-diagnostic-v0.4.md](experiments/structural-diagnostic-v0.4.md)：14688 个候选换边反事实、证据排序和分阶段解释；
+- [experiments/structural-timescale-v0.5.md](experiments/structural-timescale-v0.5.md)：同一冻结反事实的 0/32/128/256 试次时间尺度诊断；
 - [EMBODIED_LEARNING.md](EMBODIED_LEARNING.md)：当前研究问题、系统边界和验收条件；
 - [LEARNING.md](LEARNING.md)：实际学习公式、现有技术定位、与常见机器学习的区别和证据边界；
 - [ARCHITECTURE.md](ARCHITECTURE.md)：实现边界和数据流；

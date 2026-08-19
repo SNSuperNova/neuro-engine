@@ -13,6 +13,12 @@ use crate::structural_diagnostic::{
     StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,
     StructuralDiagnosticSeedProtocol, StructuralDiagnosticSeedResult,
 };
+use crate::structural_timescale::{
+    STRUCTURAL_TIMESCALE_HORIZON_COUNT, StructuralTimescaleCandidate,
+    StructuralTimescaleCheckpoint, StructuralTimescaleCheckpointMetrics,
+    StructuralTimescaleSeedHorizonMetrics, StructuralTimescaleSeedProtocol,
+    StructuralTimescaleSeedResult,
+};
 
 use crate::{EmbodiedError, GATE_B_SENSOR_COUNT, HIDDEN_COUNT};
 
@@ -2661,6 +2667,311 @@ fn diagnostic_forward_accuracy<M: AdjustmentMechanism>(
         evaluation_trials,
         seed ^ 0x4d32_4445_5641_4c01,
     )
+}
+
+pub(crate) fn run_structural_timescale_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: StructuralTimescaleSeedProtocol,
+) -> StructuralTimescaleSeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        // Match structural-diagnostic v0.4 exactly so horizon 32 is a direct
+        // replication rather than a second sample from the same protocol.
+        seed ^ 0x4d32_4443_4f4e_5452,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let topology_before = controller.topology_digest();
+    let readout_before = controller.action_readout_digest();
+    let mut structure = StructuralEvidenceState::new();
+    let mut checkpoints = Vec::new();
+    let mut global_episode = 0usize;
+    for (phase_index, rule) in M1Rule::SEQUENCE.into_iter().enumerate() {
+        let phase_seed =
+            seed ^ 0x4d32_4443_5048_4153 ^ (phase_index as u64).wrapping_mul(SEED_STRIDE);
+        for episode in 0..protocol.phase_trial_count {
+            let symbol = (episode + phase_seed.count_ones() as usize) % 4;
+            let structural_target =
+                (global_episode / protocol.structural_parameters.rewiring_interval) % HIDDEN_COUNT;
+            let mut rng = Rng::new(
+                phase_seed ^ 0x4d32_4443_4143_544e ^ (episode as u64).wrapping_mul(SEED_STRIDE),
+            );
+            let trial = controller.structural_symbol_trial(
+                rule,
+                symbol,
+                &mut rng,
+                protocol.exploration,
+                structural_target,
+            );
+            let (target, evidence) = controller.structural_evidence(&trial);
+            structure.observe(
+                target,
+                evidence,
+                protocol.structural_parameters.evidence_decay,
+            );
+            controller.adapt_trial(
+                &trial,
+                Map0Control::Baseline,
+                false,
+                phase_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+            global_episode += 1;
+            if protocol.checkpoint_global_trials.contains(&global_episode) {
+                checkpoints.push(evaluate_structural_timescale_checkpoint(
+                    &controller,
+                    &structure,
+                    seed,
+                    global_episode,
+                    phase_index,
+                    rule,
+                    target,
+                    protocol,
+                ));
+            }
+        }
+    }
+    let horizon_metrics = std::array::from_fn(|horizon_index| {
+        let count = checkpoints.len().max(1) as f64;
+        let mean = |f: fn(&StructuralTimescaleCheckpointMetrics) -> f64| {
+            checkpoints
+                .iter()
+                .map(|row| f(&row.horizon_metrics[horizon_index]))
+                .sum::<f64>()
+                / count
+        };
+        let mean_spearman_correlation = mean(|row| row.spearman_correlation);
+        let mean_shuffled_spearman_correlation = mean(|row| row.mean_shuffled_spearman_correlation);
+        let mean_selected_benefit = mean(|row| row.selected_benefit);
+        let mean_random_benefit = mean(|row| row.random_mean_benefit);
+        StructuralTimescaleSeedHorizonMetrics {
+            training_horizon: protocol.forward_training_horizons[horizon_index],
+            mean_spearman_correlation,
+            mean_shuffled_spearman_correlation,
+            mean_correlation_advantage: mean_spearman_correlation
+                - mean_shuffled_spearman_correlation,
+            mean_selected_benefit,
+            mean_random_benefit,
+            mean_selected_benefit_advantage: mean_selected_benefit - mean_random_benefit,
+            mean_oracle_benefit: mean(|row| row.oracle_benefit),
+            mean_selected_regret: mean(|row| row.selected_regret),
+            top_quartile_hit_rate: mean(|row| f64::from(row.selected_is_top_quartile)),
+        }
+    });
+    let finite = checkpoints.iter().all(|checkpoint| {
+        checkpoint
+            .no_swap_accuracies
+            .into_iter()
+            .all(f64::is_finite)
+            && checkpoint.candidates.iter().all(|candidate| {
+                candidate.evidence_score.is_finite()
+                    && candidate
+                        .benefit_over_no_swap
+                        .into_iter()
+                        .all(f64::is_finite)
+            })
+            && checkpoint.horizon_metrics.into_iter().all(|metric| {
+                [
+                    metric.spearman_correlation,
+                    metric.mean_shuffled_spearman_correlation,
+                    metric.selected_benefit,
+                    metric.random_mean_benefit,
+                    metric.oracle_benefit,
+                    metric.selected_regret,
+                ]
+                .into_iter()
+                .all(f64::is_finite)
+            })
+    });
+    StructuralTimescaleSeedResult {
+        parameter_id: parameters.id,
+        seed,
+        checkpoints,
+        horizon_metrics,
+        topology_digest_before: topology_before,
+        topology_digest_after: controller.topology_digest(),
+        action_readout_digest_before: readout_before,
+        action_readout_digest_after: controller.action_readout_digest(),
+        finite,
+    }
+}
+
+fn evaluate_structural_timescale_checkpoint<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    structure: &StructuralEvidenceState,
+    seed: u64,
+    global_trial: usize,
+    phase_index: usize,
+    rule: M1Rule,
+    target: usize,
+    protocol: StructuralTimescaleSeedProtocol,
+) -> StructuralTimescaleCheckpoint {
+    let scores = structure.scores[target];
+    let replaced_slot = controller.weakest_structural_slot(target, &scores);
+    let replaced_source_unit = controller.recurrent_slots[target][replaced_slot];
+    let candidate_sources = controller.structural_candidates(target);
+    let horizon_seed = seed ^ 0x4d32_4448_4f52_495a ^ global_trial as u64;
+    let no_swap_accuracies = diagnostic_forward_accuracies(
+        controller,
+        rule,
+        protocol.forward_training_horizons,
+        protocol.evaluation_trial_count,
+        protocol.exploration,
+        horizon_seed,
+    );
+    let candidates = candidate_sources
+        .iter()
+        .map(|source| {
+            let mut swapped = controller.clone();
+            assert!(swapped.rewire_specific(target, replaced_slot, *source));
+            let accuracies = diagnostic_forward_accuracies(
+                &swapped,
+                rule,
+                protocol.forward_training_horizons,
+                protocol.evaluation_trial_count,
+                protocol.exploration,
+                horizon_seed,
+            );
+            StructuralTimescaleCandidate {
+                source_unit: *source,
+                evidence_score: scores[*source],
+                benefit_over_no_swap: std::array::from_fn(|index| {
+                    accuracies[index] - no_swap_accuracies[index]
+                }),
+            }
+        })
+        .collect::<Vec<_>>();
+    let evidence_values = candidates
+        .iter()
+        .map(|candidate| candidate.evidence_score)
+        .collect::<Vec<_>>();
+    let evidence_ranks = rank_values(&evidence_values);
+    let selected_index = candidates
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| {
+            left.evidence_score
+                .total_cmp(&right.evidence_score)
+                .then_with(|| right.source_unit.cmp(&left.source_unit))
+        })
+        .map(|(index, _)| index)
+        .expect("17 structural candidates");
+    let horizon_metrics = std::array::from_fn(|horizon_index| {
+        let benefit_values = candidates
+            .iter()
+            .map(|candidate| candidate.benefit_over_no_swap[horizon_index])
+            .collect::<Vec<_>>();
+        let benefit_ranks = rank_values(&benefit_values);
+        let spearman_correlation = pearson(&evidence_ranks, &benefit_ranks);
+        let mut shuffled_sum = 0.0;
+        for shuffle in 0..protocol.shuffled_ranking_count {
+            let mut shuffled = evidence_values.clone();
+            let mut rng = Rng::new(
+                seed ^ 0x4d32_4453_4855_4646
+                    ^ global_trial as u64
+                    ^ (shuffle as u64).wrapping_mul(SEED_STRIDE),
+            );
+            for index in (1..shuffled.len()).rev() {
+                let swap = (rng.next_u64() as usize) % (index + 1);
+                shuffled.swap(index, swap);
+            }
+            shuffled_sum += pearson(&rank_values(&shuffled), &benefit_ranks);
+        }
+        let oracle_index = candidates
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| {
+                left.benefit_over_no_swap[horizon_index]
+                    .total_cmp(&right.benefit_over_no_swap[horizon_index])
+                    .then_with(|| right.source_unit.cmp(&left.source_unit))
+            })
+            .map(|(index, _)| index)
+            .expect("17 structural candidates");
+        let mut benefit_order = (0..candidates.len()).collect::<Vec<_>>();
+        benefit_order.sort_by(|left, right| {
+            candidates[*right].benefit_over_no_swap[horizon_index]
+                .total_cmp(&candidates[*left].benefit_over_no_swap[horizon_index])
+                .then_with(|| {
+                    candidates[*left]
+                        .source_unit
+                        .cmp(&candidates[*right].source_unit)
+                })
+        });
+        let selected_benefit = candidates[selected_index].benefit_over_no_swap[horizon_index];
+        let oracle_benefit = candidates[oracle_index].benefit_over_no_swap[horizon_index];
+        StructuralTimescaleCheckpointMetrics {
+            training_horizon: protocol.forward_training_horizons[horizon_index],
+            spearman_correlation,
+            mean_shuffled_spearman_correlation: shuffled_sum
+                / protocol.shuffled_ranking_count as f64,
+            selected_source_unit: candidates[selected_index].source_unit,
+            selected_benefit,
+            random_mean_benefit: benefit_values.iter().sum::<f64>()
+                / benefit_values.len().max(1) as f64,
+            oracle_source_unit: candidates[oracle_index].source_unit,
+            oracle_benefit,
+            selected_regret: oracle_benefit - selected_benefit,
+            selected_is_top_quartile: benefit_order[..candidates.len().div_ceil(4)]
+                .contains(&selected_index),
+        }
+    });
+    StructuralTimescaleCheckpoint {
+        global_trial,
+        phase_index,
+        rule,
+        target_unit: target,
+        replaced_slot,
+        replaced_source_unit,
+        candidate_count: candidates.len(),
+        no_swap_accuracies,
+        candidates,
+        horizon_metrics,
+    }
+}
+
+fn diagnostic_forward_accuracies<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    rule: M1Rule,
+    horizons: [usize; STRUCTURAL_TIMESCALE_HORIZON_COUNT],
+    evaluation_trials: usize,
+    exploration: f64,
+    seed: u64,
+) -> [f64; STRUCTURAL_TIMESCALE_HORIZON_COUNT] {
+    let mut forward = controller.clone();
+    let mut completed = 0usize;
+    std::array::from_fn(|index| {
+        for episode in completed..horizons[index] {
+            let symbol = (episode + seed.count_ones() as usize) % 4;
+            let mut rng =
+                Rng::new(seed ^ 0x4d32_4446_5744_5452 ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+            let trial = forward.symbol_trial(rule, symbol, &mut rng, exploration, false, false);
+            forward.adapt_trial(
+                &trial,
+                Map0Control::Baseline,
+                false,
+                seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+        }
+        completed = horizons[index];
+        evaluate_multisymbol_rule(
+            &forward,
+            rule,
+            evaluation_trials,
+            seed ^ 0x4d32_4445_5641_4c01,
+        )
+    })
 }
 
 fn rank_values(values: &[f64]) -> Vec<f64> {

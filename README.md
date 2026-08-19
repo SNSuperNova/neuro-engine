@@ -50,6 +50,8 @@ M2C-T 随后完全复用这些冻结反事实，把累计前向训练窗口扩�
 
 M2C-G 已完成该成组诊断。相同 17-bundle 搜索预算下，1/2/4 边 oracle 为 `+1.38 / +1.80 / +2.55 pp`，4 边相对单边增加 `+1.16 pp [0.91, 1.42]`，说明少数组合结构动作确有作用。但已有 A 阶段 oracle 为 `+4.69 pp`，B/C/D 新规则平均只有 `+1.47 pp`；总体收益由历史恢复主导。正式决策为 `HistoryDominatedGroupedEffect`，M2C 固定预算结构分支关闭，不进入在线成组重连或 M3。
 
+M1-R 随后把“容量不足”拆成信息、形成、信用和读出四层。48 个独立确认组合逐项复现 M1 单规则行为：B/C/D 固定读出为 `55.3%`。但训练前 24 维隐藏状态已能被带规则标签的外部线性探针 `100.0%` 解码，奖励训练后仍为 `100.0%`，配对增益只有 `+0.04 pp`；目标定向信用行为为 `53.2%`，没有救回能力。正式决策为 `LatentSymbolCodeWithoutRuleFormation`：潜在符号信息充足，现有调整却没有形成能被冻结读出表达的规则变换；外部探针不算系统学会，也没有理由先扩节点。
+
 ## 运行
 
 ```powershell
@@ -71,6 +73,9 @@ cargo run --release --example mechanism_m0_lab
 cargo run --release --example mechanism_m1_lab
 cargo run --release --example mechanism_m2c_lab
 cargo run --release --example structural_diagnostic_lab
+cargo run --release --example structural_timescale_lab
+cargo run --release --example structural_group_lab
+cargo run --release --example representation_capacity_lab
 npm install
 npm run dev
 ```
@@ -101,6 +106,7 @@ src/mechanism_m2c.rs        M2C 固定预算结构扫描、配对效应与机制
 src/structural_diagnostic.rs M2C 离线单边结构信用与反事实诊断
 src/structural_timescale.rs  M2C-T 同克隆多时长结构作用诊断
 src/structural_group.rs      M2C-G 等预算成组结构与单边加和诊断
+src/representation_capacity.rs M1-R 表征、信用和固定读出因果诊断
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘

@@ -9,6 +9,7 @@ use crate::mechanism_m1::{
     M1Control, M1PhaseResult, M1Rule, M1SeedProtocol, M1SeedResult, M1SingleRuleResult,
 };
 use crate::mechanism_m2c::{M2CControl, M2CSeedProtocol, M2CSeedResult};
+use crate::representation_capacity::{RepresentationCapacitySeedResult, RepresentationRuleResult};
 use crate::structural_diagnostic::{
     StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,
     StructuralDiagnosticSeedProtocol, StructuralDiagnosticSeedResult,
@@ -30,6 +31,17 @@ const ACTION_COUNT: usize = 2;
 const ACTIVE_RECURRENT_PER_UNIT: usize = 6;
 const PLASTIC_RECURRENT_PER_UNIT: usize = 2;
 const SEED_STRIDE: u64 = 0x9e37_79b9_7f4a_7c15;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct RepresentationCapacitySeedProtocol {
+    pub adaptation_trial_count: usize,
+    pub behavior_evaluation_trial_count: usize,
+    pub exploration: f64,
+    pub probe_training_trials: usize,
+    pub probe_evaluation_trials: usize,
+    pub probe_ridge: f64,
+    pub shuffled_label_repeats: usize,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1065,6 +1077,59 @@ impl<M: AdjustmentMechanism> MapController<M> {
         };
         if homeostasis > 0.0 {
             self.apply_homeostasis(trial, homeostasis);
+        }
+    }
+
+    fn adapt_trial_target_directed(&mut self, trial: &Trial) {
+        let reward = if trial.chosen_right == trial.target_right {
+            1.0
+        } else {
+            -1.0
+        };
+        self.baseline = self.config.reward_baseline_decay * self.baseline
+            + (1.0 - self.config.reward_baseline_decay) * reward;
+        let target_action = usize::from(trial.target_right);
+        let feedback: [f64; HIDDEN_COUNT] = std::array::from_fn(|hidden| {
+            (0..ACTION_COUNT)
+                .map(|action| {
+                    (f64::from(action == target_action) - trial.probabilities[action])
+                        * self.action_weights[action][hidden]
+                })
+                .sum::<f64>()
+        });
+        for (target, feedback_value) in feedback.into_iter().enumerate() {
+            for slot in 0..PLASTIC_RECURRENT_PER_UNIT {
+                let source = self.recurrent_slots[target][slot];
+                let delta = self.parameters.internal_learning_rate
+                    * feedback_value
+                    * trial.recurrent_eligibility[target][slot];
+                let action = self
+                    .adjustment_mechanism
+                    .adjust_plasticity(PlasticityObservation {
+                        target_unit: target,
+                        source_unit: source,
+                        current_weight: self.recurrent_weights[target][source],
+                        proposed_delta: delta,
+                        reference_norm: self.reference_recurrent_norms[target],
+                        absolute_weight_limit: self.config.weight_limit,
+                        resource_level: self.resource[target],
+                    });
+                self.recurrent_weights[target][source] = if action.recurrent_weight.is_finite() {
+                    action
+                        .recurrent_weight
+                        .clamp(-self.config.weight_limit, self.config.weight_limit)
+                } else {
+                    self.recurrent_weights[target][source]
+                };
+                self.resource[target] = if action.resource_level.is_finite() {
+                    action.resource_level.clamp(0.0, 1.0)
+                } else {
+                    self.resource[target]
+                };
+            }
+        }
+        if self.parameters.homeostasis_strength > 0.0 {
+            self.apply_homeostasis(trial, self.parameters.homeostasis_strength);
         }
     }
 
@@ -3520,6 +3585,398 @@ fn pearson(left: &[f64], right: &[f64]) -> f64 {
     } else {
         (covariance / denominator).clamp(-1.0, 1.0)
     }
+}
+
+pub(crate) fn run_representation_capacity_seed(
+    config: Map0ExperimentConfig,
+    parameters: Map0ParameterPoint,
+    seed: u64,
+    homeostasis_mechanism: HomeostasisMechanism,
+    plasticity_mechanism: PlasticityMechanism,
+    resource_mechanism: ResourceMechanism,
+    protocol: RepresentationCapacitySeedProtocol,
+) -> RepresentationCapacitySeedResult {
+    let mut controller = MapController::new(
+        config,
+        parameters,
+        seed ^ 0x4d31_434f_4e54_524c,
+        ReferenceAdjustmentMechanism::new(
+            homeostasis_mechanism,
+            plasticity_mechanism,
+            resource_mechanism,
+        ),
+    );
+    controller.train_multisymbol_readout(seed);
+    controller.reset_state();
+    let main_stream_topology_digest_before = controller.topology_digest();
+    let main_stream_action_readout_digest_before = controller.action_readout_digest();
+    let mut rule_results = Vec::new();
+    for (rule_index, rule) in M1Rule::UNIQUE.into_iter().enumerate() {
+        let rule_seed =
+            seed ^ 0x4d31_5349_4e47_4c45 ^ (rule_index as u64).wrapping_mul(SEED_STRIDE);
+        let mut initial = controller.clone();
+        initial.reset_state();
+        let topology_digest_before = initial.topology_digest();
+        let action_readout_digest_before = initial.action_readout_digest();
+        let pre_behavior_accuracy = evaluate_multisymbol_rule(
+            &initial,
+            rule,
+            protocol.behavior_evaluation_trial_count,
+            rule_seed ^ 0x494e_4954,
+        );
+        let raw_sensor_probe_accuracy = raw_sensor_probe_accuracy(
+            rule,
+            protocol.probe_training_trials,
+            protocol.probe_evaluation_trials,
+            protocol.probe_ridge,
+            rule_seed ^ 0x5241_5750_524f_4245,
+        );
+        let (pre_hidden_probe_accuracy, pre_shuffled_probe_accuracy) =
+            hidden_probe_accuracy(&initial, rule, protocol, rule_seed ^ 0x5052_455f_5052_4f42);
+
+        let mut reward_local = initial.clone();
+        let mut target_directed = initial.clone();
+        for episode in 0..protocol.adaptation_trial_count {
+            let symbol = (episode + rule_seed.count_ones() as usize) % 4;
+            let action_seed =
+                rule_seed ^ 0x4d31_4143_5449_4f4e ^ (episode as u64).wrapping_mul(SEED_STRIDE);
+            let mut reward_rng = Rng::new(action_seed);
+            let reward_trial = reward_local.symbol_trial(
+                rule,
+                symbol,
+                &mut reward_rng,
+                protocol.exploration,
+                false,
+                false,
+            );
+            reward_local.adapt_trial(
+                &reward_trial,
+                Map0Control::Baseline,
+                false,
+                rule_seed ^ 0x5245_5741_5244 ^ episode as u64,
+                0,
+            );
+
+            let mut target_rng = Rng::new(action_seed);
+            let target_trial = target_directed.symbol_trial(
+                rule,
+                symbol,
+                &mut target_rng,
+                protocol.exploration,
+                false,
+                false,
+            );
+            target_directed.adapt_trial_target_directed(&target_trial);
+        }
+        let reward_local_behavior_accuracy = evaluate_multisymbol_rule(
+            &reward_local,
+            rule,
+            protocol.behavior_evaluation_trial_count,
+            rule_seed ^ 0x4649_4e41_4c01,
+        );
+        let target_directed_behavior_accuracy = evaluate_multisymbol_rule(
+            &target_directed,
+            rule,
+            protocol.behavior_evaluation_trial_count,
+            rule_seed ^ 0x4649_4e41_4c01,
+        );
+        let (reward_local_hidden_probe_accuracy, reward_local_shuffled_probe_accuracy) =
+            hidden_probe_accuracy(
+                &reward_local,
+                rule,
+                protocol,
+                rule_seed ^ 0x504f_5354_5052_4f42,
+            );
+        let (target_directed_hidden_probe_accuracy, target_directed_shuffled_probe_accuracy) =
+            hidden_probe_accuracy(
+                &target_directed,
+                rule,
+                protocol,
+                rule_seed ^ 0x504f_5354_5052_4f42,
+            );
+        let (_, reward_local_relative_weight_drift) = reward_local.weight_dynamics();
+        let (_, target_directed_relative_weight_drift) = target_directed.weight_dynamics();
+        let reward_local_probe_gain_over_pre =
+            reward_local_hidden_probe_accuracy - pre_hidden_probe_accuracy;
+        let target_directed_probe_gain_over_pre =
+            target_directed_hidden_probe_accuracy - pre_hidden_probe_accuracy;
+        let reward_local_readout_rescue_gap =
+            reward_local_hidden_probe_accuracy - reward_local_behavior_accuracy;
+        let target_directed_behavior_gain =
+            target_directed_behavior_accuracy - reward_local_behavior_accuracy;
+        let reward_local_action_readout_digest_after = reward_local.action_readout_digest();
+        let target_directed_action_readout_digest_after = target_directed.action_readout_digest();
+        let reward_local_topology_digest_after = reward_local.topology_digest();
+        let target_directed_topology_digest_after = target_directed.topology_digest();
+        let finite = [
+            raw_sensor_probe_accuracy,
+            pre_behavior_accuracy,
+            pre_hidden_probe_accuracy,
+            pre_shuffled_probe_accuracy,
+            reward_local_behavior_accuracy,
+            reward_local_hidden_probe_accuracy,
+            reward_local_shuffled_probe_accuracy,
+            reward_local_probe_gain_over_pre,
+            reward_local_readout_rescue_gap,
+            target_directed_behavior_accuracy,
+            target_directed_hidden_probe_accuracy,
+            target_directed_shuffled_probe_accuracy,
+            target_directed_behavior_gain,
+            target_directed_probe_gain_over_pre,
+            reward_local_relative_weight_drift,
+            target_directed_relative_weight_drift,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+            && initial.hidden.iter().all(|value| value.is_finite())
+            && reward_local.hidden.iter().all(|value| value.is_finite())
+            && target_directed.hidden.iter().all(|value| value.is_finite())
+            && reward_local.resource.iter().all(|value| value.is_finite())
+            && target_directed
+                .resource
+                .iter()
+                .all(|value| value.is_finite());
+        rule_results.push(RepresentationRuleResult {
+            rule,
+            raw_sensor_probe_accuracy,
+            pre_behavior_accuracy,
+            pre_hidden_probe_accuracy,
+            pre_shuffled_probe_accuracy,
+            reward_local_behavior_accuracy,
+            reward_local_hidden_probe_accuracy,
+            reward_local_shuffled_probe_accuracy,
+            reward_local_probe_gain_over_pre,
+            reward_local_readout_rescue_gap,
+            target_directed_behavior_accuracy,
+            target_directed_hidden_probe_accuracy,
+            target_directed_shuffled_probe_accuracy,
+            target_directed_behavior_gain,
+            target_directed_probe_gain_over_pre,
+            reward_local_relative_weight_drift,
+            target_directed_relative_weight_drift,
+            action_readout_digest_before,
+            reward_local_action_readout_digest_after,
+            target_directed_action_readout_digest_after,
+            topology_digest_before,
+            reward_local_topology_digest_after,
+            target_directed_topology_digest_after,
+            adjustable_connection_count: HIDDEN_COUNT * PLASTIC_RECURRENT_PER_UNIT,
+            finite,
+        });
+    }
+    RepresentationCapacitySeedResult {
+        parameter_id: parameters.id,
+        seed,
+        finite: rule_results.iter().all(|row| row.finite),
+        rule_results,
+        main_stream_topology_digest_before,
+        main_stream_topology_digest_after: controller.topology_digest(),
+        main_stream_action_readout_digest_before,
+        main_stream_action_readout_digest_after: controller.action_readout_digest(),
+    }
+}
+
+fn hidden_probe_accuracy<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    rule: M1Rule,
+    protocol: RepresentationCapacitySeedProtocol,
+    seed: u64,
+) -> (f64, f64) {
+    let (training_features, training_labels) = hidden_probe_examples(
+        controller,
+        rule,
+        protocol.probe_training_trials,
+        seed ^ 0x5452_4149_4e01,
+    );
+    let (evaluation_features, evaluation_labels) = hidden_probe_examples(
+        controller,
+        rule,
+        protocol.probe_evaluation_trials,
+        seed ^ 0x4556_414c_0101,
+    );
+    let accuracy = linear_probe_accuracy(
+        &training_features,
+        &training_labels,
+        &evaluation_features,
+        &evaluation_labels,
+        protocol.probe_ridge,
+        None,
+    );
+    let shuffled = (0..protocol.shuffled_label_repeats)
+        .map(|repeat| {
+            linear_probe_accuracy(
+                &training_features,
+                &training_labels,
+                &evaluation_features,
+                &evaluation_labels,
+                protocol.probe_ridge,
+                Some(seed ^ 0x5348_5546_464c_4501 ^ (repeat as u64).wrapping_mul(SEED_STRIDE)),
+            )
+        })
+        .sum::<f64>()
+        / protocol.shuffled_label_repeats as f64;
+    (accuracy, shuffled)
+}
+
+fn hidden_probe_examples<M: AdjustmentMechanism>(
+    controller: &MapController<M>,
+    rule: M1Rule,
+    trial_count: usize,
+    seed: u64,
+) -> (Vec<Vec<f64>>, Vec<f64>) {
+    let mut evaluation = controller.clone();
+    let mut features = Vec::with_capacity(trial_count);
+    let mut labels = Vec::with_capacity(trial_count);
+    for episode in 0..trial_count {
+        let symbol = (episode + seed.count_ones() as usize) % 4;
+        let mut rng =
+            Rng::new(seed ^ 0x4849_4444_454e_0101 ^ (episode as u64).wrapping_mul(SEED_STRIDE));
+        let trial = evaluation.symbol_trial(rule, symbol, &mut rng, 0.0, false, false);
+        features.push(evaluation.hidden.to_vec());
+        labels.push(if trial.target_right { 1.0 } else { -1.0 });
+    }
+    (features, labels)
+}
+
+fn raw_sensor_probe_accuracy(
+    rule: M1Rule,
+    training_count: usize,
+    evaluation_count: usize,
+    ridge: f64,
+    seed: u64,
+) -> f64 {
+    let examples = |count: usize, stream_seed: u64| {
+        let mut features = Vec::with_capacity(count);
+        let mut labels = Vec::with_capacity(count);
+        for episode in 0..count {
+            let symbol = (episode + stream_seed.count_ones() as usize) % 4;
+            features.push(vec![
+                if symbol & 1 == 0 { -1.0 } else { 1.0 },
+                if symbol & 2 == 0 { -1.0 } else { 1.0 },
+            ]);
+            labels.push(if rule.target_right(symbol) { 1.0 } else { -1.0 });
+        }
+        (features, labels)
+    };
+    let (training_features, training_labels) = examples(training_count, seed ^ 0x5452_4149_4e01);
+    let (evaluation_features, evaluation_labels) =
+        examples(evaluation_count, seed ^ 0x4556_414c_0101);
+    linear_probe_accuracy(
+        &training_features,
+        &training_labels,
+        &evaluation_features,
+        &evaluation_labels,
+        ridge,
+        None,
+    )
+}
+
+fn linear_probe_accuracy(
+    training_features: &[Vec<f64>],
+    training_labels: &[f64],
+    evaluation_features: &[Vec<f64>],
+    evaluation_labels: &[f64],
+    ridge: f64,
+    shuffle_seed: Option<u64>,
+) -> f64 {
+    let dimension = training_features.first().map_or(0, Vec::len);
+    if dimension == 0 || training_features.is_empty() || evaluation_features.is_empty() {
+        return 0.0;
+    }
+    let mut labels = training_labels.to_vec();
+    if let Some(seed) = shuffle_seed {
+        let mut rng = Rng::new(seed);
+        for index in (1..labels.len()).rev() {
+            let swap = (rng.next_u64() as usize) % (index + 1);
+            labels.swap(index, swap);
+        }
+    }
+    let count = training_features.len() as f64;
+    let means = (0..dimension)
+        .map(|column| training_features.iter().map(|row| row[column]).sum::<f64>() / count)
+        .collect::<Vec<_>>();
+    let scales = (0..dimension)
+        .map(|column| {
+            let variance = training_features
+                .iter()
+                .map(|row| (row[column] - means[column]).powi(2))
+                .sum::<f64>()
+                / count;
+            variance.sqrt().max(1e-9)
+        })
+        .collect::<Vec<_>>();
+    let augmented = dimension + 1;
+    let mut normal = vec![vec![0.0; augmented]; augmented];
+    let mut target = vec![0.0; augmented];
+    for (row, label) in training_features.iter().zip(labels) {
+        let mut values = Vec::with_capacity(augmented);
+        values.push(1.0);
+        values.extend(
+            row.iter()
+                .enumerate()
+                .map(|(column, value)| (value - means[column]) / scales[column]),
+        );
+        for left in 0..augmented {
+            target[left] += values[left] * label;
+            for right in 0..augmented {
+                normal[left][right] += values[left] * values[right];
+            }
+        }
+    }
+    for index in 1..augmented {
+        normal[index][index] += ridge;
+    }
+    let weights = solve_linear_system(normal, target);
+    let correct = evaluation_features
+        .iter()
+        .zip(evaluation_labels)
+        .filter(|(row, label)| {
+            let score = weights[0]
+                + row
+                    .iter()
+                    .enumerate()
+                    .map(|(column, value)| {
+                        weights[column + 1] * (value - means[column]) / scales[column]
+                    })
+                    .sum::<f64>();
+            (score >= 0.0) == (**label >= 0.0)
+        })
+        .count();
+    correct as f64 / evaluation_features.len() as f64
+}
+
+fn solve_linear_system(mut matrix: Vec<Vec<f64>>, mut target: Vec<f64>) -> Vec<f64> {
+    let size = target.len();
+    for column in 0..size {
+        let pivot = (column..size)
+            .max_by(|left, right| {
+                matrix[*left][column]
+                    .abs()
+                    .total_cmp(&matrix[*right][column].abs())
+            })
+            .expect("linear probe pivot");
+        matrix.swap(column, pivot);
+        target.swap(column, pivot);
+        let divisor = matrix[column][column];
+        if divisor.abs() <= 1e-12 {
+            continue;
+        }
+        for value in &mut matrix[column][column..] {
+            *value /= divisor;
+        }
+        target[column] /= divisor;
+        for row in 0..size {
+            if row == column {
+                continue;
+            }
+            let scale = matrix[row][column];
+            for offset in column..size {
+                matrix[row][offset] -= scale * matrix[column][offset];
+            }
+            target[row] -= scale * target[column];
+        }
+    }
+    target
 }
 
 fn run_single_rule_capacity<M: AdjustmentMechanism>(

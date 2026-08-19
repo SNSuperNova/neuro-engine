@@ -1,0 +1,1066 @@
+{
+  "version": "adaptive-mechanism/m1-representation-v0.7",
+  "config": {
+    "m1Protocol": {
+      "map2Protocol": {
+        "map2bProtocol": {
+          "map2aProtocol": {
+            "map1Protocol": {
+              "seed": 5566818783092277505,
+              "developmentConfigCount": 48,
+              "developmentSeedCount": 8,
+              "confirmationSeedCount": 12,
+              "confirmationCandidateCount": 6,
+              "recurrentGainRange": [
+                0.1,
+                0.45
+              ],
+              "internalLearningRateRange": [
+                0.06,
+                0.16
+              ],
+              "homeostasisStrengthRange": [
+                0.25,
+                1.0
+              ],
+              "explorationRateRange": [
+                0.04,
+                0.18
+              ],
+              "activityTarget": 0.35,
+              "activityEmaRate": 0.05,
+              "excitabilityAdjustmentRate": 0.02,
+              "weightNormRelaxationRate": 0.03,
+              "minimumExcitabilityGain": 0.65,
+              "maximumExcitabilityGain": 1.35,
+              "probeProtocol": {
+                "seed": 5566818783092277505,
+                "developmentConfigCount": 64,
+                "developmentSeedCount": 8,
+                "confirmationSeedCount": 12,
+                "confirmationCandidateCount": 6,
+                "pretrainingEpisodes": 320,
+                "adaptationEpisodes": 240,
+                "evaluationEpisodes": 80,
+                "thresholdCheckInterval": 20,
+                "cueSteps": 2,
+                "memoryDelaySteps": 8,
+                "rewardDelaySteps": 6,
+                "eligibilityDecay": 0.88,
+                "hiddenLeak": 0.8,
+                "policyLearningRate": 0.055,
+                "softmaxTemperature": 0.4,
+                "rewardBaselineDecay": 0.92,
+                "weightLimit": 2.5,
+                "recurrentGainRange": [
+                  0.1,
+                  0.45
+                ],
+                "internalLearningRateRange": [
+                  0.06,
+                  0.16
+                ],
+                "homeostasisStrengthRange": [
+                  0.25,
+                  1.0
+                ],
+                "explorationRateRange": [
+                  0.04,
+                  0.18
+                ],
+                "thresholds": {
+                  "memoryAccuracy": 0.65,
+                  "delayedCreditAccuracy": 0.65,
+                  "reversalAccuracy": 0.7,
+                  "restorationAccuracy": 0.7,
+                  "repeatedReversalAccuracy": 0.7,
+                  "perturbationRecoveryAccuracy": 0.65,
+                  "minimumPerturbationDamageDrop": 0.15,
+                  "minimumPerturbationRecoveryGain": 0.1,
+                  "maximumSaturationFraction": 0.25,
+                  "maximumSynchronyFraction": 0.5,
+                  "maximumRelativeWeightDrift": 1.0,
+                  "minimumRegionFormationProbability": 0.5,
+                  "minimumRegionSize": 3,
+                  "minimumCausalProbabilityDrop": 0.15,
+                  "minimumCausalProbeScoreDrop": 0.1
+                }
+              }
+            },
+            "softBoundScale": 1.0,
+            "minimumMeanWeightDriftReduction": 0.25,
+            "maximumAccuracyDegradation": 0.02
+          },
+          "initialResource": 0.75,
+          "supplyRate": 0.007,
+          "maintenanceCost": 0.001,
+          "activityCost": 0.012,
+          "plasticityCost": 0.05,
+          "minimumModulation": 0.6,
+          "minimumNoSupplyResourceDrop": 0.2,
+          "minimumNoSupplyProbeScoreDrop": 0.1,
+          "maximumProbeScoreDegradation": 0.02,
+          "maximumWeightDriftIncrease": 0.05
+        },
+        "streamTrialCount": 720,
+        "minimumChangeGap": 30,
+        "changeProbability": 0.025,
+        "settlingWindow": 20,
+        "exploration": 0.12,
+        "minimumRuleChanges": 5,
+        "minimumOverallAccuracy": 0.6,
+        "minimumSettledAccuracy": 0.65,
+        "maximumRelativeWeightDrift": 1.0,
+        "minimumResourceLevel": 0.05,
+        "minimumFormationProbability": 0.5,
+        "minimumRegionSize": 3,
+        "maximumResetAdvantage": 0.05,
+        "minimumNoSupplyAccuracyDrop": 0.1,
+        "minimumFrozenAccuracyDrop": 0.1
+      },
+      "referenceParameterIds": [
+        0,
+        16,
+        20,
+        21,
+        29,
+        45
+      ],
+      "developmentSeedCount": 4,
+      "confirmationSeedCount": 8,
+      "phaseTrialCount": 240,
+      "evaluationTrialCount": 48,
+      "thresholdCheckInterval": 20,
+      "accuracyThreshold": 0.7,
+      "minimumRetainedAccuracy": 0.6,
+      "maximumRetentionDrop": 0.15,
+      "maximumRelativeWeightDrift": 1.0,
+      "minimumMeanResourceLevel": 0.2,
+      "minimumSingleRuleAccuracy": 0.7,
+      "minimumRetentionProbability": 0.5,
+      "minimumCausalAccuracyDrop": 0.05,
+      "maximumResetRetentionAdvantage": 0.05
+    },
+    "probeTrainingTrials": 128,
+    "probeEvaluationTrials": 128,
+    "probeRidge": 0.01,
+    "shuffledLabelRepeats": 16,
+    "behaviorAccuracyThreshold": 0.7,
+    "hiddenProbeAccuracyThreshold": 0.75,
+    "minimumRepresentationGain": 0.05,
+    "minimumTargetCreditGain": 0.05,
+    "minimumReadoutRescueGap": 0.1,
+    "maximumShuffledProbeAccuracy": 0.6
+  },
+  "causalContract": [
+    "M1 rules, carrier parameters, A-trained frozen action readout, 240-trial per-rule budget, and seed partitions are reused exactly",
+    "probe training and evaluation use disjoint deterministic streams and never write state, weights, topology, resources, or readout back to the live controller",
+    "the target-directed clone changes only the credit signal; it uses the same symbols, trials, adjustable recurrent slots, weight bounds, resource mechanism, and homeostasis",
+    "raw-sensor and shuffled-label probes are paired controls; all formal claims are aggregated over parameter-by-seed runs rather than probe trials",
+    "a successful external decoder establishes accessible information only; it is not counted as system-level rule learning"
+  ],
+  "carrierParameters": [
+    {
+      "id": 0,
+      "recurrentGain": 0.275,
+      "internalLearningRate": 0.09333333333333332,
+      "homeostasisStrength": 0.4,
+      "explorationRate": 0.06
+    },
+    {
+      "id": 16,
+      "recurrentGain": 0.28593749999999996,
+      "internalLearningRate": 0.15259259259259259,
+      "homeostasisStrength": 0.64,
+      "explorationRate": 0.1057142857142857
+    },
+    {
+      "id": 20,
+      "recurrentGain": 0.3296875,
+      "internalLearningRate": 0.07851851851851852,
+      "homeostasisStrength": 0.52,
+      "explorationRate": 0.04857142857142857
+    },
+    {
+      "id": 21,
+      "recurrentGain": 0.2421875,
+      "internalLearningRate": 0.11185185185185184,
+      "homeostasisStrength": 0.67,
+      "explorationRate": 0.06857142857142857
+    },
+    {
+      "id": 29,
+      "recurrentGain": 0.2640625,
+      "internalLearningRate": 0.07234567901234568,
+      "homeostasisStrength": 0.28600000000000003,
+      "explorationRate": 0.09142857142857141
+    },
+    {
+      "id": 45,
+      "recurrentGain": 0.25859374999999996,
+      "internalLearningRate": 0.1019753086419753,
+      "homeostasisStrength": 0.526,
+      "explorationRate": 0.13714285714285712
+    }
+  ],
+  "developmentSummaries": [
+    {
+      "rule": "a",
+      "seedRunCount": 24,
+      "rawSensorProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.8029513888888888,
+        "lower95": 0.7558665598339767,
+        "upper95": 0.850036217943801
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.4854939778645833,
+        "lower95": 0.4726357864488916,
+        "upper95": 0.49835216928027504
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.6953125,
+        "lower95": 0.6185726691312963,
+        "upper95": 0.7720523308687037
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.43096923828125,
+        "lower95": 0.4188356039318348,
+        "upper95": 0.4431028726306652
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.30468750000000006,
+        "lower95": 0.22794766913129638,
+        "upper95": 0.38142733086870373
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.704861111111111,
+        "lower95": 0.619269537116262,
+        "upper95": 0.7904526851059601
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.4292195638020833,
+        "lower95": 0.4184366035509238,
+        "upper95": 0.4400025240532428
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": 0.009548611111111105,
+        "lower95": -0.05170036147152254,
+        "upper95": 0.07079758369374475
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.3828362822644566,
+        "lower95": 0.31029867928921684,
+        "upper95": 0.45537388523969635
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.3418822827277772,
+        "lower95": 0.26940970877334003,
+        "upper95": 0.4143548566822144
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "rule": "b",
+      "seedRunCount": 24,
+      "rawSensorProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.3333333333333333,
+        "lower95": 0.29294627933784134,
+        "upper95": 0.3737203873288253
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.4920450846354167,
+        "lower95": 0.45954625582643494,
+        "upper95": 0.5245439134443984
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.5729166666666667,
+        "lower95": 0.5230271954350074,
+        "upper95": 0.6228061378983261
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.5268758138020834,
+        "lower95": 0.5089101095691697,
+        "upper95": 0.544841518034997
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.4270833333333333,
+        "lower95": 0.37719386210167405,
+        "upper95": 0.4769728045649926
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.546875,
+        "lower95": 0.48807826725059605,
+        "upper95": 0.6056717327494039
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.5309855143229166,
+        "lower95": 0.5168416223240875,
+        "upper95": 0.5451294063217458
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.02604166666666667,
+        "lower95": -0.04604734281872729,
+        "upper95": -0.00603599051460605
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.20981278732830058,
+        "lower95": 0.1614216361879771,
+        "upper95": 0.25820393846862405
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.30976564127551987,
+        "lower95": 0.23923274147070664,
+        "upper95": 0.3802985410803331
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "rule": "c",
+      "seedRunCount": 24,
+      "rawSensorProbeAccuracy": {
+        "mean": 0.5,
+        "lower95": 0.5,
+        "upper95": 0.5
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.43836805555555564,
+        "lower95": 0.36335327106324233,
+        "upper95": 0.5133828400478689
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.5079752604166666,
+        "lower95": 0.49746816324590637,
+        "upper95": 0.5184823575874269
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.5538194444444444,
+        "lower95": 0.5240277073973557,
+        "upper95": 0.5836111814915331
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.5044759114583334,
+        "lower95": 0.4876645125578453,
+        "upper95": 0.5212873103588214
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.4461805555555556,
+        "lower95": 0.4163888185084669,
+        "upper95": 0.4759722926026443
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.5052083333333334,
+        "lower95": 0.46435651082842394,
+        "upper95": 0.5460601558382427
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.5038859049479166,
+        "lower95": 0.4907626814439672,
+        "upper95": 0.5170091284518661
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.0486111111111111,
+        "lower95": -0.0991422739369602,
+        "upper95": 0.001920051714738004
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.42866299099453226,
+        "lower95": 0.384495283726342,
+        "upper95": 0.4728306982627225
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.4134868244667129,
+        "lower95": 0.3740555056356999,
+        "upper95": 0.45291814329772595
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "rule": "d",
+      "seedRunCount": 24,
+      "rawSensorProbeAccuracy": {
+        "mean": 0.5,
+        "lower95": 0.5,
+        "upper95": 0.5
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.5546874999999999,
+        "lower95": 0.47269553577598095,
+        "upper95": 0.6366794642240188
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 0.9996744791666666,
+        "lower95": 0.9990364583333333,
+        "upper95": 1.0003125
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.5164388020833334,
+        "lower95": 0.5055895417213341,
+        "upper95": 0.5272880624453327
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.5694444444444443,
+        "lower95": 0.5168052926599556,
+        "upper95": 0.6220835962289331
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.5261433919270834,
+        "lower95": 0.5115763487578646,
+        "upper95": 0.5407104350963021
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0003255208333333333,
+        "lower95": -0.00031250000000000033,
+        "upper95": 0.000963541666666667
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.4305555555555556,
+        "lower95": 0.37791640377106683,
+        "upper95": 0.4831947073400443
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.5355902777777778,
+        "lower95": 0.5123403687274157,
+        "upper95": 0.5588401868281399
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.5181070963541666,
+        "lower95": 0.5017661366299574,
+        "upper95": 0.5344480560783759
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.033854166666666664,
+        "lower95": -0.09798605880012198,
+        "upper95": 0.03027772546678866
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0003255208333333333,
+        "lower95": -0.00031250000000000033,
+        "upper95": 0.000963541666666667
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.4464236096581764,
+        "lower95": 0.3719498672198258,
+        "upper95": 0.520897352096527
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.48305335496307156,
+        "lower95": 0.427508634393466,
+        "upper95": 0.5385980755326771
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "developmentNovelSummary": {
+    "seedRunCount": 24,
+    "rawSensorProbeAccuracy": {
+      "mean": 0.6666666666666664,
+      "lower95": 0.6666666666666663,
+      "upper95": 0.6666666666666665
+    },
+    "preBehaviorAccuracy": {
+      "mean": 0.44212962962962954,
+      "lower95": 0.42842840485166556,
+      "upper95": 0.4558308544075935
+    },
+    "preHiddenProbeAccuracy": {
+      "mean": 0.9998914930555557,
+      "lower95": 0.9996788194444446,
+      "upper95": 1.0001041666666668
+    },
+    "preShuffledProbeAccuracy": {
+      "mean": 0.5054863823784722,
+      "lower95": 0.49271909786764356,
+      "upper95": 0.5182536668893009
+    },
+    "rewardLocalBehaviorAccuracy": {
+      "mean": 0.5653935185185185,
+      "lower95": 0.5365558539510072,
+      "upper95": 0.5942311830860297
+    },
+    "rewardLocalHiddenProbeAccuracy": {
+      "mean": 1.0,
+      "lower95": 1.0,
+      "upper95": 1.0
+    },
+    "rewardLocalShuffledProbeAccuracy": {
+      "mean": 0.5191650390625,
+      "lower95": 0.5077693273505,
+      "upper95": 0.5305607507745
+    },
+    "rewardLocalProbeGainOverPre": {
+      "mean": 0.00010850694444444444,
+      "lower95": -0.00010416666666666666,
+      "upper95": 0.00032118055555555556
+    },
+    "rewardLocalReadoutRescueGap": {
+      "mean": 0.43460648148148145,
+      "lower95": 0.40576881691397015,
+      "upper95": 0.46344414604899276
+    },
+    "targetDirectedBehaviorAccuracy": {
+      "mean": 0.529224537037037,
+      "lower95": 0.5022502791068639,
+      "upper95": 0.55619879496721
+    },
+    "targetDirectedHiddenProbeAccuracy": {
+      "mean": 1.0,
+      "lower95": 1.0,
+      "upper95": 1.0
+    },
+    "targetDirectedShuffledProbeAccuracy": {
+      "mean": 0.5176595052083334,
+      "lower95": 0.5059700192526487,
+      "upper95": 0.529348991164018
+    },
+    "targetDirectedBehaviorGain": {
+      "mean": -0.03616898148148148,
+      "lower95": -0.05961534344696215,
+      "upper95": -0.012722619516000813
+    },
+    "targetDirectedProbeGainOverPre": {
+      "mean": 0.00010850694444444444,
+      "lower95": -0.00010416666666666666,
+      "upper95": 0.00032118055555555556
+    }
+  },
+  "confirmationSummaries": [
+    {
+      "rule": "a",
+      "seedRunCount": 48,
+      "rawSensorProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.8411458333333334,
+        "lower95": 0.8049644457840814,
+        "upper95": 0.8773272208825853
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 0.9990234375,
+        "lower95": 0.9982847577292108,
+        "upper95": 0.9997621172707892
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.4994099934895833,
+        "lower95": 0.48526678915830534,
+        "upper95": 0.5135531978208613
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.8576388888888888,
+        "lower95": 0.811209957773297,
+        "upper95": 0.9040678200044807
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.5261027018229166,
+        "lower95": 0.5115119409436382,
+        "upper95": 0.5406934627021951
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0009765625,
+        "lower95": 0.00023788272921074173,
+        "upper95": 0.0017152422707892583
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.1423611111111111,
+        "lower95": 0.09593217999551917,
+        "upper95": 0.18879004222670304
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.8524305555555555,
+        "lower95": 0.8021278871627916,
+        "upper95": 0.9027332239483193
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.52874755859375,
+        "lower95": 0.5119933162812417,
+        "upper95": 0.5455018009062583
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.00520833333333334,
+        "lower95": -0.014265800652816133,
+        "upper95": 0.0038491339861494523
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0009765625,
+        "lower95": 0.00023788272921074173,
+        "upper95": 0.0017152422707892583
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.14427134916942136,
+        "lower95": 0.106464785956349,
+        "upper95": 0.1820779123824937
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.18461458288327526,
+        "lower95": 0.1317977311566533,
+        "upper95": 0.2374314346098972
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "rule": "b",
+      "seedRunCount": 48,
+      "rawSensorProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.35894097222222215,
+        "lower95": 0.32541853985275193,
+        "upper95": 0.3924634045916924
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 0.9996744791666666,
+        "lower95": 0.9992281555690847,
+        "upper95": 1.0001208027642485
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.48028564453125,
+        "lower95": 0.4663819294354389,
+        "upper95": 0.4941893596270611
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.5299479166666666,
+        "lower95": 0.4994824603728095,
+        "upper95": 0.5604133729605237
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.511016845703125,
+        "lower95": 0.4853191137740723,
+        "upper95": 0.5367145776321777
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0003255208333333333,
+        "lower95": -0.00012080276424861848,
+        "upper95": 0.000771844430915285
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.47005208333333326,
+        "lower95": 0.43958662703947615,
+        "upper95": 0.5005175396271904
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.5282118055555556,
+        "lower95": 0.5057117304530283,
+        "upper95": 0.5507118806580829
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.5023193359375,
+        "lower95": 0.47643214122037864,
+        "upper95": 0.5282065306546213
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.001736111111111105,
+        "lower95": -0.012934190707026613,
+        "upper95": 0.009461968484804403
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0003255208333333333,
+        "lower95": -0.00012080276424861848,
+        "upper95": 0.000771844430915285
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.376028968093492,
+        "lower95": 0.3200143477153671,
+        "upper95": 0.43204358847161695
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.34966587259425075,
+        "lower95": 0.2933569745213651,
+        "upper95": 0.4059747706671364
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "rule": "c",
+      "seedRunCount": 48,
+      "rawSensorProbeAccuracy": {
+        "mean": 0.5,
+        "lower95": 0.5,
+        "upper95": 0.5
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.36762152777777785,
+        "lower95": 0.33758156341012924,
+        "upper95": 0.39766149214542645
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 0.9991861979166666,
+        "lower95": 0.998503898240236,
+        "upper95": 0.9998684975930973
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.4931233723958333,
+        "lower95": 0.48219098779344705,
+        "upper95": 0.5040557569982196
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.5477430555555555,
+        "lower95": 0.5248693590272993,
+        "upper95": 0.5706167520838117
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.5020345052083334,
+        "lower95": 0.48579798816755215,
+        "upper95": 0.5182710222491146
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0008138020833333334,
+        "lower95": 0.00013150240690269419,
+        "upper95": 0.0014961017597639726
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.4522569444444445,
+        "lower95": 0.4293832479161883,
+        "upper95": 0.47513064097270064
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.5316840277777778,
+        "lower95": 0.5149700731869867,
+        "upper95": 0.5483979823685688
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.50128173828125,
+        "lower95": 0.4846141554500056,
+        "upper95": 0.5179493211124945
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.01605902777777778,
+        "lower95": -0.032739784963918286,
+        "upper95": 0.0006217294083627235
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0008138020833333334,
+        "lower95": 0.00013150240690269419,
+        "upper95": 0.0014961017597639726
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.489188254236532,
+        "lower95": 0.4583987184639262,
+        "upper95": 0.5199777900091378
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.534218978132697,
+        "lower95": 0.4986271052460586,
+        "upper95": 0.5698108510193355
+      },
+      "finiteFraction": 1.0
+    },
+    {
+      "rule": "d",
+      "seedRunCount": 48,
+      "rawSensorProbeAccuracy": {
+        "mean": 0.5,
+        "lower95": 0.5,
+        "upper95": 0.5
+      },
+      "preBehaviorAccuracy": {
+        "mean": 0.6276041666666666,
+        "lower95": 0.5991009730124814,
+        "upper95": 0.6561073603208518
+      },
+      "preHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "preShuffledProbeAccuracy": {
+        "mean": 0.4965413411458333,
+        "lower95": 0.4792249650773497,
+        "upper95": 0.513857717214317
+      },
+      "rewardLocalBehaviorAccuracy": {
+        "mean": 0.5824652777777777,
+        "lower95": 0.5539016456292003,
+        "upper95": 0.6110289099263551
+      },
+      "rewardLocalHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "rewardLocalShuffledProbeAccuracy": {
+        "mean": 0.5323994954427084,
+        "lower95": 0.5165771833915825,
+        "upper95": 0.5482218074938342
+      },
+      "rewardLocalProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalReadoutRescueGap": {
+        "mean": 0.41753472222222227,
+        "lower95": 0.38897109007364494,
+        "upper95": 0.4460983543707996
+      },
+      "targetDirectedBehaviorAccuracy": {
+        "mean": 0.5368923611111112,
+        "lower95": 0.5165395208784693,
+        "upper95": 0.557245201343753
+      },
+      "targetDirectedHiddenProbeAccuracy": {
+        "mean": 1.0,
+        "lower95": 1.0,
+        "upper95": 1.0
+      },
+      "targetDirectedShuffledProbeAccuracy": {
+        "mean": 0.5285441080729166,
+        "lower95": 0.5123502142192007,
+        "upper95": 0.5447380019266326
+      },
+      "targetDirectedBehaviorGain": {
+        "mean": -0.04557291666666668,
+        "lower95": -0.07381644107069046,
+        "upper95": -0.017329392262642886
+      },
+      "targetDirectedProbeGainOverPre": {
+        "mean": 0.0,
+        "lower95": 0.0,
+        "upper95": 0.0
+      },
+      "rewardLocalRelativeWeightDrift": {
+        "mean": 0.5149627353143755,
+        "lower95": 0.47320645038174813,
+        "upper95": 0.5567190202470029
+      },
+      "targetDirectedRelativeWeightDrift": {
+        "mean": 0.6148264733119774,
+        "lower95": 0.5749770948749596,
+        "upper95": 0.6546758517489951
+      },
+      "finiteFraction": 1.0
+    }
+  ],
+  "confirmationNovelSummary": {
+    "seedRunCount": 48,
+    "rawSensorProbeAccuracy": {
+      "mean": 0.6666666666666671,
+      "lower95": 0.666666666666667,
+      "upper95": 0.6666666666666672
+    },
+    "preBehaviorAccuracy": {
+      "mean": 0.4513888888888888,
+      "lower95": 0.44002700615890294,
+      "upper95": 0.4627507716188746
+    },
+    "preHiddenProbeAccuracy": {
+      "mean": 0.9996202256944446,
+      "lower95": 0.9993574557864423,
+      "upper95": 0.999882995602447
+    },
+    "preShuffledProbeAccuracy": {
+      "mean": 0.4899834526909721,
+      "lower95": 0.48391004698103013,
+      "upper95": 0.49605685840091407
+    },
+    "rewardLocalBehaviorAccuracy": {
+      "mean": 0.5533854166666667,
+      "lower95": 0.5301430000321933,
+      "upper95": 0.5766278333011402
+    },
+    "rewardLocalHiddenProbeAccuracy": {
+      "mean": 1.0,
+      "lower95": 1.0,
+      "upper95": 1.0
+    },
+    "rewardLocalShuffledProbeAccuracy": {
+      "mean": 0.5151502821180556,
+      "lower95": 0.501373435000506,
+      "upper95": 0.5289271292356051
+    },
+    "rewardLocalProbeGainOverPre": {
+      "mean": 0.0003797743055555555,
+      "lower95": 0.00011700439755321987,
+      "upper95": 0.0006425442135578911
+    },
+    "rewardLocalReadoutRescueGap": {
+      "mean": 0.4466145833333332,
+      "lower95": 0.4233721666988598,
+      "upper95": 0.4698569999678066
+    },
+    "targetDirectedBehaviorAccuracy": {
+      "mean": 0.5322627314814815,
+      "lower95": 0.5181045958643359,
+      "upper95": 0.5464208670986271
+    },
+    "targetDirectedHiddenProbeAccuracy": {
+      "mean": 1.0,
+      "lower95": 1.0,
+      "upper95": 1.0
+    },
+    "targetDirectedShuffledProbeAccuracy": {
+      "mean": 0.510715060763889,
+      "lower95": 0.49698367889359546,
+      "upper95": 0.5244464426341824
+    },
+    "targetDirectedBehaviorGain": {
+      "mean": -0.02112268518518518,
+      "lower95": -0.03444695769651628,
+      "upper95": -0.007798412673854074
+    },
+    "targetDirectedProbeGainOverPre": {
+      "mean": 0.0003797743055555555,
+      "lower95": 0.00011700439755321987,
+      "upper95": 0.0006425442135578911
+    }
+  },
+  "decision": "latent-symbol-code-without-rule-formation",
+  "acceptance": {
+    "m1TaskAndCarrierFrozen": true,
+    "diagnosticIsOfflineOnly": true,
+    "developmentAndConfirmationSeedsDisjoint": true,
+    "developmentRunsComplete": true,
+    "confirmationRunsComplete": true,
+    "allFourRulesComplete": true,
+    "probeTrainAndEvaluationStreamsDisjoint": true,
+    "rawSensorLinearityControlValid": true,
+    "shuffledLabelControlsValid": true,
+    "mainStreamUnchanged": true,
+    "actionReadoutRemainedFrozen": true,
+    "topologyAndConnectionBudgetPreserved": true,
+    "targetCreditUsesMatchedTrialsAndVariables": true,
+    "finiteOutputs": true,
+    "latentNovelCodeAccessible": true,
+    "rewardLocalRepresentationFormed": false,
+    "alternativeReadoutRescuesNovelRules": true,
+    "targetDirectedCreditRescuesNovelRules": false,
+    "stagePassed": true,
+    "passed": true
+  },
+  "conclusions": [
+    "B/C/D 奖励局部调整的正式行为为 55.3%，训练前隐藏探针为 100.0%，训练后隐藏探针为 100.0%。",
+    "奖励局部调整带来的隐藏探针增益为 +0.04 pp [+0.01, +0.06]，外部读出相对固定读出的救援差为 +44.66 pp。",
+    "目标定向信用的正式行为为 53.2%，相对奖励局部调整的配对增益为 -2.11 pp [-3.44, -0.78]。",
+    "原始两位输入探针为 66.7%，随机标签隐藏探针为 51.5%；M1-R 正式决策为 LatentSymbolCodeWithoutRuleFormation。",
+    "外部探针利用的是训练前已存在的潜在符号码，奖励调整没有形成足够的规则相关几何变化；不能把探针救援算作学习成功。"
+  ]
+}

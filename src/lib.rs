@@ -19,6 +19,7 @@ pub mod mechanism_m1;
 pub mod mechanism_m2c;
 pub mod metrics;
 pub mod network;
+pub mod representation_capacity;
 pub mod structural_diagnostic;
 pub mod structural_group;
 pub mod structural_timescale;
@@ -126,6 +127,12 @@ pub use network::{
     NetworkDefinition, NetworkError, NetworkRun, NetworkSpike, NeuronPolarity, NeuronSpec,
     Position3, PropagationSpec, SimulationLimits, SpikeId, SynapseId, SynapseSpec,
     simulate_network, simulate_network_with_limits,
+};
+pub use representation_capacity::{
+    RepresentationCapacityAcceptanceReport, RepresentationCapacityConfig,
+    RepresentationCapacityDecision, RepresentationCapacityPublishedResult,
+    RepresentationCapacityResult, RepresentationCapacitySeedResult, RepresentationNovelSummary,
+    RepresentationRuleResult, RepresentationRuleSummary, run_representation_capacity_diagnostic,
 };
 pub use structural_diagnostic::{
     StructuralCandidateCounterfactual, StructuralCheckpointDiagnostic,

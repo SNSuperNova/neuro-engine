@@ -115,6 +115,19 @@ sense [12] ─► shared fixed projection [288]
 
 `examples/gate_e_lab.rs` 输出 `app/public/gate-e-v1.5.json`。确定性结果保存行为、样本效率、活动、事件计数、概念状态内存、25% 损伤和代表轨迹；平台墙钟时间单独保存，避免破坏科学报告的精确重现。
 
+`gate_f.rs` 实现 `reversal-cue-fork/v1`。原规则预训练只修改 48 个内部状态到左右分支的动作权重，之后将动作读出逐位冻结。四个分支从同一控制器克隆，只改变内部可塑边界：关闭全部内部更新、开放 48 个线索感觉投影、开放 48 个结构化循环入边，或开放相同循环入边但关闭逐单元 L2 归一化。
+
+```text
+cue [left/right] ─► state [24] ─► frozen branch readout [48]
+        │                 ▲
+        ├─ sensory eligibility [48]      (one condition only)
+        └─ recurrent eligibility [48]    (one condition only)
+                         │
+reward × frozen action feedback ─────────┘
+```
+
+每个回合的资格量只累积突触前活动与突触后局部敏感度，结果奖励和冻结动作反馈作为第三因子。适应阶段使用共享的 16% 动作探索，评估关闭探索。`examples/gate_f_lab.rs` 输出检查点曲线、逐种子配对指标、读出与模型摘要、权重漂移及代表内部轨迹到 `app/public/gate-f-v1.6.json`。
+
 ## 5. Web 与桌面
 
 `app/` 使用原生 TypeScript、DOM 和 Canvas 2D，不再依赖 Three.js。主界面展示：
@@ -129,6 +142,7 @@ sense [12] ─► shared fixed projection [288]
 - Gate C 的资格迹 × 能量延迟矩阵、因果效应与能量到账时间轨迹。
 - Gate D 的三控制器记忆边界、等权重因果比较和状态稳定性指标。
 - Gate E 的连续/LIF 记忆边界、脉冲轨迹、损伤结果和成本对照。
+- Gate F 的规则反转/恢复曲线、冻结读出证据、内部轨迹和权重范数漂移。
 
 Tauri 只是同一 Web 应用的桌面壳。核心 crate 不依赖浏览器、Tauri 或 UI 类型。
 

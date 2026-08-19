@@ -32,6 +32,8 @@ Gate D 加入 144 条固定稀疏跨单元连接。在 8 步无信息延迟中�
 
 Gate E 把事件式 LIF 接入同一延迟线索闭环。在连续泄漏与脉冲迹衰减同为 0.86、动态状态和可训练连接预算匹配时，延迟 8 的 LIF 达到 `88.5% [85.3%, 91.6%]`，连续状态为 `67.3% [60.5%, 74.1%]`，配对增益 `21.2 [13.6, 28.7]` 个百分点；可靠记忆边界分别为 12 和 4 步。代价同样公开：LIF 当前 CPU 实现慢约 6.3 倍，概念状态预算相同但实现动态状态为 2,496 B（连续状态 384 B），25% 损伤下降也更大，因此仍是实验分支而非默认控制器。
 
+Gate F 冻结动作读出后反转线索—目标规则。冻结内部网络保持 `0.0%`，感觉投影可塑性在 800 回合后达到 `100.0%`，局部循环可塑性达到 `91.3% [79.0%, 103.6%]`，并都能在规则恢复后重新达到 100%。关闭内稳态的循环控制行为相近，但开放权重组范数漂移约 658%。因此内部突触变化可以承担这个受控任务的持续适应，而归一化目前只证明能控制参数尺度；该结果仍依赖二元规则、强制探索和预对齐通路。
+
 ## 运行
 
 ```powershell
@@ -43,6 +45,7 @@ cargo run --release --example gate_b_robustness_lab
 cargo run --release --example gate_c_lab
 cargo run --release --example gate_d_lab
 cargo run --release --example gate_e_lab
+cargo run --release --example gate_f_lab
 npm install
 npm run dev
 ```
@@ -63,6 +66,7 @@ src/gate_b.rs               延迟线索环境、等预算控制器和配对统�
 src/gate_c.rs               延迟能量环境、资格迹矩阵和因果对照
 src/gate_d.rs               稀疏循环动力学、置乱控制和稳定性审计
 src/gate_e.rs               连续状态与 LIF 的等预算行为、损伤和成本比较
+src/gate_f.rs               冻结读出后的内部可塑性、规则反转与内稳态对照
 examples/embodied_lab.rs    生成版本化实验数据
 tests/embodied.rs           确定性、闭环、可塑性和行为验收
 app/                        具身行为仪表盘
@@ -83,6 +87,7 @@ experiments/                版本化结果与失败记录
 - [GATE_C.md](GATE_C.md)：已完成的资格迹 × 延迟能量冻结规格；
 - [GATE_D.md](GATE_D.md)：已完成的稀疏内部循环、等权重置乱与稳定性冻结规格；
 - [GATE_E.md](GATE_E.md)：已完成的连续状态与 LIF 脉冲状态等预算冻结规格；
+- [GATE_F.md](GATE_F.md)：已完成的内部可塑性、规则反转与内稳态冻结规格；
 - [experiments/embodied-v1.md](experiments/embodied-v1.md)：正式结果、对照和限制；
 - [experiments/gate-a-v1.1.md](experiments/gate-a-v1.1.md)：奖励塑形与方向感觉的多种子审计；
 - [experiments/gate-b-v1.2.md](experiments/gate-b-v1.2.md)：连续状态必要性的多种子配对实验；
@@ -90,6 +95,7 @@ experiments/                版本化结果与失败记录
 - [experiments/gate-c-v1.3.md](experiments/gate-c-v1.3.md)：资格迹解决受控延迟信用分配的 4×4 实验；
 - [experiments/gate-d-v1.4.md](experiments/gate-d-v1.4.md)：结构化循环延长可靠记忆的多种子实验；
 - [experiments/gate-e-v1.5.md](experiments/gate-e-v1.5.md)：LIF 的记忆收益、CPU 代价和损伤边界；
+- [experiments/gate-f-v1.6.md](experiments/gate-f-v1.6.md)：冻结动作读出后的规则反转、恢复和权重稳定性；
 - [experiments/phase2-v1.md](experiments/phase2-v1.md)：被否定的随机网络分类路线，作为负结果保留。
 
 ## 原则

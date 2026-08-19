@@ -29,9 +29,9 @@
 
 v1 不宣称模拟真实生命、意识或完整生物神经元。它只建立第一个可以从外部行为直接验证的感知—学习—动作闭环。
 
-当前学习算法的公式、与 Reservoir Computing/策略梯度/三因素规则的关系，以及尚未证明的能力，集中记录在 [LEARNING.md](LEARNING.md)。下一阶段不会默认增加规模，而会依照 [ROADMAP.md](ROADMAP.md) 比较连续与脉冲状态的功能和成本。
+当前学习算法的公式、与 Reservoir Computing/策略梯度/三因素规则的关系，以及尚未证明的能力，集中记录在 [LEARNING.md](LEARNING.md)。下一阶段不会默认增加规模，而会依照 [ROADMAP.md](ROADMAP.md) 检验规则保留与迁移边界。
 
-Gate A 已完成奖励与感觉辅助审计；Gate B 已完成状态必要性与鲁棒性边界；Gate C 已证明资格迹在受控延迟能量任务中的功能；Gate D 证明结构化固定稀疏循环可以延长可靠记忆；Gate E 又完成了连续状态与 LIF 脉冲状态的等预算比较。LIF 在冻结任务上延长记忆，但当前 CPU 更慢、状态内存不更小、损伤下降更大，结果见 [experiments/gate-e-v1.5.md](experiments/gate-e-v1.5.md)。下一阶段只进入 Gate F 的内部可塑性与环境变化。
+Gate A 已完成奖励与感觉辅助审计；Gate B 已完成状态必要性与鲁棒性边界；Gate C 已证明资格迹在受控延迟能量任务中的功能；Gate D 证明结构化固定稀疏循环可以延长可靠记忆；Gate E 完成了连续状态与 LIF 脉冲状态的等预算比较；Gate F 又证明，在动作读出冻结后，感觉或循环内部突触变化可以适应二元规则反转并在规则恢复后重新学习。Gate F 的结论依赖强制探索和预对齐通路，结果见 [experiments/gate-f-v1.6.md](experiments/gate-f-v1.6.md)。
 
 ## 验收标准
 

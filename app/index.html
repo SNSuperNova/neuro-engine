@@ -8,7 +8,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate E</small></div></div>
+    <div class="brand"><span class="brand-mark"></span><div><strong>Neuro Engine</strong><small>Embodied Learning Lab · Gate F</small></div></div>
     <div class="status"><span id="acceptance-dot"></span><strong id="acceptance-label">载入实验</strong><span id="version"></span></div>
   </header>
 
@@ -170,6 +170,29 @@
           <p id="gate-e-trace-note"></p>
           <h3>25% 单元损伤</h3>
           <div id="gate-e-damage" class="damage-list"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="gate-f card">
+      <div class="section-head"><div><span class="eyebrow">GATE F · INTERNAL PLASTICITY</span><h2>规则反转与持续适应</h2></div><span id="gate-f-protocol"></span></div>
+      <p class="audit-intro">动作读出在环境改变前冻结。曲线只比较内部连接是否能重新组织行为；16% 探索不携带目标信息，内稳态结果与行为结果分开解释。</p>
+      <div id="gate-f-acceptance" class="acceptance-grid gate-f-acceptance"></div>
+      <div class="gate-f-layout">
+        <div>
+          <canvas id="gate-f-curve" aria-label="Gate F 四种控制器在规则反转与恢复阶段的准确率"></canvas>
+          <div id="gate-f-comparison" class="gate-b-comparison gate-f-comparison"></div>
+          <div id="gate-f-effects" class="gate-b-effects gate-f-effects"></div>
+        </div>
+        <aside class="plasticity-observer">
+          <label>内部状态轨迹 <select id="gate-f-trace-select"></select></label>
+          <div class="dynamics-readout"><span id="gate-f-phase">—</span><strong id="gate-f-cue">—</strong></div>
+          <div id="gate-f-neurons" class="hidden-grid gate-f-neurons"></div>
+          <input id="gate-f-range" type="range" min="0" max="1" value="0" aria-label="Gate F 时间轨迹">
+          <p id="gate-f-trace-note"></p>
+          <h3>开放权重组范数漂移</h3>
+          <div id="gate-f-stability" class="stability-list gate-f-stability"></div>
+          <small class="observer-note">归一化控制保持 0%；无内稳态循环在反转后漂移约 658%。</small>
         </aside>
       </div>
     </section>

@@ -74,6 +74,12 @@ interface GateEFrame { step: number; visibleCue: ForkSide | null; delayStepsRema
 interface GateETrace { label: string; delaySteps: number; controller: GateEController; target: ForkSide; frames: GateEFrame[]; correctChoice: boolean; foodEaten: boolean; finalEnergy: number }
 interface GateEDataset { version: string; config: { modelSeedCount: number; evaluationEpisodes: number; memoryDelays: number[]; damageFraction: number; lifMembraneTimeConstantMs: number; lifSpikeTraceDecay: number; controller: { hiddenLeak: number } }; controllerBudgets: { controller: GateEController; conceptualStateBytes: number; implementationDynamicStateBytes: number; trainableActionWeightCount: number }[]; reports: GateEReport[]; pairedEffects: { id: string; effect: { correctChoiceFraction: Interval } }[]; reliableMemoryBoundarySteps: [GateEController, number | null][]; aggregateCosts: [GateEController, { environmentSteps: number; inputEvents: number; emittedSpikes: number; denseInputMultiplyAccumulates: number; denseReadoutMultiplyAccumulates: number }][]; traces: GateETrace[]; acceptance: Record<string, boolean> & { passed: boolean } }
 interface GateERuntime { controller: GateEController; repetitions: number; environmentSteps: number; elapsedSeconds: number; nanosecondsPerEnvironmentStep: number }
+type GateFController = "fixed-internal" | "plastic-sensory" | "plastic-recurrent" | "plastic-recurrent-no-homeostasis";
+type GateFPhase = "before-change" | "reversal" | "restoration";
+interface GateFReport { controller: GateFController; phase: GateFPhase; rule: "original" | "reversed"; checkpointEpisode: number; metrics: { accuracy: Interval; leftTargetAccuracy: Interval; rightTargetAccuracy: Interval; rightChoiceFraction: Interval }; weights: { rmsChange: Interval; maximumAbsoluteWeight: Interval; finiteWeightFraction: Interval; meanRelativeGroupNormDrift: Interval }; modelSeedCount: number }
+interface GateFTraceFrame { step: number; cueVisible: boolean; cueRight: boolean; hiddenActivity: number[] }
+interface GateFTrace { label: string; controller: GateFController; phase: GateFPhase; rule: "original" | "reversed"; cueRight: boolean; targetRight: boolean; chosenRight: boolean; reward: number; actionProbabilities: number[]; frames: GateFTraceFrame[] }
+interface GateFDataset { version: string; task: string; config: { modelSeedCount: number; pretrainingEpisodes: number; adaptationEpisodes: number; evaluationEpisodes: number; checkpoints: number[]; adaptationExploration: number }; reports: GateFReport[]; pairedEffects: { id: string; effect: { accuracy: Interval } }[]; adaptation: { controller: GateFController; reversalEpisodesTo75Percent: number | null; restorationEpisodesTo75Percent: number | null }[]; traces: GateFTrace[]; acceptance: Record<string, boolean> & { passed: boolean } }
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -99,6 +105,9 @@ const gateEBoundaryCanvas = byId<HTMLCanvasElement>("gate-e-boundary");
 const gateERasterCanvas = byId<HTMLCanvasElement>("gate-e-raster");
 const gateETraceSelect = byId<HTMLSelectElement>("gate-e-trace-select");
 const gateERange = byId<HTMLInputElement>("gate-e-range");
+const gateFCurveCanvas = byId<HTMLCanvasElement>("gate-f-curve");
+const gateFTraceSelect = byId<HTMLSelectElement>("gate-f-trace-select");
+const gateFRange = byId<HTMLInputElement>("gate-f-range");
 const traceSelect = byId<HTMLSelectElement>("trace-select");
 const timeline = byId<HTMLInputElement>("timeline");
 const play = byId<HTMLButtonElement>("play");
@@ -120,6 +129,9 @@ let gateE: GateEDataset;
 let gateERuntime: GateERuntime[];
 let gateETrace: GateETrace;
 let gateEFrameIndex = 0;
+let gateF: GateFDataset;
+let gateFTrace: GateFTrace;
+let gateFFrameIndex = 0;
 let gateBTrace: GateBTrace;
 let gateBFrameIndex = 0;
 let gateBPlaying = false;
@@ -138,6 +150,8 @@ const labels: Record<string, string> = {
   "delayed-cue": "延迟线索", "cue-visible-at-fork": "岔路可见", "cue-randomized": "随机线索", "history-shuffled": "历史置乱",
   "no-recurrence": "无循环", "shuffled-recurrence": "置乱循环", "structured-recurrence": "结构化循环",
   "continuous-state": "连续状态", "lif-spiking": "LIF 脉冲",
+  "fixed-internal": "冻结内部", "plastic-sensory": "感觉可塑", "plastic-recurrent": "循环可塑", "plastic-recurrent-no-homeostasis": "循环可塑 · 无内稳态",
+  "before-change": "变化前", reversal: "规则反转", restoration: "恢复原规则",
 };
 
 const fitCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContext2D => {
@@ -482,6 +496,36 @@ const renderGateE = () => {
   gateETraceSelect.replaceChildren(...gateE.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=labels[trace.controller];if(trace.controller==="lif-spiking")option.selected=true;return option;}));selectGateETrace();drawGateEBoundary();
 };
 
+const drawGateFCurve = () => {
+  const ctx=fitCanvas(gateFCurveCanvas),rect=gateFCurveCanvas.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);
+  const pad={l:46,r:18,t:32,b:42},w=rect.width-pad.l-pad.r,h=rect.height-pad.t-pad.b;
+  const points=[...gateF.config.checkpoints.map(episode=>({phase:"reversal" as GateFPhase,episode})),...gateF.config.checkpoints.map(episode=>({phase:"restoration" as GateFPhase,episode}))];
+  const xOf=(index:number)=>pad.l+index/Math.max(1,points.length-1)*w,yOf=(value:number)=>pad.t+h-Math.max(0,Math.min(1,value))*h;
+  ctx.fillStyle="#fff7e9";ctx.fillRect(pad.l,pad.t,xOf(4)-pad.l+10,h);ctx.fillStyle="#eef8f2";ctx.fillRect(xOf(5)-10,pad.t,pad.l+w-(xOf(5)-10),h);
+  ctx.font="10px system-ui";ctx.textAlign="right";for(let i=0;i<=4;i++){const value=i/4,y=yOf(value);ctx.strokeStyle="#d9e3dc";ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();ctx.fillStyle="#718078";ctx.fillText(`${value*100}%`,pad.l-7,y+3);}
+  ctx.setLineDash([5,4]);ctx.strokeStyle="#a38a47";ctx.beginPath();ctx.moveTo(pad.l,yOf(.75));ctx.lineTo(pad.l+w,yOf(.75));ctx.stroke();ctx.setLineDash([]);
+  const colors:Record<GateFController,string>={"fixed-internal":"#87938d","plastic-sensory":"#268b65","plastic-recurrent":"#397da0","plastic-recurrent-no-homeostasis":"#d07b32"};
+  for(const controller of Object.keys(colors) as GateFController[]){ctx.strokeStyle=colors[controller];ctx.lineWidth=2.4;ctx.beginPath();points.forEach((point,index)=>{const report=gateF.reports.find(item=>item.controller===controller&&item.phase===point.phase&&item.checkpointEpisode===point.episode)!;const x=xOf(index),y=yOf(report.metrics.accuracy.mean);index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();points.forEach((point,index)=>{const report=gateF.reports.find(item=>item.controller===controller&&item.phase===point.phase&&item.checkpointEpisode===point.episode)!;ctx.fillStyle=colors[controller];ctx.beginPath();ctx.arc(xOf(index),yOf(report.metrics.accuracy.mean),3.5,0,Math.PI*2);ctx.fill();});}
+  ctx.fillStyle="#61736a";ctx.textAlign="center";points.forEach((point,index)=>ctx.fillText(String(point.episode),xOf(index),pad.t+h+17));ctx.font="600 10px system-ui";ctx.fillText("规则反转",(xOf(0)+xOf(4))/2,15);ctx.fillText("恢复原规则",(xOf(5)+xOf(9))/2,15);
+};
+
+const renderGateFFrame = () => {
+  const frame=gateFTrace.frames[gateFFrameIndex];gateFRange.value=String(gateFFrameIndex);
+  byId("gate-f-phase").textContent=labels[gateFTrace.phase];byId("gate-f-cue").textContent=frame.cueVisible?`线索 ${frame.cueRight?"右":"左"}`:"线索关闭";
+  const neurons=byId("gate-f-neurons");neurons.replaceChildren();frame.hiddenActivity.forEach((value,index)=>{const cell=document.createElement("i");cell.title=`H${index}: ${value.toFixed(3)}`;cell.style.setProperty("--activity",String(Math.min(1,Math.abs(value))));cell.className=value>=0?"excited":"inhibited";neurons.append(cell);});
+  const selected=gateFTrace.chosenRight?"右":"左",target=gateFTrace.targetRight?"右":"左";byId("gate-f-trace-note").textContent=`${labels[gateFTrace.controller]} · 目标 ${target} · 选择 ${selected} · 奖励 ${gateFTrace.reward>0?"+1":"−1"} · 右侧概率 ${(gateFTrace.actionProbabilities[1]*100).toFixed(1)}%`;
+};
+const selectGateFTrace = () => {gateFTrace=gateF.traces.find(trace=>trace.label===gateFTraceSelect.value)??gateF.traces[0];gateFFrameIndex=0;gateFRange.max=String(gateFTrace.frames.length-1);renderGateFFrame();};
+
+const renderGateF = () => {
+  byId("gate-f-protocol").textContent=`${gateF.config.modelSeedCount} 模型种子 · ${gateF.config.adaptationEpisodes} 回合/阶段 · ${(gateF.config.adaptationExploration*100).toFixed(0)}% 探索`;
+  const acceptanceLabels:Record<string,string>={matchedStartAndPlasticBudgets:"相同起点与48槽位",originalRuleLearned:"原规则已学习",sensoryPlasticityAdapts:"感觉可塑性适应",recurrentPlasticityAdapts:"循环可塑性适应",restoredRuleRelearned:"规则恢复后重学",readoutFrozenAndStatesFinite:"读出冻结且状态有限",homeostasisControlComplete:"内稳态关闭对照完整",deterministic:"完全确定性"};const acceptance=byId("gate-f-acceptance");acceptance.replaceChildren();for(const [key,label] of Object.entries(acceptanceLabels)){const pass=gateF.acceptance[key];const item=document.createElement("div");item.className=pass?"pass":"fail";item.innerHTML=`<i>${pass?"✓":"×"}</i><span>${label}</span>`;acceptance.append(item);}
+  const finalCards=byId("gate-f-comparison");finalCards.replaceChildren(...(["fixed-internal","plastic-sensory","plastic-recurrent","plastic-recurrent-no-homeostasis"] as GateFController[]).map(controller=>{const report=gateF.reports.find(item=>item.phase==="reversal"&&item.checkpointEpisode===gateF.config.adaptationEpisodes&&item.controller===controller)!;const timing=gateF.adaptation.find(item=>item.controller===controller)!;const card=document.createElement("article");if(controller==="plastic-sensory"||controller==="plastic-recurrent")card.className="memory";card.innerHTML=`<span>${labels[controller]}</span><strong>${(report.metrics.accuracy.mean*100).toFixed(1)}%</strong><small>反转 ${gateF.config.adaptationEpisodes} · 95% CI ${(report.metrics.accuracy.lower95*100).toFixed(1)}–${(report.metrics.accuracy.upper95*100).toFixed(1)}%</small><dl><div><dt>达到75%</dt><dd>${timing.reversalEpisodesTo75Percent??"未达到"}${timing.reversalEpisodesTo75Percent!==null?" 回合":""}</dd></div><div><dt>左目标</dt><dd>${(report.metrics.leftTargetAccuracy.mean*100).toFixed(1)}%</dd></div><div><dt>右目标</dt><dd>${(report.metrics.rightTargetAccuracy.mean*100).toFixed(1)}%</dd></div></dl>`;return card;}));
+  const effects=byId("gate-f-effects");effects.replaceChildren(...gateF.pairedEffects.slice(0,2).map(effect=>{const value=effect.effect.accuracy,card=document.createElement("article");card.innerHTML=`<span>${effect.id.includes("sensory")?"感觉可塑 − 冻结内部":"循环可塑 − 冻结内部"}</span><strong>+${(value.mean*100).toFixed(1)} pp</strong><small>配对 95% CI ${(value.lower95*100).toFixed(1)}–${(value.upper95*100).toFixed(1)} pp</small>`;return card;}));
+  const stability=byId("gate-f-stability");stability.replaceChildren(...(["plastic-sensory","plastic-recurrent","plastic-recurrent-no-homeostasis"] as GateFController[]).map(controller=>{const report=gateF.reports.find(item=>item.phase==="reversal"&&item.checkpointEpisode===gateF.config.adaptationEpisodes&&item.controller===controller)!;const drift=report.weights.meanRelativeGroupNormDrift.mean,row=document.createElement("div");row.innerHTML=`<span>${labels[controller]}</span><div><i style="width:${Math.min(100,drift*15)}%"></i></div><strong>${(drift*100).toFixed(0)}%</strong>`;return row;}));
+  gateFTraceSelect.replaceChildren(...gateF.traces.map(trace=>{const option=document.createElement("option");option.value=trace.label;option.textContent=`${labels[trace.controller]} · ${labels[trace.phase]}`;if(trace.controller==="plastic-recurrent"&&trace.phase==="reversal")option.selected=true;return option;}));selectGateFTrace();drawGateFCurve();
+};
+
 const renderEvidence = () => {
   const cards=byId("evaluation-cards");cards.replaceChildren();
   for(const item of dataset.evaluations){const card=document.createElement("article");card.className=`evaluation ${item.label}`;card.innerHTML=`<span>${labels[item.label]??item.label}</span><strong>${item.meanFoodsEaten.toFixed(2)}</strong><small>平均食物 / ${dataset.config.arena.foodCount}</small><dl><div><dt>完成率</dt><dd>${(item.completionFraction*100).toFixed(0)}%</dd></div><div><dt>最终能量</dt><dd>${item.meanFinalEnergy.toFixed(1)}</dd></div><div><dt>危险接触</dt><dd>${item.meanHazardContacts.toFixed(1)}</dd></div></dl>`;cards.append(card);}
@@ -504,20 +548,22 @@ gateDTraceSelect.addEventListener("change",selectGateDTrace);
 gateDRange.addEventListener("input",()=>{gateDFrameIndex=Number(gateDRange.value);renderGateDFrame();});
 gateETraceSelect.addEventListener("change",selectGateETrace);
 gateERange.addEventListener("input",()=>{gateEFrameIndex=Number(gateERange.value);renderGateEFrame();});
+gateFTraceSelect.addEventListener("change",selectGateFTrace);
+gateFRange.addEventListener("input",()=>{gateFFrameIndex=Number(gateFRange.value);renderGateFFrame();});
 gateBPlay.addEventListener("click",()=>{gateBPlaying=!gateBPlaying;gateBPlay.textContent=gateBPlaying?"Ⅱ":"▶";gateBLastTick=performance.now();});
 byId("gate-b-prev").addEventListener("click",()=>setGateBFrame(gateBFrameIndex-1));byId("gate-b-next").addEventListener("click",()=>setGateBFrame(gateBFrameIndex+1));gateBRange.addEventListener("input",()=>setGateBFrame(Number(gateBRange.value)));
-window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();drawGateDBoundary();drawGateEBoundary();drawGateERaster();}});
+window.addEventListener("resize",()=>{if(ready){drawWorld();drawCurve();drawGateACurve();drawGateBWorld();drawGateBCurve();drawGateDBoundary();drawGateEBoundary();drawGateERaster();drawGateFCurve();}});
 
 const animate = (now:number) => { if(playing && now-lastTick>=1000/Number(speed.value)){lastTick=now;if(frameIndex>=trace.frames.length-1){playing=false;play.textContent="▶";}else setFrame(frameIndex+1);}if(gateBPlaying&&now-gateBLastTick>=650){gateBLastTick=now;if(gateBFrameIndex>=gateBTrace.frames.length-1){gateBPlaying=false;gateBPlay.textContent="▶";}else setGateBFrame(gateBFrameIndex+1);}requestAnimationFrame(animate); };
 
 const start = async () => {
-  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json")]);
-  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);
-  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];
+  const [behaviorResponse,gateAResponse,gateBResponse,robustnessResponse,gateCResponse,gateDResponse,gateEResponse,gateERuntimeResponse,gateFResponse]=await Promise.all([fetch("/embodied-v1.json"),fetch("/gate-a-v1.1.json"),fetch("/gate-b-v1.2.json"),fetch("/gate-b-robustness-v1.2b.json"),fetch("/gate-c-v1.3.json"),fetch("/gate-d-v1.4.json"),fetch("/gate-e-v1.5.json"),fetch("/gate-e-runtime-windows-x86_64.json"),fetch("/gate-f-v1.6.json")]);
+  if(!behaviorResponse.ok)throw new Error(`behavior dataset ${behaviorResponse.status}`);if(!gateAResponse.ok)throw new Error(`Gate A dataset ${gateAResponse.status}`);if(!gateBResponse.ok)throw new Error(`Gate B dataset ${gateBResponse.status}`);if(!robustnessResponse.ok)throw new Error(`Gate B robustness dataset ${robustnessResponse.status}`);if(!gateCResponse.ok)throw new Error(`Gate C dataset ${gateCResponse.status}`);if(!gateDResponse.ok)throw new Error(`Gate D dataset ${gateDResponse.status}`);if(!gateEResponse.ok)throw new Error(`Gate E dataset ${gateEResponse.status}`);if(!gateERuntimeResponse.ok)throw new Error(`Gate E runtime dataset ${gateERuntimeResponse.status}`);if(!gateFResponse.ok)throw new Error(`Gate F dataset ${gateFResponse.status}`);
+  dataset=await behaviorResponse.json() as Dataset;gateA=await gateAResponse.json() as GateADataset;gateB=await gateBResponse.json() as GateBDataset;robustness=await robustnessResponse.json() as RobustnessDataset;gateC=await gateCResponse.json() as GateCDataset;gateD=await gateDResponse.json() as GateDDataset;gateE=await gateEResponse.json() as GateEDataset;gateERuntime=await gateERuntimeResponse.json() as GateERuntime[];gateF=await gateFResponse.json() as GateFDataset;
   ready=true;
-  byId("version").textContent=gateE.version;byId("acceptance-label").textContent=gateE.acceptance.passed?"Gate E 验收通过":"Gate E 验收失败";byId("acceptance-dot").className=gateE.acceptance.passed?"pass":"fail";
+  byId("version").textContent=gateF.version;byId("acceptance-label").textContent=gateF.acceptance.passed?"Gate F 验收通过":"Gate F 验收失败";byId("acceptance-dot").className=gateF.acceptance.passed?"pass":"fail";
   traceSelect.replaceChildren(...dataset.traces.map(item=>{const option=document.createElement("option");option.value=item.label;option.textContent=labels[item.label]??item.label;if(item.label==="learned")option.selected=true;return option;}));
-  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();drawCurve();selectTrace();requestAnimationFrame(animate);
+  renderEvidence();renderGateA();renderGateB();renderRobustness();renderGateC();renderGateD();renderGateE();renderGateF();drawCurve();selectTrace();requestAnimationFrame(animate);
 };
 
 start().catch(error=>{document.body.innerHTML=`<pre class="fatal">无法载入具身实验：${String(error)}</pre>`;console.error(error);});

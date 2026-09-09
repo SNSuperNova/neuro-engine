@@ -129,11 +129,13 @@ fn m0_release_freezes_map2_hashes_and_capability_summary() {
 
 #[test]
 fn interface_boundary_rejects_non_finite_candidate_writes() {
-    let mut config = Map0ExperimentConfig::default();
-    config.pretraining_episodes = 4;
-    config.adaptation_episodes = 4;
-    config.evaluation_episodes = 4;
-    config.threshold_check_interval = 2;
+    let config = Map0ExperimentConfig {
+        pretraining_episodes: 4,
+        adaptation_episodes: 4,
+        evaluation_episodes: 4,
+        threshold_check_interval: 2,
+        ..Map0ExperimentConfig::default()
+    };
     let result = run_map_seed_with_adjustment_mechanism(
         config,
         Map0ParameterPoint {

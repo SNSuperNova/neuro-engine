@@ -1103,6 +1103,7 @@ fn continuous_stable_region(
     best
 }
 
+#[allow(clippy::too_many_arguments)]
 fn continuous_conclusions(
     development: &[Map2CParameterSummary],
     confirmation: &[Map2CParameterSummary],

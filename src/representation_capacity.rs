@@ -556,7 +556,7 @@ fn summarize_novel(results: &[RepresentationCapacitySeedResult]) -> Representati
         .map(|row| {
             let novel = &row.rule_results[1..4];
             let mean = |f: fn(&RepresentationRuleResult) -> f64| {
-                novel.iter().map(|result| f(result)).sum::<f64>() / novel.len() as f64
+                novel.iter().map(&f).sum::<f64>() / novel.len() as f64
             };
             [
                 mean(|row| row.raw_sensor_probe_accuracy),

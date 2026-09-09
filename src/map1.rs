@@ -30,11 +30,13 @@ pub struct Map1ExperimentConfig {
 
 impl Default for Map1ExperimentConfig {
     fn default() -> Self {
-        let mut probe_protocol = Map0ExperimentConfig::default();
-        probe_protocol.recurrent_gain_range = [0.10, 0.45];
-        probe_protocol.internal_learning_rate_range = [0.06, 0.16];
-        probe_protocol.homeostasis_strength_range = [0.25, 1.0];
-        probe_protocol.exploration_rate_range = [0.04, 0.18];
+        let probe_protocol = Map0ExperimentConfig {
+            recurrent_gain_range: [0.10, 0.45],
+            internal_learning_rate_range: [0.06, 0.16],
+            homeostasis_strength_range: [0.25, 1.0],
+            exploration_rate_range: [0.04, 0.18],
+            ..Map0ExperimentConfig::default()
+        };
         Self {
             // Reuse Map 0's base seed and partition labels so a mechanism
             // comparison never changes the sampled random worlds.

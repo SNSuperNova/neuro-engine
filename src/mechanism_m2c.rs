@@ -693,10 +693,7 @@ fn validate_config(config: M2CExperimentConfig) -> Result<(), EmbodiedError> {
     ];
     if config.m1_protocol.development_seed_count == 0
         || config.m1_protocol.confirmation_seed_count == 0
-        || config
-            .candidate_rewiring_intervals
-            .iter()
-            .any(|value| *value == 0)
+        || config.candidate_rewiring_intervals.contains(&0)
         || config
             .candidate_evidence_decays
             .iter()

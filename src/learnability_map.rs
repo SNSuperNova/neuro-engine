@@ -886,6 +886,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
         self.baseline = 0.0;
     }
 
+    #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
     fn trial(
         &mut self,
         original_rule: bool,
@@ -1003,6 +1004,7 @@ impl<M: AdjustmentMechanism> MapController<M> {
         )
     }
 
+    #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
     fn symbol_trial_with_structural_target(
         &mut self,
         rule: M1Rule,
@@ -1892,6 +1894,7 @@ pub fn run_map_seed_with_adjustment_mechanism<M: AdjustmentMechanism>(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_continuous_seed_with_mechanisms(
     config: Map0ExperimentConfig,
     parameters: Map0ParameterPoint,
@@ -2022,6 +2025,7 @@ pub fn run_continuous_seed_with_adjustment_mechanism<M: AdjustmentMechanism>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_multirule_seed_with_mechanisms(
     config: Map0ExperimentConfig,
     parameters: Map0ParameterPoint,
@@ -2227,6 +2231,7 @@ struct M2CSingleOutcome {
     finite: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_m2c_seed_with_mechanisms(
     config: Map0ExperimentConfig,
     parameters: Map0ParameterPoint,
@@ -2700,6 +2705,7 @@ pub(crate) fn run_structural_diagnostic_seed(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn evaluate_structural_checkpoint<M: AdjustmentMechanism>(
     controller: &MapController<M>,
     structure: &StructuralEvidenceState,
@@ -3001,6 +3007,7 @@ pub(crate) fn run_structural_timescale_seed(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn evaluate_structural_timescale_checkpoint<M: AdjustmentMechanism>(
     controller: &MapController<M>,
     structure: &StructuralEvidenceState,
@@ -3322,6 +3329,7 @@ pub(crate) fn run_structural_group_seed(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn evaluate_structural_group_checkpoint<M: AdjustmentMechanism>(
     controller: &MapController<M>,
     structure: &StructuralEvidenceState,
@@ -3712,6 +3720,7 @@ fn pearson(left: &[f64], right: &[f64]) -> f64 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_m1f_seed(
     config: Map0ExperimentConfig,
     parameters: Map0ParameterPoint,
@@ -5506,6 +5515,7 @@ fn raw_sensor_probe_accuracy(
     )
 }
 
+#[allow(clippy::needless_range_loop)]
 fn linear_probe_accuracy(
     training_features: &[Vec<f64>],
     training_labels: &[f64],
@@ -5580,6 +5590,7 @@ fn linear_probe_accuracy(
     correct as f64 / evaluation_features.len() as f64
 }
 
+#[allow(clippy::needless_range_loop)]
 fn solve_linear_system(mut matrix: Vec<Vec<f64>>, mut target: Vec<f64>) -> Vec<f64> {
     let size = target.len();
     for column in 0..size {

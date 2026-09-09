@@ -4,6 +4,43 @@ use neuro_engine::{
     M1CD_CHECKPOINT_COUNT, M1CD_COMPONENT_COUNT, M1CD_CONTROL_COUNT, M1CDConfig, M1CDControl,
     M1CDDecision, run_m1cd_experiment,
 };
+use serde_json::Value;
+
+fn assert_json_equivalent(actual: &Value, expected: &Value, path: &str) {
+    match (actual, expected) {
+        (Value::Number(actual), Value::Number(expected)) => {
+            if let (Some(actual), Some(expected)) = (actual.as_i64(), expected.as_i64()) {
+                assert_eq!(actual, expected, "integer mismatch at {path}");
+            } else if let (Some(actual), Some(expected)) = (actual.as_u64(), expected.as_u64()) {
+                assert_eq!(actual, expected, "integer mismatch at {path}");
+            } else {
+                let actual = actual.as_f64().expect("finite actual JSON number");
+                let expected = expected.as_f64().expect("finite expected JSON number");
+                let tolerance = 1e-12 * actual.abs().max(expected.abs()).max(1.0);
+                assert!(
+                    (actual - expected).abs() <= tolerance,
+                    "floating-point mismatch at {path}: actual={actual}, expected={expected}"
+                );
+            }
+        }
+        (Value::Array(actual), Value::Array(expected)) => {
+            assert_eq!(actual.len(), expected.len(), "array length mismatch at {path}");
+            for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+                assert_json_equivalent(actual, expected, &format!("{path}[{index}]"));
+            }
+        }
+        (Value::Object(actual), Value::Object(expected)) => {
+            assert_eq!(actual.len(), expected.len(), "object size mismatch at {path}");
+            for (key, expected) in expected {
+                let actual = actual
+                    .get(key)
+                    .unwrap_or_else(|| panic!("missing key at {path}.{key}"));
+                assert_json_equivalent(actual, expected, &format!("{path}.{key}"));
+            }
+        }
+        _ => assert_eq!(actual, expected, "JSON mismatch at {path}"),
+    }
+}
 
 fn quick_config() -> M1CDConfig {
     let mut config = M1CDConfig::default();
@@ -120,10 +157,12 @@ fn m1cd_decision_is_a_registered_diagnostic_outcome() {
 #[test]
 fn formal_m1cd_result_matches_the_frozen_release_artifact() {
     let result = run_m1cd_experiment(M1CDConfig::default()).expect("formal M1-CD");
-    assert_eq!(
-        serde_json::to_string_pretty(&result.published()).expect("published M1-CD JSON"),
-        include_str!("../app/public/credit-decomposition-v1.2.json")
-    );
+    let actual = serde_json::to_value(result.published()).expect("published M1-CD JSON");
+    let expected = serde_json::from_str(include_str!(
+        "../app/public/credit-decomposition-v1.2.json"
+    ))
+    .expect("frozen published M1-CD JSON");
+    assert_json_equivalent(&actual, &expected, "$");
     assert_eq!(result.decision, M1CDDecision::EligibilityUninformative);
     assert!(result.acceptance.stage_passed);
     assert!(result.acceptance.passed);

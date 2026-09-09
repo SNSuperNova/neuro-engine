@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{Map0Control, Map0RegionClass, Map1ExperimentConfig, run_map1_experiment};
 
 fn quick_config() -> Map1ExperimentConfig {

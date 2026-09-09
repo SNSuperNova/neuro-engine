@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     Map0Control, Map2AExperimentConfig, Map2BExperimentConfig, Map2CExperimentConfig,
     run_map2a_experiment, run_map2b_experiment, run_map2c_experiment,

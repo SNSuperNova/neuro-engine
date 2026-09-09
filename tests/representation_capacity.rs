@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     M1Rule, RepresentationCapacityConfig, RepresentationCapacityDecision,
     run_representation_capacity_diagnostic,

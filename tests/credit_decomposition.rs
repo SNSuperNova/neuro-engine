@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     M1CD_CHECKPOINT_COUNT, M1CD_COMPONENT_COUNT, M1CD_CONTROL_COUNT, M1CDConfig, M1CDControl,
     M1CDDecision, run_m1cd_experiment,

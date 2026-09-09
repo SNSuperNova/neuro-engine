@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{M1F_GAIN_COUNT, M1FConfig, M1FControl, M1FDecision, run_m1f_experiment};
 
 fn quick_config() -> M1FConfig {

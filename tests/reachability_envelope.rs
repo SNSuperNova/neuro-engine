@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     M1XE_MULTIPLIER_COUNT, M1XEBoundKind, M1XEConfig, M1XEDecision, run_m1xe_experiment,
 };

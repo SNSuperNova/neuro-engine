@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{M1Control, M1ExperimentConfig, M1Rule, run_m1_experiment};
 
 fn quick_config() -> M1ExperimentConfig {

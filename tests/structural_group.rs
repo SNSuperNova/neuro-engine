@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     StructuralGroupConfig, StructuralGroupDecision, run_structural_group_diagnostic,
 };

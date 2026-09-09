@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{M2CControl, M2CDecision, M2CExperimentConfig, run_m2c_experiment};
 
 fn quick_config() -> M2CExperimentConfig {

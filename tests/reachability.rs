@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     M1X_LEARNING_RATE_COUNT, M1XConfig, M1XControl, M1XDecision, run_m1x_experiment,
 };

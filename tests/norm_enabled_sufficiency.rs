@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use neuro_engine::{
     M1NE_CONTROL_COUNT, M1NEConfig, M1NEControl, M1NEDecision, run_m1ne_experiment,
 };

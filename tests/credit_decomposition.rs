@@ -24,13 +24,21 @@ fn assert_json_equivalent(actual: &Value, expected: &Value, path: &str) {
             }
         }
         (Value::Array(actual), Value::Array(expected)) => {
-            assert_eq!(actual.len(), expected.len(), "array length mismatch at {path}");
+            assert_eq!(
+                actual.len(),
+                expected.len(),
+                "array length mismatch at {path}"
+            );
             for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
                 assert_json_equivalent(actual, expected, &format!("{path}[{index}]"));
             }
         }
         (Value::Object(actual), Value::Object(expected)) => {
-            assert_eq!(actual.len(), expected.len(), "object size mismatch at {path}");
+            assert_eq!(
+                actual.len(),
+                expected.len(),
+                "object size mismatch at {path}"
+            );
             for (key, expected) in expected {
                 let actual = actual
                     .get(key)
@@ -158,10 +166,9 @@ fn m1cd_decision_is_a_registered_diagnostic_outcome() {
 fn formal_m1cd_result_matches_the_frozen_release_artifact() {
     let result = run_m1cd_experiment(M1CDConfig::default()).expect("formal M1-CD");
     let actual = serde_json::to_value(result.published()).expect("published M1-CD JSON");
-    let expected = serde_json::from_str(include_str!(
-        "../app/public/credit-decomposition-v1.2.json"
-    ))
-    .expect("frozen published M1-CD JSON");
+    let expected =
+        serde_json::from_str(include_str!("../app/public/credit-decomposition-v1.2.json"))
+            .expect("frozen published M1-CD JSON");
     assert_json_equivalent(&actual, &expected, "$");
     assert_eq!(result.decision, M1CDDecision::EligibilityUninformative);
     assert!(result.acceptance.stage_passed);
